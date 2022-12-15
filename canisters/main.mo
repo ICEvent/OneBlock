@@ -10,8 +10,7 @@ import Array "mo:base/Array";
 import Types "types";
 
 actor {
-    type Profile = Types.Profile;
-    
+    type Profile = Types.Profile;    
 
     stable var profileIds: [Text] = [];
     stable var stableProfiles : [(Text,Profile)] = [];
@@ -50,17 +49,23 @@ actor {
                             #err("the profile is existed!")
                         };
                         case(_){
-                            profiles.put(newProfile.id,{
-                                id = newProfile.id;
-                                name= newProfile.name;
-                                bio = newProfile.bio;
-                                pfp= newProfile.pfp;
-                                links = [];
-                                owner = caller;
-                                createtime = Time.now();
-                            });
-                            userprofiles.put(caller,newProfile.id);
-                            #ok(1);
+
+                            if(Text.size(newProfile.id) < 4){
+                                #err("profile id length must be greater than 3")
+                            }else{
+                                profiles.put(newProfile.id,{
+                                    id = newProfile.id;
+                                    name= newProfile.name;
+                                    bio = newProfile.bio;
+                                    pfp= newProfile.pfp;
+                                    links = [];
+                                    owner = caller;
+                                    createtime = Time.now();
+                                });
+                                userprofiles.put(caller,newProfile.id);
+                                #ok(1);
+                            }
+                            
                         };
                     };
                 }
@@ -199,17 +204,42 @@ actor {
         
     };
 
-
-    public query func dumpProfiles(): async [(Text,Profile)]{
-        Iter.toArray(profiles.entries());  
+    public query func count(): async Nat{
+        profiles.size();
     };
 
-    public query func dumpUserProfiles(): async [(Principal,Text)]{
-        Iter.toArray(userprofiles.entries());  
-    };
+    // public shared({caller}) func deleteProfile(id: Text): async Result.Result<Nat, Text>{
+    //     let p = profiles.remove(id);
+    //     switch(p){
+    //         case(?p){
+    //             #ok(1);
+    //         };
+    //         case(_){
+    //             #err(" no profile deleted")
+    //         }
+    //     }
+    // };
+    // public shared({caller}) func deleteUserProfile(user: Text): async Result.Result<Nat, Text>{
+    //     let p = userprofiles.remove(Principal.fromText(user));
+    //     switch(p){
+    //         case(?p){
+    //             #ok(1);
+    //         };
+    //         case(_){
+    //             #err(" no profile deleted")
+    //         }
+    //     }
+    // };
+    // public query func dumpProfiles(): async [(Text,Profile)]{
+    //     Iter.toArray(profiles.entries());  
+    // };
 
-    public query func listProfiles(): async [Profile]{
-        Iter.toArray(profiles.vals());  
-    };
+    // public query func dumpUserProfiles(): async [(Principal,Text)]{
+    //     Iter.toArray(userprofiles.entries());  
+    // };
+
+    // public query func listProfiles(): async [Profile]{
+    //     Iter.toArray(profiles.vals());  
+    // };
     
 };

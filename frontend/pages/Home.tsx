@@ -65,27 +65,21 @@ const Home = (props) => {
 
   const oneblock = useOneblock();
   const setAgent = useSetAgent();
-  const { state: { isAuthed } } = useGlobalContext();
+  const { state: { isAuthed, principal } } = useGlobalContext();
   
   const [profile, setProfile] = useState<Profile>();
 
-
-
   const [value, setValue] = useState(0);
-
+  const [message, setMessage] = useState();
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
   };
 
   useEffect(() => {
 
-    oneblock.getMyProfile().then(res => {
-
-      if (res[0]) {
-        setProfile(res[0])
-      }
-    });
-  }, [oneblock]);
+    loadProfile();
+   
+  }, [principal]);
 
   async function login() {
     const authClient = await AuthClient.create(
@@ -113,6 +107,16 @@ const Home = (props) => {
     });
   };
 
+  function loadProfile(){
+    if(principal){
+      oneblock.getMyProfile().then(res => {
+        if (res[0]) {
+          setProfile(res[0])
+        }
+      });
+    }
+  }
+  
   return (
 
     <Box sx={{ flexGrow: 1 }}>
@@ -131,6 +135,7 @@ const Home = (props) => {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             ONEBLOCK
           </Typography>
+          {!isAuthed &&<Button  color="inherit" onClick={login}>Login</Button>}
 
         </Toolbar>
       </AppBar>
@@ -142,38 +147,25 @@ const Home = (props) => {
 
         {isAuthed && <Tabs value={value} onChange={handleChange} aria-label="basic tabs example">
           <Tab label="profile" {...a11yProps(0)} />
-          <Tab label="links" {...a11yProps(1)} />
-          <Tab label="wallets" {...a11yProps(2)} />
+          {profile && <Tab label="links" {...a11yProps(1)} />}
+          {profile && <Tab label="wallets" {...a11yProps(2)} />}
         </Tabs>
         }
         {isAuthed && <Box maxWidth="md">
           <TabPanel value={value} index={0}>
-            <ProfileForm profile={profile} />
+            <ProfileForm profile={profile}  reload={loadProfile}/>
 
           </TabPanel>
           <TabPanel value={value} index={1}>
             <LinkDialog profile={profile} />
           </TabPanel>
           <TabPanel value={value} index={2}>
-
+            building...
           </TabPanel>
         </Box>}
         {!isAuthed &&
-          <Box 
-          m={5}
-          sx={{
-            maxWidth: '100%'
-          }}
-
-          >
-            <Box>
-              <DefaultHome />
-            </Box>
-            <Box mt={10} >
-             
-             {!isAuthed &&<Button  variant="contained" onClick={login}>Login</Button>}
-            </Box>
-          </Box>}
+          <Box m={10}><DefaultHome /></Box> 
+          }
       </Container>
 
     </Box>

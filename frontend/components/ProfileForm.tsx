@@ -2,31 +2,23 @@ import React, { useEffect, useState } from "react"
 
 
 import Box from '@mui/material/Box';
-import IconButton from '@mui/material/IconButton';
-import Input from '@mui/material/Input';
-import FilledInput from '@mui/material/FilledInput';
-import OutlinedInput from '@mui/material/OutlinedInput';
-import InputLabel from '@mui/material/InputLabel';
 import InputAdornment from '@mui/material/InputAdornment';
-import FormHelperText from '@mui/material/FormHelperText';
-import FormControl from '@mui/material/FormControl';
+
 import TextField from '@mui/material/TextField';
 import Paper from '@mui/material/Paper';
-import Stack from '@mui/material/Stack';
+
 import { styled } from '@mui/material/styles';
 import Button from "@mui/material/Button";
+import Alert from '@mui/material/Alert';
 
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import DialogTitle from '@mui/material/DialogTitle';
+
 import CircularProgress from '@mui/material/CircularProgress';
 import Link from '@mui/material/Link';
 import Container from '@mui/material/Container';
 import Card from '@mui/material/Card';
 import CardMedia from '@mui/material/CardMedia';
 import { useOneblock } from "./Store";
+import { requirePropFactory } from "@mui/material";
 
 interface State {
   id: string;
@@ -42,9 +34,10 @@ const ProfileForm = (props) => {
 
   const oneblock = useOneblock();
 
-  const [isexist, setIsexist] = useState(false)
+
   const [links, setLinks] = useState([])
   const [progress, setProgress] = useState(false);
+  const [message, setMessage] = useState();
 
   const [open, setOpen] = React.useState(false);
 
@@ -55,6 +48,18 @@ const ProfileForm = (props) => {
     bio: '',
   });
 
+  useEffect(() => {
+    if (props.profile) {
+      setValues({
+        id: props.profile.id,
+        name: props.profile.name,
+        pfp: props.profile.pfp,
+        bio: props.profile.bio,
+
+      })
+    }
+  }, [props.profile])
+
   const Item = styled(Paper)(({ theme }) => ({
     backgroundColor: theme.palette.mode === 'dark' ? '#1A2027' : '#fff',
     ...theme.typography.body2,
@@ -62,21 +67,6 @@ const ProfileForm = (props) => {
     textAlign: 'center',
     color: theme.palette.text.secondary,
   }));
-
-  useEffect(() => {
-
-    if (props.profile) {
-
-      setValues({
-        ...values,
-        id: props.profile.id,
-        name: props.profile.name,
-        pfp: props.profile.pfp,
-        bio: props.profile.bio,
-      });
-    }
-
-  }, [props.profile]);
 
 
   const linklist = links.map(link =>
@@ -98,7 +88,8 @@ const ProfileForm = (props) => {
   };
 
   function createProfile() {
-    setProgress(true)
+    setMessage(null)
+    setProgress(true);
     oneblock.createProfile({
       id: values.id,
       name: values.name,
@@ -107,10 +98,19 @@ const ProfileForm = (props) => {
     }).then(res => {
       console.log(res)
       setProgress(false)
+      if (res["ok"]) {
+        props.reload();
+      } else {
+        setMessage(res["err"])
+      }
+
+
     })
   };
 
+
   function saveProfile() {
+    setMessage(null);
     setProgress(true)
     oneblock.updateProfile(values.id, {
       name: values.name,
@@ -119,7 +119,12 @@ const ProfileForm = (props) => {
     }).then(res => {
       console.log(res)
       setProgress(false)
-      setIsexist(true)
+      if (res["err"]) {
+        setMessage(res["err"])
+      } else {
+
+      }
+
     })
   };
 
@@ -127,58 +132,59 @@ const ProfileForm = (props) => {
   return (
 
     <Container>
-      {values.pfp && 
-      <Card variant="outlined" >
-        
-        <CardMedia
-          component="img"
-          height="140"
-          image={values.pfp}
-          alt="hello"
+      {values.pfp &&
+        <Card variant="outlined" >
+
+          <CardMedia
+            component="img"
+            height="140"
+            image={values.pfp}
+            alt="hello"
+          />
+        </Card>}
+
+
+      <Box>
+        <TextField
+          label="id(4 charactors or more)"
+          required
+          fullWidth
+          sx={{ m: 1 }}
+          value={values.id}
+          onChange={handleChange('id')}
+          disabled={props.profile}
+          InputProps={{
+            startAdornment: <InputAdornment position="start">@</InputAdornment>,
+          }}
         />
-      </Card>}
+        <TextField
+          label="name"
+          fullWidth
+          sx={{ m: 1 }}
+          value={values.name}
+          onChange={handleChange('name')}
+        />
+        <TextField
+          label="pfp url"
+          fullWidth
+          sx={{ m: 1 }}
+          value={values.pfp}
+          onChange={handleChange('pfp')}
+        />
+        <TextField
+          label="bio"
+          multiline
+          maxRows={5}
+          fullWidth
+          sx={{ m: 1 }}
+          value={values.bio}
+          onChange={handleChange('bio')}
+        />
 
-
-      <Box component="form">
-      <TextField
-        label="id"
-        required
-        fullWidth
-        sx={{ m: 1 }}
-        value={values.id}
-        onChange={handleChange('id')}
-        disabled={props.profile}
-        InputProps={{
-          startAdornment: <InputAdornment position="start">@</InputAdornment>,
-        }}
-      />
-      <TextField
-        label="name"
-        fullWidth
-        sx={{ m: 1 }}
-        value={values.name}
-        onChange={handleChange('name')}
-      />
-      <TextField
-        label="pfp"
-        fullWidth
-        sx={{ m: 1 }}
-        value={values.pfp}
-        onChange={handleChange('pfp')}
-      />
-      <TextField
-        label="bio"
-        multiline
-        maxRows={5}
-        fullWidth
-        sx={{ m: 1 }}
-        value={values.bio}
-        onChange={handleChange('bio')}
-      />
-
-      {props.profile && <Button variant="contained" disabled={progress} onClick={saveProfile}>{progress ? <CircularProgress /> : "Save"} </Button>}
-      {!props.profile && <Button variant="contained" disabled={progress} onClick={createProfile}>{progress ? <CircularProgress /> : "Create"} </Button>}
-      {props.profile && <Link p={2} href={"/" + props.profile.id} target={"_blank"}>Open</Link>}
+        {props.profile && <Button variant="contained" disabled={progress} onClick={saveProfile}>{progress ? <CircularProgress /> : "Save"} </Button>}
+        {!props.profile && <Button variant="contained" disabled={progress} onClick={createProfile}>{progress ? <CircularProgress /> : "Create"} </Button>}
+        {props.profile && <Link p={2} href={"/" + props.profile.id} target={"_blank"}>Open</Link>}
+        {message && <Alert severity="warning">{message}</Alert>}
       </Box>
     </Container>
 

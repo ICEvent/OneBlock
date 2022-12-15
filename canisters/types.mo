@@ -1,28 +1,41 @@
 module {
     public type Profile = {
-        id: Text;
-        name: Text;
-        bio: Text;
-        pfp: Text;
-        links: [Link];
-        owner: Principal;
-        createtime: Int;
+        id : Text;
+        name : Text;
+        bio : Text;
+        pfp : Text;
+        links : [Link];
+        owner : Principal;
+        createtime : Int
     };
 
     public type NewProfile = {
-        id: Text;
-        name: Text;
-        bio: Text;
-        pfp: Text;
+        id : Text;
+        name : Text;
+        bio : Text;
+        pfp : Text
     };
     public type UpdateProfile = {
-        name: Text;
-        bio: Text;
-        pfp: Text;
+        name : Text;
+        bio : Text;
+        pfp : Text
     };
     public type Link = {
-        name: Text;
-        url: Text;
+        name : Text;
+        url : Text
     };
 
+    public type Wallet = {
+        name : Text;
+        addresses : {
+            address : Text;
+            network : Network
+        }
+    };
+
+    public type Network = {
+        #ic;
+        #ethereum;
+        #bitcoin
+    }
 }

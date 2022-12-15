@@ -64,8 +64,8 @@ const LinkList = (props) => {
 
   
 
-  const linklist = props.links.map(link=>
-    <Tooltip title={link.url}><Link  href={link.url} target="_blank"><Item >{link.name} </Item></Link></Tooltip>
+  const linklist = props.links.map((link, index)=>
+    <Tooltip key={index} title={link.url}><Link  href={link.url} target="_blank"><Item >{link.name} </Item></Link></Tooltip>
   )
 
 

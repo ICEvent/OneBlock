@@ -13,23 +13,23 @@ import { CANISTER_ONEBLOCK } from "frontend/lib/constants";
 
 export type State = {
   agent: HttpAgent;
-  oneblock: ActorSubclass<ONEBLOCKService._SERVICE>; 
+  oneblock: ActorSubclass<ONEBLOCKService._SERVICE>;
   isAuthed: boolean;
   principal: Principal | null;
- 
+
 };
 
 const createActors = (agent: HttpAgent = defaultAgent) => ({
-  oneblock: ONEBLOCK.createActor(agent,{ actorOptions: {} }),  
+  oneblock: ONEBLOCK.createActor(agent),
 });
 
 const initialState: State = {
   ...createActors(),
- 
+
   agent: defaultAgent,
   isAuthed: false,
   principal: null,
- 
+
 };
 
 type Action =
@@ -54,7 +54,12 @@ const reducer = (state: State, action: Action): State => {
         ...createActors(agent),
         agent,
         isAuthed: !!action.isAuthed,
-      };    
+      };
+    case "SET_PRINCIPAL":
+      return {
+        ...state,
+        principal: action.principal,
+      };
     default:
       return { ...state };
 

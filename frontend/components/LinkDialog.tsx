@@ -28,10 +28,11 @@ import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import { useOneblock } from "./Store";
+import { Link } from "../api/profile/profile.did";
 
 interface State {
-  linkname: String;
-  linkurl: String;
+  linkname: string;
+  linkurl: string;
 }
 
 
@@ -40,7 +41,7 @@ const LinkDialog = (props) => {
   
   const oneblock = useOneblock();
 
-  const [links, setLinks] = useState(props.profile.links)
+  const [links, setLinks] = useState(props.profile ? props.profile.links : [])
   const [progress, setProgress] = useState(false);
 
   const [open, setOpen] = React.useState(false);
@@ -89,7 +90,7 @@ const LinkDialog = (props) => {
 
   function addLink() {
     setProgress(true)
-    let link =  {
+    let link: Link =  {
       name: values.linkname,
       url: values.linkurl
     };

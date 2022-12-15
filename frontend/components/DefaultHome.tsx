@@ -63,7 +63,11 @@ const DefaultHome = () => {
     url:"www"
   },
   {
-    name:"Login to create your profile",
+    name:"linkedin",
+    url:"www"
+  },
+  {
+    name:"[ ... ]",
     url:"www"
   }
 ];
@@ -76,15 +80,10 @@ const DefaultHome = () => {
   
   return (
    
-    <Box component="form" sx={{  
-      
-      maxWidth: '100%' }}>
     
     <Stack spacing={2}>
       {linklist}
     </Stack>
-    
-  </Box>
 
   )
 }
