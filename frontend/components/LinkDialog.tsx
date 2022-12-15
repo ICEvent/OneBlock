@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react"
-import { useCanister } from "@connect2ic/react"
 
 import Box from '@mui/material/Box';
 
@@ -28,6 +27,7 @@ import ListItem from '@mui/material/ListItem';
 import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
+import { useOneblock } from "./Store";
 
 interface State {
   linkname: String;
@@ -37,7 +37,9 @@ interface State {
 
 const LinkDialog = (props) => {
 
-  const [profile] = useCanister("profile");
+  
+  const oneblock = useOneblock();
+
   const [links, setLinks] = useState(props.profile.links)
   const [progress, setProgress] = useState(false);
 
@@ -91,7 +93,7 @@ const LinkDialog = (props) => {
       name: values.linkname,
       url: values.linkurl
     };
-    profile.addLink(props.profile.id,link).then(res => {
+    oneblock.addLink(props.profile.id,link).then(res => {
       if (res["ok"]) {
         links.push(link);
         setOpen(false);
@@ -102,7 +104,7 @@ const LinkDialog = (props) => {
 
   function deleteLink(name){
     setProgress(true)
-    profile.deleteLink(props.profile.id,name).then(res=>{
+    oneblock.deleteLink(props.profile.id,name).then(res=>{
       if(res["ok"]){
         let flinks = links.filter(l=>l.name != name);
         setLinks(flinks);

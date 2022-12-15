@@ -68,8 +68,8 @@ const DefaultHome = () => {
   }
 ];
 
-  const linklist = links.map(link=>
-    <Item>{link.name} </Item>
+  const linklist = links.map((link,index)=>
+    <Item key={index}>{link.name} </Item>
   )
 
 

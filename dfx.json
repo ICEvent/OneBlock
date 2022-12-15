@@ -4,7 +4,7 @@
       "main": "canisters/main.mo",
       "type": "motoko"
     },
-    "assets": {
+    "profile_assets": {
       "dependencies": [
         "profile"
       ],

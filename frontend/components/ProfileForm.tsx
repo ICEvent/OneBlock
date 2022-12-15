@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import { useBalance, useCanister, useWallet, useConnect } from "@connect2ic/react"
+
 
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
@@ -26,6 +26,7 @@ import Link from '@mui/material/Link';
 import Container from '@mui/material/Container';
 import Card from '@mui/material/Card';
 import CardMedia from '@mui/material/CardMedia';
+import { useOneblock } from "./Store";
 
 interface State {
   id: string;
@@ -38,10 +39,8 @@ interface State {
 
 const ProfileForm = (props) => {
 
-  const [wallet] = useWallet()
-  const [assets] = useBalance()
-  const { principal } = useConnect();
-  const [profile] = useCanister("profile");
+
+  const oneblock = useOneblock();
 
   const [isexist, setIsexist] = useState(false)
   const [links, setLinks] = useState([])
@@ -100,23 +99,25 @@ const ProfileForm = (props) => {
 
   function createProfile() {
     setProgress(true)
-    profile.createProfile({
+    oneblock.createProfile({
       id: values.id,
       name: values.name,
       pfp: values.pfp,
       bio: values.bio
     }).then(res => {
+      console.log(res)
       setProgress(false)
     })
   };
 
   function saveProfile() {
     setProgress(true)
-    profile.updateProfile(values.id, {
+    oneblock.updateProfile(values.id, {
       name: values.name,
       pfp: values.pfp,
       bio: values.bio
     }).then(res => {
+      console.log(res)
       setProgress(false)
       setIsexist(true)
     })

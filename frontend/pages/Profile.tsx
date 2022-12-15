@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react"
-import { useBalance, useCanister, useWallet, useConnect } from "@connect2ic/react"
 import { useParams } from "react-router-dom";
 
 import Box from '@mui/material/Box';
@@ -25,6 +24,7 @@ import CardMedia from '@mui/material/CardMedia';
 import Typography from '@mui/material/Typography';
 
 import { LinkList } from "../components/LinkList";
+import { useOneblock } from "../components/Store";
 
 interface State {
   id: string;
@@ -38,8 +38,8 @@ interface State {
 
 const Profile = () => {
 
-  const [profile] = useCanister("profile");
 
+  const oneblock = useOneblock()
   const [links, setLinks] = useState([])
 
   const [values, setValues] = React.useState<State>({
@@ -54,7 +54,7 @@ const Profile = () => {
 
   useEffect(() => {
 
-    profile.getProfile(params.id).then(res => {
+    oneblock.getProfile(params.id).then(res => {
       if (res[0]) {
         setLinks(res[0].links);
         setValues({
@@ -68,23 +68,15 @@ const Profile = () => {
       };
 
     });
-  }, [profile]);
+  }, []);
 
 
 
 
   return (
 
-    <Grid
-      container
-      spacing={1}
-      alignItems="center"
-      justifyContent="center"
-
-    >
-
-      <Grid item>
-        <Box minWidth={600}
+      <Container maxWidth="md">
+        <Box 
         m={10}
 
         >
@@ -107,10 +99,8 @@ const Profile = () => {
         </Card>
         </Box>
         <LinkList links={links} />
-      </Grid>
 
-    </Grid>
-
+        </Container>
   )
 }
 

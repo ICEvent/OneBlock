@@ -1,5 +1,4 @@
 import React, { useEffect,useState } from "react"
-import { useBalance, useCanister, useWallet, useConnect } from "@connect2ic/react"
 
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
@@ -36,10 +35,7 @@ interface State {
 
 const LinkList = (props) => {
 
-  const [wallet] = useWallet()
-  const [assets] = useBalance()
-  const {principal}= useConnect();
-  const [profile] = useCanister("profile");
+
 
   const [isexist, setIsexist] = useState(false)
   const [links, setLinks] = useState([])

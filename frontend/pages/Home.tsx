@@ -1,14 +1,10 @@
 import React, { useState } from "react"
 import { useEffect } from "react"
+import { AuthClient } from "@dfinity/auth-client";
+import { HttpAgent } from "@dfinity/agent";
+import { HOST } from "../lib/canisters";
 
-import { useBalance, useCanister, useWallet } from "@connect2ic/react"
 import CssBaseline from '@mui/material/CssBaseline';
-/*
- * Connect2ic provides essential utilities for IC app development
- */
-
-import { ConnectButton, ConnectDialog, Connect2ICProvider, useConnect } from "@connect2ic/react"
-import "@connect2ic/core/style.css"
 
 
 import AppBar from '@mui/material/AppBar';
@@ -23,11 +19,14 @@ import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 
 
-import { Profile } from ".dfx/local/canisters/profile/profile.did";
 
 import { ProfileForm } from "../components/ProfileForm";
 import { LinkDialog } from "../components/LinkDialog";
 import { DefaultHome } from "../components/DefaultHome";
+import { Identity } from "@dfinity/agent";
+
+import { useOneblock, useSetAgent, useGlobalContext } from "../components/Store";
+import { Profile } from "frontend/api/profile/profile.did";
 
 
 interface TabPanelProps {
@@ -64,13 +63,13 @@ function a11yProps(index: number) {
 }
 const Home = (props) => {
 
-  const [wallet] = useWallet()
-  const [assets] = useBalance()
-  const [profileCanister] = useCanister("profile");
-  const [profiles, setProfiles] = useState<[Profile]>();
-  const [profile, setProfile] = useState();
+  const oneblock = useOneblock();
+  const setAgent = useSetAgent();
+  const { state: { isAuthed } } = useGlobalContext();
+  
+  const [profile, setProfile] = useState<Profile>();
 
-  const { isConnected, principal, activeProvider } = useConnect()
+
 
   const [value, setValue] = useState(0);
 
@@ -80,13 +79,39 @@ const Home = (props) => {
 
   useEffect(() => {
 
-    profileCanister.getMyProfile().then(res => {
+    oneblock.getMyProfile().then(res => {
 
       if (res[0]) {
         setProfile(res[0])
       }
     });
-  }, [profileCanister]);
+  }, [oneblock]);
+
+  async function login() {
+    const authClient = await AuthClient.create(
+      {idleOptions: {
+        disableIdle: true,
+        disableDefaultIdleCallback: true
+      }}
+    );
+   
+    authClient.login({
+      identityProvider: "https://identity.ic0.app",
+      onSuccess: () => {
+        const identity = authClient.getIdentity();
+        
+          setAgent({
+            agent: new HttpAgent({
+              identity,
+              host: HOST,
+            }),
+            isAuthed: true,
+
+          });
+        
+      },
+    });
+  };
 
   return (
 
@@ -115,13 +140,13 @@ const Home = (props) => {
         maxWidth="md"
       >
 
-        {isConnected && <Tabs value={value} onChange={handleChange} aria-label="basic tabs example">
+        {isAuthed && <Tabs value={value} onChange={handleChange} aria-label="basic tabs example">
           <Tab label="profile" {...a11yProps(0)} />
           <Tab label="links" {...a11yProps(1)} />
           <Tab label="wallets" {...a11yProps(2)} />
         </Tabs>
         }
-        {isConnected && <Box maxWidth="md">
+        {isAuthed && <Box maxWidth="md">
           <TabPanel value={value} index={0}>
             <ProfileForm profile={profile} />
 
@@ -130,11 +155,10 @@ const Home = (props) => {
             <LinkDialog profile={profile} />
           </TabPanel>
           <TabPanel value={value} index={2}>
-            <Box>Principal: {principal}</Box>
-            <Button><ConnectButton /></Button>
+
           </TabPanel>
         </Box>}
-        {!isConnected &&
+        {!isAuthed &&
           <Box 
           m={5}
           sx={{
@@ -146,12 +170,12 @@ const Home = (props) => {
               <DefaultHome />
             </Box>
             <Box mt={10} >
-              <Button><ConnectButton dark={false}/></Button>
+             
+             {!isAuthed &&<Button  variant="contained" onClick={login}>Login</Button>}
             </Box>
           </Box>}
       </Container>
 
-      <ConnectDialog />
     </Box>
 
   )
