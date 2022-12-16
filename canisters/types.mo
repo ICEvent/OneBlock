@@ -27,10 +27,10 @@ module {
 
     public type Wallet = {
         name : Text;
-        addresses : {
+        addresses : [{
             address : Text;
             network : Network
-        }
+        }]
     };
 
     public type Network = {

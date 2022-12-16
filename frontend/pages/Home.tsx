@@ -1,11 +1,9 @@
 import React, { useState } from "react"
 import { useEffect } from "react"
 import { AuthClient } from "@dfinity/auth-client";
-import { HttpAgent } from "@dfinity/agent";
+import { HttpAgent,Identity } from "@dfinity/agent";
 import { HOST } from "../lib/canisters";
-
-import CssBaseline from '@mui/material/CssBaseline';
-
+import { ONE_WEEK_NS,IDENTITY_PROVIDER } from "../lib/constants";
 
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
@@ -14,7 +12,6 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Container from '@mui/material/Container';
-import Chip from '@mui/material/Chip';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 
@@ -23,7 +20,7 @@ import Tab from '@mui/material/Tab';
 import { ProfileForm } from "../components/ProfileForm";
 import { LinkDialog } from "../components/LinkDialog";
 import { DefaultHome } from "../components/DefaultHome";
-import { Identity } from "@dfinity/agent";
+import Tooltip from '@mui/material/Tooltip';
 
 import { useOneblock, useSetAgent, useGlobalContext } from "../components/Store";
 import { Profile } from "frontend/api/profile/profile.did";
@@ -68,6 +65,7 @@ const Home = (props) => {
   const { state: { isAuthed, principal } } = useGlobalContext();
   
   const [profile, setProfile] = useState<Profile>();
+  const [authClient, setAuthClient] = useState<AuthClient>(null);
 
   const [value, setValue] = useState(0);
   const [message, setMessage] = useState();
@@ -77,37 +75,53 @@ const Home = (props) => {
 
   useEffect(() => {
 
-    loadProfile();
-   
-  }, [principal]);
+    (async () => {
+      const authClient = await AuthClient.create(
+        {idleOptions: {
+          disableIdle: true,
+          disableDefaultIdleCallback: true
+        }}
+      );
+      setAuthClient(authClient);
 
-  async function login() {
-    const authClient = await AuthClient.create(
-      {idleOptions: {
-        disableIdle: true,
-        disableDefaultIdleCallback: true
-      }}
-    );
-   
+     
+      if (await authClient.isAuthenticated()) {
+        handleAuthenticated(authClient);
+        loadProfile();
+      }
+
+    })();
+
+  }, [isAuthed]);
+
+  const handleAuthenticated = async (authClient: AuthClient) => {
+
+    const identity: Identity = authClient.getIdentity();
+    setAgent({
+      agent: new HttpAgent({
+        identity,
+        host: HOST,
+      }),
+      isAuthed: true,
+
+    });
+
+  };
+
+  const login = async () => {
     authClient.login({
-      identityProvider: "https://identity.ic0.app",
-      onSuccess: () => {
-        const identity = authClient.getIdentity();
-        
-          setAgent({
-            agent: new HttpAgent({
-              identity,
-              host: HOST,
-            }),
-            isAuthed: true,
-
-          });
-        
-      },
+      identityProvider: IDENTITY_PROVIDER,
+      maxTimeToLive: ONE_WEEK_NS,
+      onSuccess: () => handleAuthenticated(authClient),
     });
   };
 
-  function loadProfile(){
+  const logout = async () => {
+    await authClient.logout();
+    setAgent({ agent: null });
+  };
+
+  async function loadProfile(){
     if(principal){
       oneblock.getMyProfile().then(res => {
         if (res[0]) {
@@ -136,6 +150,7 @@ const Home = (props) => {
             ONEBLOCK
           </Typography>
           {!isAuthed &&<Button  color="inherit" onClick={login}>Login</Button>}
+          {principal && <Tooltip title={principal.toString()}><Button  color="inherit" onClick={logout}>{principal.toString().slice(0,5)+"..."+principal.toString().slice(-5)}</Button></Tooltip>}
 
         </Toolbar>
       </AppBar>

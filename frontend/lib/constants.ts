@@ -17,5 +17,7 @@ export const LEDGER_E6S = 1000000; //ICET
 //canisterids
 export const CANISTER_ONEBLOCK = "nzxho-uqaaa-aaaak-adwxq-cai";
 
+export const IDENTITY_PROVIDER = "https://identity.ic0.app";
+
 //paging
 export const PAGING_LENGTH = 10;

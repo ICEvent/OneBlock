@@ -70,15 +70,18 @@ const Profile = () => {
 
         >
         <Card >
-          <CardMedia
+          {values.pfp &&<CardMedia
             component="img"
             height="140"
             image={values.pfp}
             alt=""
-          />
+          />}
           <CardContent>
             <Typography gutterBottom variant="h5" component="div">
               @{values.id}
+            </Typography>
+            <Typography gutterBottom variant="h4" component="div">
+              {values.name}
             </Typography>
             <Typography sx={{ mb: 1.5 }} color="text.secondary">
               since {values.createtime}
