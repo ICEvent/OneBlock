@@ -10,12 +10,14 @@ import Array "mo:base/Array";
 import Types "types";
 
 actor {
-    type Profile = Types.Profile;    
+    type Profile = Types.Profile;
+    type Favorite = Types.Favorite;    
 
     stable var profileIds: [Text] = [];
     stable var stableProfiles : [(Text,Profile)] = [];
     stable var userProfiles : [(Principal,Text)] = [];
     stable var userWallets: [(Text,[Types.Wallet])] = [];
+    stable var upgradeFavorites : [(Principal, [Favorite])] = [];
 
     var profiles = TrieMap.TrieMap<Text, Profile>(Text.equal, Text.hash);
     profiles := TrieMap.fromEntries<Text, Profile>(Iter.fromArray(stableProfiles), Text.equal, Text.hash);
@@ -27,16 +29,21 @@ actor {
     var wallets = TrieMap.TrieMap<Text, [Types.Wallet]>(Text.equal, Text.hash);
     wallets := TrieMap.fromEntries<Text, [Types.Wallet]>(Iter.fromArray(userWallets), Text.equal, Text.hash);
 
+    var myFavorites = TrieMap.TrieMap<Principal, [Favorite]>(Principal.equal, Principal.hash);
+    myFavorites := TrieMap.fromEntries<Principal, [Favorite]>(Iter.fromArray(upgradeFavorites), Principal.equal, Principal.hash);
+
     system func preupgrade() {
         stableProfiles := Iter.toArray(profiles.entries());  
         userProfiles:= Iter.toArray(userprofiles.entries());  
         userWallets := Iter.toArray(wallets.entries());
+        upgradeFavorites := Iter.toArray(myFavorites.entries());
     };
 
     system func postupgrade(){
         stableProfiles:=[];
         userProfiles:=[];
         userWallets:=[];
+        upgradeFavorites:= []
     };
 
     public shared({caller}) func createProfile(newProfile: Types.NewProfile): async Result.Result<Nat,Text>{
@@ -210,7 +217,41 @@ actor {
         
     };
 
+    //----------------------------- Favorites ------------------------------------
+    public shared({caller}) func addFavorite(favorite: {name: Text; address: Text}): async Result.Result<Favorite, Text>{
+        if(Principal.isAnonymous(caller)){
+            #err("no authenticated");
+        }else{
+            let f = {
+                owner = caller;
+                name = favorite.name;
+                address = favorite.address;
+            };
+            let fs = myFavorites.get(caller);
+            switch(fs){
+                case(?fs){
+                    let bfs = Buffer.fromArray<Favorite>(fs);
+                    bfs.add(f);
+                    myFavorites.put(caller, Buffer.toArray(bfs));
+                };
+                case(_){
+                    myFavorites.put(caller, [f]);
+                };
+            };
+            #ok(f)
+        }
+    };
 
+    public query({caller}) func getMyFavorites(): async [Favorite]{
+        let fs = myFavorites.get(caller);
+        switch(fs){
+            case(?fs){fs};
+            case(_){[]};
+        }
+
+    };
+
+    //-----------------------------wallet----------------------------------
    public shared({caller}) func addWallet(id: Text, wallet: Types.Wallet): async Result.Result<Nat,Text>{
         if(Principal.isAnonymous(caller)){
             #err("no authenticated")
@@ -247,42 +288,5 @@ actor {
         
         };
     };
-    public query func count(): async Nat{
-        profiles.size();
-    };
 
-    // public shared({caller}) func deleteProfile(id: Text): async Result.Result<Nat, Text>{
-    //     let p = profiles.remove(id);
-    //     switch(p){
-    //         case(?p){
-    //             #ok(1);
-    //         };
-    //         case(_){
-    //             #err(" no profile deleted")
-    //         }
-    //     }
-    // };
-    // public shared({caller}) func deleteUserProfile(user: Text): async Result.Result<Nat, Text>{
-    //     let p = userprofiles.remove(Principal.fromText(user));
-    //     switch(p){
-    //         case(?p){
-    //             #ok(1);
-    //         };
-    //         case(_){
-    //             #err(" no profile deleted")
-    //         }
-    //     }
-    // };
-    // public query func dumpProfiles(): async [(Text,Profile)]{
-    //     Iter.toArray(profiles.entries());  
-    // };
-
-    // public query func dumpUserProfiles(): async [(Principal,Text)]{
-    //     Iter.toArray(userprofiles.entries());  
-    // };
-
-    // public query func listProfiles(): async [Profile]{
-    //     Iter.toArray(profiles.vals());  
-    // };
-    
 };

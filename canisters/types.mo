@@ -1,3 +1,4 @@
+
 module {
     public type Profile = {
         id : Text;
@@ -37,5 +38,11 @@ module {
         #ic;
         #ethereum;
         #bitcoin
-    }
+    };
+
+    public type Favorite = {
+        owner: Principal;
+        name: Text;
+        address: Text;
+    };
 }
