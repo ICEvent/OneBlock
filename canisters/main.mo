@@ -1,3 +1,4 @@
+import Cycles "mo:base/ExperimentalCycles";
 import Text "mo:base/Text";
 import TrieMap "mo:base/TrieMap";
 import Principal "mo:base/Principal";
@@ -18,6 +19,7 @@ actor {
     stable var userProfiles : [(Principal,Text)] = [];
     stable var userWallets: [(Text,[Types.Wallet])] = [];
     stable var upgradeFavorites : [(Principal, [Favorite])] = [];
+    stable var _admins :[Text] = ["3z4ue-dry77-pvwdh-4ugn3-lu2wi-sbfp6-7xzaf-jupqw-vqiit-zi7m7-gae"];
 
     var profiles = TrieMap.TrieMap<Text, Profile>(Text.equal, Text.hash);
     profiles := TrieMap.fromEntries<Text, Profile>(Iter.fromArray(stableProfiles), Text.equal, Text.hash);
@@ -301,4 +303,33 @@ actor {
         };
     };
 
+
+
+  public query({caller}) func availableCycles() : async Nat {
+    if(isAdmin(caller)){
+        return Cycles.balance();
+    }else{
+        return 0;
+    }
+    
+  };
+
+  public shared({caller}) func addAdmin(pid: Text): async Result.Result<Nat, Text>{
+    if(isAdmin(caller)){
+        let b = Buffer.fromArray<Text>(_admins);
+        b.add(pid);
+        _admins := Buffer.toArray<Text>(b);
+        #ok(1)
+    }else{
+        #err("no permission")
+    }
+  };
+
+  private func isAdmin(pid: Principal): Bool{
+    let fa = Array.find(_admins, func(a: Text):Bool{a == Principal.toText(pid)});
+    switch(fa){
+        case(?fa){true};
+        case(_)(false)
+    };
+  };
 };
