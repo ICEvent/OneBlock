@@ -204,6 +204,18 @@ actor {
         profiles.get(id);
     };
 
+    public query func getProfileByPrincipal(principal: Text): async ?Profile{
+         let pt = userprofiles.get(Principal.fromText(principal));
+        switch(pt){
+            case(?pt){
+                profiles.get(pt);
+            };
+            case(_){
+                null;
+            }
+        }
+    };
+
     public query({caller}) func getMyProfile(): async ?Profile{
         let pt = userprofiles.get(caller);
         switch(pt){
