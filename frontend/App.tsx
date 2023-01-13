@@ -6,7 +6,7 @@ import {
   Link,
 } from "react-router-dom";
 
-import * as profile from "./api/profile";
+// import * as profile from "./api/profile";
 
 import Store from "./components/Store";
 /*
