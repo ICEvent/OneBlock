@@ -8,8 +8,6 @@ import ONEBLOCKService from "../api/profile/profile.did";
 
 import { defaultAgent } from "../lib/canisters";
 import * as ONEBLOCK from "../api/profile/index";
-import { CANISTER_ONEBLOCK } from "frontend/lib/constants";
-
 
 export type State = {
   agent: HttpAgent;
