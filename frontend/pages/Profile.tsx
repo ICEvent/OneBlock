@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 
 import moment from "moment";
 
-import Box from '@mui/material/Box';
+import { Box } from '@mui/material';
 import Container from '@mui/material/Container';
 
 

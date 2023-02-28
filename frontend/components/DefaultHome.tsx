@@ -1,7 +1,7 @@
 import React, { useEffect,useState } from "react"
 import { useBalance, useCanister, useWallet, useConnect } from "@connect2ic/react"
 
-import Box from '@mui/material/Box';
+import { Box, Grid } from '@mui/material';
 import IconButton from '@mui/material/IconButton';
 import Input from '@mui/material/Input';
 import FilledInput from '@mui/material/FilledInput';
@@ -79,12 +79,788 @@ const DefaultHome = () => {
 
   
   return (
-   
-    
-    <Stack spacing={2}>
-      {linklist}
-    </Stack>
+   <Grid container spacing={2}>
 
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}>Find</Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}>Your</Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}>Block</Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}>On</Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}>Blockchain</Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+
+    
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+
+   
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+    <Grid item>
+      <Box sx={{
+        p: 2, border: '1px dashed grey' 
+      }}></Box>
+    </Grid>
+
+    </Grid>
   )
 }
 
