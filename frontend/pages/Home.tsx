@@ -110,7 +110,8 @@ const Home = (props) => {
 
   const login = async () => {
     authClient.login({
-      identityProvider: IDENTITY_PROVIDER,
+      identityProvider: IDENTITY_PROVIDER, 
+      derivationOrigin: "https://32pz7-5qaaa-aaaag-qacra-cai.raw.ic0.app",
       maxTimeToLive: ONE_WEEK_NS,
       onSuccess: () => handleAuthenticated(authClient),
     });
