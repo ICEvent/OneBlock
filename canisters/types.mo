@@ -45,4 +45,9 @@ module {
         name: Text;
         address: Text;
     };
+
+    public type Inbox = {
+        inboxid: Text;
+        owner: Principal;
+    };
 }
