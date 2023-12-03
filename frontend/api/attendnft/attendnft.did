@@ -1,0 +1,169 @@
+type attendance_nft = 
+ service {
+   acceptCycles: () -> ();
+   addMinter: (principal) -> ();
+   allowance: (AllowanceRequest) -> (Result) query;
+   approve: (ApproveRequest) -> ();
+   availableCycles: () -> (nat) query;
+   balance: (BalanceRequest) -> (BalanceResponse) query;
+   bearer: (TokenIdentifier__1) -> (Result_4) query;
+   checkANFT: (nat) -> (opt EventCollection);
+   claimANFT: (EVENTID, text) -> (Result_3);
+   closeClaim: (EVENTID) -> (Result_1);
+   extensions: () -> (vec Extension) query;
+   getAllowances: () -> (vec record {
+                               TokenIndex;
+                               principal;
+                             }) query;
+   getMinter: () -> (principal) query;
+   getRegistry: () -> (vec record {
+                             TokenIndex;
+                             AccountIdentifier__1;
+                           }) query;
+   getTokens: () -> (vec record {
+                           TokenIndex;
+                           Metadata;
+                         }) query;
+   inventory: () -> (vec Inventory) query;
+   metadata: (TokenIdentifier__1) -> (Result_2) query;
+   mintANFT: (EventCollection) -> (Result_1);
+   mintNFT: (MintRequest) -> (TokenIndex);
+   openClaim: (EVENTID) -> (Result_1);
+   setMinter: (principal) -> ();
+   supply: (TokenIdentifier__1) -> (Result) query;
+   transfer: (TransferRequest) -> (TransferResponse);
+ };
+type User = 
+ variant {
+   address: AccountIdentifier;
+   "principal": principal;
+ };
+type TransferResponse = 
+ variant {
+   err:
+    variant {
+      CannotNotify: AccountIdentifier;
+      InsufficientBalance;
+      InvalidToken: TokenIdentifier;
+      Other: text;
+      Rejected;
+      Unauthorized: AccountIdentifier;
+    };
+   ok: Balance;
+ };
+type TransferRequest = 
+ record {
+   amount: Balance;
+   from: User;
+   memo: Memo;
+   notify: bool;
+   subaccount: opt SubAccount;
+   to: User;
+   token: TokenIdentifier;
+ };
+type TokenIndex = nat32;
+type TokenIdentifier__1 = text;
+type TokenIdentifier = text;
+type SubAccount = vec nat8;
+type Result_4 = 
+ variant {
+   err: CommonError;
+   ok: AccountIdentifier__1;
+ };
+type Result_3 = 
+ variant {
+   err: text;
+   ok: TokenIndex;
+ };
+type Result_2 = 
+ variant {
+   err: CommonError;
+   ok: Metadata;
+ };
+type Result_1 = 
+ variant {
+   err: text;
+   ok: nat;
+ };
+type Result = 
+ variant {
+   err: CommonError;
+   ok: Balance__1;
+ };
+type MintRequest = 
+ record {
+   metadata: opt blob;
+   to: User;
+ };
+type Metadata = 
+ variant {
+   fungible:
+    record {
+      decimals: nat8;
+      metadata: opt blob;
+      name: text;
+      symbol: text;
+    };
+   nonfungible: record {metadata: opt blob;};
+ };
+type Memo = blob;
+type Inventory = 
+ record {
+   event: EventCollection;
+   token: TokenIndex;
+ };
+type Extension = text;
+type EventCollection = 
+ record {
+   asset: text;
+   claimcode: text;
+   datetime: int;
+   eid: EVENTID;
+   host: text;
+   location: text;
+   status: variant {
+             close;
+             new;
+             ready;
+           };
+   title: text;
+ };
+type EVENTID = nat;
+type CommonError__1 = 
+ variant {
+   InvalidToken: TokenIdentifier;
+   Other: text;
+ };
+type CommonError = 
+ variant {
+   InvalidToken: TokenIdentifier;
+   Other: text;
+ };
+type Balance__1 = nat;
+type BalanceResponse = 
+ variant {
+   err: CommonError__1;
+   ok: Balance;
+ };
+type BalanceRequest = 
+ record {
+   token: TokenIdentifier;
+   user: User;
+ };
+type Balance = nat;
+type ApproveRequest = 
+ record {
+   allowance: Balance;
+   spender: principal;
+   subaccount: opt SubAccount;
+   token: TokenIdentifier;
+ };
+type AllowanceRequest = 
+ record {
+   owner: User;
+   spender: principal;
+   token: TokenIdentifier;
+ };
+type AccountIdentifier__1 = text;
+type AccountIdentifier = text;
+service : () -> attendance_nft

@@ -22,8 +22,9 @@ import { LinkDialog } from "../components/LinkDialog";
 import { DefaultHome } from "../components/DefaultHome";
 import Tooltip from '@mui/material/Tooltip';
 
-import { useOneblock, useSetAgent, useGlobalContext } from "../components/Store";
-import { Profile } from "frontend/api/profile/profile.did";
+import { useOneblock, useSetAgent, useGlobalContext, useProfile } from "../components/Store";
+import { Profile } from "../api/profile/profile.did";
+import Inbox from "../components/Inbox";
 
 
 interface TabPanelProps {
@@ -64,7 +65,7 @@ const Home = (props) => {
   const setAgent = useSetAgent();
   const { state: { isAuthed, principal } } = useGlobalContext();
   
-  const [profile, setProfile] = useState<Profile>();
+  const {profile, setProfile} = useProfile();
   const [authClient, setAuthClient] = useState<AuthClient>(null);
 
   const [value, setValue] = useState(0);
@@ -111,7 +112,7 @@ const Home = (props) => {
   const login = async () => {
     authClient.login({
       identityProvider: IDENTITY_PROVIDER, 
-      derivationOrigin: "https://32pz7-5qaaa-aaaag-qacra-cai.raw.ic0.app",
+      // derivationOrigin: "https://32pz7-5qaaa-aaaag-qacra-cai.raw.ic0.app",
       maxTimeToLive: ONE_WEEK_NS,
       onSuccess: () => handleAuthenticated(authClient),
     });
@@ -151,7 +152,8 @@ const Home = (props) => {
             ONEBLOCK
           </Typography>
           {!isAuthed &&<Button  color="inherit" onClick={login}>Login</Button>}
-          {principal && <Tooltip title={principal.toString()}><Button  color="inherit" onClick={logout}>{principal.toString().slice(0,5)+"..."+principal.toString().slice(-5)}</Button></Tooltip>}
+          {principal && <Tooltip title={principal.toString()}>
+            <Button  color="inherit" onClick={logout}>{principal.toString().slice(0,5)+"..."+principal.toString().slice(-5)}</Button></Tooltip>}
 
         </Toolbar>
       </AppBar>
@@ -165,6 +167,7 @@ const Home = (props) => {
           <Tab label="profile" {...a11yProps(0)} />
           {profile && <Tab label="links" {...a11yProps(1)} />}
           {profile && <Tab label="wallets" {...a11yProps(2)} />}
+          {profile && <Tab label="inbox" {...a11yProps(3)} />}
         </Tabs>
         }
         {isAuthed && <Box maxWidth="md">
@@ -177,6 +180,9 @@ const Home = (props) => {
           </TabPanel>
           <TabPanel value={value} index={2}>
             building...
+          </TabPanel>
+          <TabPanel value={value} index={3}>
+            <Inbox />
           </TabPanel>
         </Box>}
         {!isAuthed &&

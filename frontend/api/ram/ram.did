@@ -1,0 +1,182 @@
+type AccessKey = record {
+  key : text;
+  keycomponent : KeyComponent;
+  componentid : text;
+  expiredtime : int;
+};
+type Action = variant { read; delete; create; update };
+type Application = record {
+  id : nat;
+  status : Status;
+  applicant : text;
+  atime : int;
+  atem : Atem;
+  memo : text;
+  approver : text;
+};
+type Atem = variant { bounty : nat; invitation : nat; activity : nat };
+type Comment = record {
+  comto : Comto__1;
+  user : text;
+  comment : text;
+  timestamp : int;
+  attachments : vec text;
+};
+type Comto = variant {
+  other : text;
+  note : nat;
+  todo : nat;
+  user : text;
+  event : nat;
+  calendar : nat;
+};
+type Comto__1 = variant {
+  other : text;
+  note : nat;
+  todo : nat;
+  user : text;
+  event : nat;
+  calendar : nat;
+};
+type Content = text;
+type Function = variant {
+  contact : nat;
+  other;
+  note : nat;
+  todo : nat;
+  user : text;
+  event : nat;
+  calendar : nat;
+  comment : nat;
+};
+type HikingData = record {
+  eid : nat;
+  end : nat;
+  log : opt HikingLog;
+  organizer : text;
+  elevation : opt nat;
+  distance : nat;
+  start : nat;
+  attendees : text;
+};
+type HikingLog = record { logdata : text; logtype : text };
+type Inbox = record { id : text; owner : principal; name : text };
+type KeyComponent = variant {
+  log;
+  contact;
+  expense;
+  order;
+  invoice;
+  note;
+  todo;
+  event;
+  calendar;
+  comment;
+  message;
+  checklist;
+  profile;
+};
+type Log = record {
+  function : Function;
+  action : Action;
+  user : text;
+  logtime : int;
+  message : text;
+};
+type Message = record {
+  id : nat;
+  note : text;
+  sender : text;
+  isread : bool;
+  readtime : int;
+  replyid : opt nat;
+  attachment : opt text;
+  receiver : text;
+  sendtime : int;
+};
+type MessageTo = text;
+type NewApplication = record { atem : Atem; memo : text; approver : text };
+type NewComment = record {
+  comto : Comto__1;
+  comment : text;
+  attachments : vec text;
+};
+type NewLog = record {
+  function : Function;
+  action : Action;
+  user : text;
+  message : text;
+};
+type NewMessage = record {
+  note : text;
+  replyid : opt nat;
+  attachment : opt text;
+  receiver : text;
+};
+type NewNotification = record {
+  note : text;
+  sender : text;
+  ntype : TypeNotification;
+  receiver : text;
+};
+type Notification = record {
+  id : nat;
+  note : text;
+  sender : text;
+  isread : bool;
+  readtime : int;
+  ntype : TypeNotification;
+  receiver : text;
+  sendtime : int;
+};
+type Ram = service {
+  addAccessKey : (opt text, KeyComponent, text, int) -> (Result_2);
+  addAdmin : (text) -> (Result_1);
+  addAllow : (text) -> (Result_1);
+  addApplication : (NewApplication) -> (Result);
+  addComment : (NewComment) -> (Result);
+  addNotification : (NewNotification) -> ();
+  availableCycles : () -> (nat) query;
+  createHiking : (HikingData) -> (Result);
+  deleteNotification : (nat) -> (Result);
+  findUserHiking : (text, nat, nat) -> (vec HikingData) query;
+  getAccessKey : (KeyComponent, text) -> (opt AccessKey);
+  getAdmins : () -> (vec text) query;
+  getAllows : () -> (vec text) query;
+  getApplications : (Atem) -> (vec Application);
+  getBackupState : () -> (nat) query;
+  getComments : (Comto, nat) -> (vec Comment) query;
+  getLogs : (nat) -> (vec Log) query;
+  getMyInboxes : () -> (vec Inbox) query;
+  getMyMessages : (bool, nat) -> (vec Message) query;
+  getMyNotifications : (bool, nat) -> (vec Notification) query;
+  getSystemData : () -> (
+      record { memory : nat; heap : nat; cycles : nat },
+    ) query;
+  getUserLogs : (nat) -> (vec Log) query;
+  hookInbox : (text, text) -> (Result);
+  log : (NewLog) -> ();
+  message : (NewMessage) -> (Result);
+  readMessage : (nat) -> (Result);
+  readNotification : (nat) -> (Result);
+  removeAccessKey : (KeyComponent, text) -> ();
+  searchInboxes : (text) -> (vec Inbox) query;
+  sendMessage : (MessageTo, Subject, Content, Sender) -> (Result_1);
+  updateApplication : (nat, Status) -> (Result);
+};
+type Result = variant { ok : nat; err : text };
+type Result_1 = variant { ok : int; err : text };
+type Result_2 = variant { ok : text; err : text };
+type Sender = text;
+type Status = variant { created; approved; rejected };
+type Subject = text;
+type TypeNotification = variant {
+  contact : nat;
+  other;
+  note : nat;
+  todo : nat;
+  user : text;
+  event : nat;
+  calendar : nat;
+};
+service : Ram

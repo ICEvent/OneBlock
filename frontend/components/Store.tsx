@@ -4,21 +4,32 @@ import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 
 import ONEBLOCKService from "../api/profile/profile.did";
+import RAMService from "../api/ram/ram.did";
+import ATTENDNFTService from "../api/attendnft/attendnft.did";
+
+import { Profile } from "../api/profile/profile.did";
 
 
 import { defaultAgent } from "../lib/canisters";
 import * as ONEBLOCK from "../api/profile/index";
+import * as RAM from "../api/ram/index";
+import * as ATTENDNFT from "../api/attendnft/index";
 
 export type State = {
   agent: HttpAgent;
   oneblock: ActorSubclass<ONEBLOCKService._SERVICE>;
+  ram: ActorSubclass<RAMService._SERVICE>;
+  attendnft: ActorSubclass<ATTENDNFTService._SERVICE>;
   isAuthed: boolean;
   principal: Principal | null;
+  profile: Profile | null;
 
 };
 
 const createActors = (agent: HttpAgent = defaultAgent) => ({
   oneblock: ONEBLOCK.createActor(agent),
+  ram: RAM.createActor(agent,{ actorOptions: {} }),
+  attendnft: ATTENDNFT.createActor(agent, { actorOptions: {} }),
 });
 
 const initialState: State = {
@@ -27,7 +38,7 @@ const initialState: State = {
   agent: defaultAgent,
   isAuthed: false,
   principal: null,
-
+  profile: null
 };
 
 type Action =
@@ -39,6 +50,10 @@ type Action =
   | {
     type: "SET_PRINCIPAL";
     principal: Principal;
+  }
+  | {
+    type: "SET_PROFILE";
+    profile: Profile;
   };
 
 
@@ -57,6 +72,11 @@ const reducer = (state: State, action: Action): State => {
       return {
         ...state,
         principal: action.principal,
+      };
+    case "SET_PROFILE":
+      return {
+        ...state,
+        profile: action.profile,
       };
     default:
       return { ...state };
@@ -92,6 +112,15 @@ export const useOneblock = () => {
   return context.state.oneblock;
 };
 
+export const useRam = () => {
+  const context = useGlobalContext();
+  return context.state.ram;
+};
+export const useAttendNFT = () => {
+  const context = useGlobalContext();
+  return context.state.attendnft;
+};
+
 export const useSetAgent = () => {
   const { dispatch } = useGlobalContext();
 
@@ -119,5 +148,16 @@ export const useSetAgent = () => {
   };
 };
 
-
+export const useProfile = () => {
+  const { dispatch, state } = useGlobalContext();
+  return {
+    profile: state.profile,
+    setProfile: (profile: Profile) => {
+      dispatch({
+        type: "SET_PROFILE",
+        profile
+      });
+    }
+  };
+};
 export default Store;
