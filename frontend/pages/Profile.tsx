@@ -138,7 +138,7 @@ const Profile = () => {
         <Tabs value={currentTab} onChange={handleChange} aria-label="basic tabs example">
           <Tab label="Links" {...a11yProps(0)} />
           <Tab label="Hikings" {...a11yProps(1)} />
-        </Tabs>
+          </Tabs>
       </Box>
       <CustomTabPanel value={currentTab} index={0}>
       <LinkList links={links} />

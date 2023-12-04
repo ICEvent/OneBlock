@@ -25,7 +25,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { useOneblock, useSetAgent, useGlobalContext, useProfile } from "../components/Store";
 import { Profile } from "../api/profile/profile.did";
 import Inbox from "../components/Inbox";
-
+import {Comments} from "../components/Comments";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -112,7 +112,7 @@ const Home = (props) => {
   const login = async () => {
     authClient.login({
       identityProvider: IDENTITY_PROVIDER, 
-      // derivationOrigin: "https://32pz7-5qaaa-aaaag-qacra-cai.raw.ic0.app",
+      derivationOrigin: "https://32pz7-5qaaa-aaaag-qacra-cai.raw.ic0.app",
       maxTimeToLive: ONE_WEEK_NS,
       onSuccess: () => handleAuthenticated(authClient),
     });
@@ -168,6 +168,7 @@ const Home = (props) => {
           {profile && <Tab label="links" {...a11yProps(1)} />}
           {profile && <Tab label="wallets" {...a11yProps(2)} />}
           {profile && <Tab label="inbox" {...a11yProps(3)} />}
+          {profile && <Tab label="comments" {...a11yProps(4)} />}
         </Tabs>
         }
         {isAuthed && <Box maxWidth="md">
@@ -183,6 +184,9 @@ const Home = (props) => {
           </TabPanel>
           <TabPanel value={value} index={3}>
             <Inbox />
+          </TabPanel>
+          <TabPanel value={value} index={4}>
+            <Comments />
           </TabPanel>
         </Box>}
         {!isAuthed &&
