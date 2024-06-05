@@ -9,10 +9,13 @@ import {
 // import * as profile from "./api/profile";
 
 import Store from "./components/Store";
+
+import 'react-toastify/dist/ReactToastify.css';
+
 /*
  * Some examples to get you started
  */
-import { Profile } from "./pages/Profile"
+import { ProfilePage } from "./pages/Profile"
 import { Home } from "./pages/Home";
 
 export default () => {
@@ -22,7 +25,8 @@ export default () => {
     <BrowserRouter>
       <Store>
         <Routes>
-          <Route path="/:id" element={<Profile />} />
+
+          <Route path="/:id" element={<ProfilePage />} />
           <Route path="/" element={<Home />} />
         </Routes>
       </Store>

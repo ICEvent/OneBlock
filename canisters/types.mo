@@ -50,4 +50,12 @@ module {
         inboxid: Text;
         owner: Principal;
     };
+
+    public type Canister = {
+        canisterid: Principal;
+        name: Text;
+        desc: Text;
+        posts: Text;
+        gallery: Text;
+    }
 }

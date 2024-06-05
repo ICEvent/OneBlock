@@ -1,6 +1,14 @@
 import type { Principal } from '@dfinity/principal';
 import type { ActorMethod } from '@dfinity/agent';
+import type { IDL } from '@dfinity/candid';
 
+export interface Canister {
+  'desc' : string,
+  'name' : string,
+  'posts' : string,
+  'canisterid' : Principal,
+  'gallery' : string,
+}
 export interface Favorite {
   'owner' : Principal,
   'name' : string,
@@ -51,11 +59,16 @@ export interface _SERVICE {
   'availableCycles' : ActorMethod<[], bigint>,
   'createProfile' : ActorMethod<[NewProfile], Result>,
   'deleteLink' : ActorMethod<[string, string], Result>,
+  'editCanister' : ActorMethod<[Canister], Result>,
   'getInbox' : ActorMethod<[string], [] | [Inbox]>,
+  'getMyCanister' : ActorMethod<[], [] | [Canister]>,
   'getMyFavorites' : ActorMethod<[], Array<Favorite>>,
   'getMyInbox' : ActorMethod<[], [] | [Inbox]>,
   'getMyProfile' : ActorMethod<[], [] | [Profile]>,
   'getProfile' : ActorMethod<[string], [] | [Profile]>,
   'getProfileByPrincipal' : ActorMethod<[string], [] | [Profile]>,
+  'getProfileCanister' : ActorMethod<[Principal], [] | [Canister]>,
   'updateProfile' : ActorMethod<[string, UpdateProfile], Result>,
 }
+export declare const idlFactory: IDL.InterfaceFactory;
+export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

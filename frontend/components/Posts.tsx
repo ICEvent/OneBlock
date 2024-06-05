@@ -14,7 +14,7 @@ import moment from "moment";
 
 import { useGlobalContext, useRam } from "./Store";
 
-const Comments = (props) => {
+const Posts = (props) => {
 
   const { state: {
     isAuthed,
@@ -62,4 +62,4 @@ const Comments = (props) => {
   )
 }
 
-export { Comments }
+export { Posts }

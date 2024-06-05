@@ -1,9 +1,9 @@
 import React, { useState } from "react"
 import { useEffect } from "react"
 import { AuthClient } from "@dfinity/auth-client";
-import { HttpAgent,Identity } from "@dfinity/agent";
+import { HttpAgent, Identity } from "@dfinity/agent";
 import { HOST } from "../lib/canisters";
-import { ONE_WEEK_NS,IDENTITY_PROVIDER } from "../lib/constants";
+import { ONE_WEEK_NS, IDENTITY_PROVIDER } from "../lib/constants";
 
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
@@ -21,11 +21,11 @@ import { ProfileForm } from "../components/ProfileForm";
 import { LinkDialog } from "../components/LinkDialog";
 import { DefaultHome } from "../components/DefaultHome";
 import Tooltip from '@mui/material/Tooltip';
-
+import { ToastContainer, toast } from 'react-toastify';
 import { useOneblock, useSetAgent, useGlobalContext, useProfile } from "../components/Store";
-import { Profile } from "../api/profile/profile.did";
-import Inbox from "../components/Inbox";
-import {Comments} from "../components/Comments";
+
+import Setting from "../components/Setting";
+import { Posts } from "../components/Posts";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -64,8 +64,8 @@ const Home = (props) => {
   const oneblock = useOneblock();
   const setAgent = useSetAgent();
   const { state: { isAuthed, principal } } = useGlobalContext();
-  
-  const {profile, setProfile} = useProfile();
+
+  const { profile, setProfile } = useProfile();
   const [authClient, setAuthClient] = useState<AuthClient>(null);
 
   const [value, setValue] = useState(0);
@@ -78,16 +78,18 @@ const Home = (props) => {
 
     (async () => {
       const authClient = await AuthClient.create(
-        {idleOptions: {
-          disableIdle: true,
-          disableDefaultIdleCallback: true
-        }}
+        {
+          idleOptions: {
+            disableIdle: true,
+            disableDefaultIdleCallback: true
+          }
+        }
       );
       setAuthClient(authClient);
 
-     
+
       if (await authClient.isAuthenticated()) {
-        handleAuthenticated(authClient);
+        handleAuthenticated(authClient);    
         loadProfile();
       }
 
@@ -111,8 +113,8 @@ const Home = (props) => {
 
   const login = async () => {
     authClient.login({
-      identityProvider: IDENTITY_PROVIDER, 
-      derivationOrigin: "https://32pz7-5qaaa-aaaag-qacra-cai.raw.ic0.app",
+      identityProvider: IDENTITY_PROVIDER,
+      // derivationOrigin: "https://32pz7-5qaaa-aaaag-qacra-cai.raw.ic0.app",
       maxTimeToLive: ONE_WEEK_NS,
       onSuccess: () => handleAuthenticated(authClient),
     });
@@ -123,8 +125,8 @@ const Home = (props) => {
     setAgent({ agent: null });
   };
 
-  async function loadProfile(){
-    if(principal){
+  async function loadProfile() {
+    if (principal) {
       oneblock.getMyProfile().then(res => {
         if (res[0]) {
           setProfile(res[0])
@@ -132,7 +134,7 @@ const Home = (props) => {
       });
     }
   }
-  
+
   return (
 
     <Box sx={{ flexGrow: 1 }}>
@@ -151,9 +153,9 @@ const Home = (props) => {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             ONEBLOCK
           </Typography>
-          {!isAuthed &&<Button  color="inherit" onClick={login}>Login</Button>}
+          {!isAuthed && <Button color="inherit" onClick={login}>Login</Button>}
           {principal && <Tooltip title={principal.toString()}>
-            <Button  color="inherit" onClick={logout}>{principal.toString().slice(0,5)+"..."+principal.toString().slice(-5)}</Button></Tooltip>}
+            <Button color="inherit" onClick={logout}>{principal.toString().slice(0, 5) + "..." + principal.toString().slice(-5)}</Button></Tooltip>}
 
         </Toolbar>
       </AppBar>
@@ -162,18 +164,18 @@ const Home = (props) => {
         sx={{ textAlign: "center" }}
         maxWidth="md"
       >
-
+        <ToastContainer />
         {isAuthed && <Tabs value={value} onChange={handleChange} aria-label="basic tabs example">
           <Tab label="profile" {...a11yProps(0)} />
           {profile && <Tab label="links" {...a11yProps(1)} />}
           {profile && <Tab label="wallets" {...a11yProps(2)} />}
-          {profile && <Tab label="inbox" {...a11yProps(3)} />}
-          {profile && <Tab label="comments" {...a11yProps(4)} />}
+          {profile && <Tab label="Setting" {...a11yProps(3)} />}
+          {profile && <Tab label="posts" {...a11yProps(4)} />}
         </Tabs>
         }
         {isAuthed && <Box maxWidth="md">
           <TabPanel value={value} index={0}>
-            <ProfileForm profile={profile}  reload={loadProfile}/>
+            <ProfileForm profile={profile} reload={loadProfile} />
 
           </TabPanel>
           <TabPanel value={value} index={1}>
@@ -183,15 +185,15 @@ const Home = (props) => {
             building...
           </TabPanel>
           <TabPanel value={value} index={3}>
-            <Inbox />
+            <Setting />
           </TabPanel>
           <TabPanel value={value} index={4}>
-            <Comments />
+            <Posts />
           </TabPanel>
         </Box>}
         {!isAuthed &&
-          <Box m={10}><DefaultHome /></Box> 
-          }
+          <Box m={10}><DefaultHome /></Box>
+        }
       </Container>
 
     </Box>

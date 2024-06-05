@@ -14,13 +14,14 @@ actor {
     type Profile = Types.Profile;
     type Favorite = Types.Favorite;
     type Inbox = Types.Inbox;
+    type Canister = Types.Canister;
 
-    stable var profileIds : [Text] = [];
     stable var stableProfiles : [(Text, Profile)] = [];
     stable var userProfiles : [(Principal, Text)] = [];
     stable var upgradeInboxes : [(Text, Inbox)] = [];
     stable var userWallets : [(Text, [Types.Wallet])] = [];
     stable var upgradeFavorites : [(Principal, [Favorite])] = [];
+    stable var upgradeCanisters: [(Principal, Canister )] = [];
 
     stable var _admins : [Text] = ["3z4ue-dry77-pvwdh-4ugn3-lu2wi-sbfp6-7xzaf-jupqw-vqiit-zi7m7-gae"];
 
@@ -39,12 +40,16 @@ actor {
     var myFavorites = TrieMap.TrieMap<Principal, [Favorite]>(Principal.equal, Principal.hash);
     myFavorites := TrieMap.fromEntries<Principal, [Favorite]>(Iter.fromArray(upgradeFavorites), Principal.equal, Principal.hash);
 
+    var myCanisters = TrieMap.TrieMap<Principal, Canister>(Principal.equal, Principal.hash);
+    myCanisters := TrieMap.fromEntries<Principal,Canister>(Iter.fromArray(upgradeCanisters), Principal.equal, Principal.hash);
+
     system func preupgrade() {
         stableProfiles := Iter.toArray(profiles.entries());
         userProfiles := Iter.toArray(userprofiles.entries());
         upgradeInboxes := Iter.toArray(inboxes.entries());
         userWallets := Iter.toArray(wallets.entries());
-        upgradeFavorites := Iter.toArray(myFavorites.entries())
+        upgradeFavorites := Iter.toArray(myFavorites.entries());
+        upgradeCanisters := Iter.toArray(myCanisters.entries());
     };
 
     system func postupgrade() {
@@ -52,7 +57,8 @@ actor {
         userProfiles := [];
         upgradeInboxes := [];
         userWallets := [];
-        upgradeFavorites := []
+        upgradeFavorites := [];
+        upgradeCanisters := [];
     };
 
     public shared ({ caller }) func createProfile(newProfile : Types.NewProfile) : async Result.Result<Nat, Text> {
@@ -369,6 +375,30 @@ actor {
     };
 
 
+    //===================================
+    // Canister
+    //===================================
+
+    public shared ({ caller }) func editCanister(canister : Canister) : async Result.Result<Nat, Text> {
+
+  
+                            myCanisters.put(
+                                caller,
+                                canister,
+                            );
+                            #ok(1)
+                 
+ 
+
+    };
+
+    public query({caller}) func getMyCanister() : async ?Canister {
+        myCanisters.get(caller);
+    };
+
+    public query func getProfileCanister(uid: Principal) : async ?Canister {
+        myCanisters.get(uid);
+    };
 
     //=======================================
     // system 

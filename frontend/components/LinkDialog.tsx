@@ -28,7 +28,7 @@ import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import { useOneblock } from "./Store";
-import { Link } from "../api/profile/profile.did";
+import { Link } from "../api/profile/service.did";
 
 interface State {
   linkname: string;

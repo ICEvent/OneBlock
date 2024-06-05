@@ -61,6 +61,14 @@ type Favorite =
    name: text;
    owner: principal;
  };
+type Canister = 
+ record {
+   canisterid: principal;
+   desc: text;
+   gallery: text;
+   name: text;
+   posts: text;
+ };
 service : {
   addAdmin: (text) -> (Result);
   addFavorite: (record {
@@ -73,11 +81,14 @@ service : {
   availableCycles: () -> (nat) query;
   createProfile: (NewProfile) -> (Result);
   deleteLink: (text, text) -> (Result);
+  editCanister: (Canister) -> (Result);
   getInbox: (text) -> (opt Inbox) query;
+  getMyCanister: () -> (opt Canister) query;
   getMyFavorites: () -> (vec Favorite) query;
   getMyInbox: () -> (opt Inbox) query;
   getMyProfile: () -> (opt Profile) query;
   getProfile: (text) -> (opt Profile) query;
   getProfileByPrincipal: (text) -> (opt Profile) query;
+  getProfileCanister: (principal) -> (opt Canister) query;
   updateProfile: (text, UpdateProfile) -> (Result);
 }

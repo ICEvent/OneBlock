@@ -3,11 +3,11 @@ import React, { createContext, useContext, useReducer } from "react";
 import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 
-import ONEBLOCKService from "../api/profile/profile.did";
+import ONEBLOCKService from "../api/profile/service.did";
 import RAMService from "../api/ram/ram.did";
 import ATTENDNFTService from "../api/attendnft/attendnft.did";
 
-import { Profile } from "../api/profile/profile.did";
+import { Profile } from "../api/profile/service.did";
 
 
 import { defaultAgent } from "../lib/canisters";

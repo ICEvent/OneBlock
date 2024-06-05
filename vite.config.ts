@@ -58,7 +58,7 @@ const canisterDefinitions = Object.entries(canisterIds).reduce(
   }),
   {},
 )
-
+console.log(canisterDefinitions)
 // Gets the port dfx is running on from dfx.json
 const DFX_PORT = dfxJson.networks.local.bind.split(":")[1]
 
