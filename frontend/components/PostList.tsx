@@ -1,24 +1,32 @@
+//@ts-nocheck
 import React, { useEffect, useState } from 'react';
 
 import moment from 'moment';
 import { Box, Card, CardContent, Typography } from '@mui/material';
 import { Post } from './types';
 import { Canister } from '../api/profile/service.did';
-import { initSatellite } from "@junobuild/core";
+
 import { listDocs } from "@junobuild/core";
+
+import { useGlobalContext } from './Store';
+
 
 interface PostsProps {
   canister: Canister;
 }
 
+
 const PostList: React.FC<PostsProps> = ({ canister }) => {
   const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(false)
+  const { state: { isAuthed, principal } } = useGlobalContext();
 
   useEffect(() => {
     loadPosts();
   }, [canister]);
 
   const loadPosts = async () => {
+    setLoading(true)
     if (canister) {
       console.log(canister.posts);
 
@@ -55,12 +63,15 @@ const PostList: React.FC<PostsProps> = ({ canister }) => {
       }
 
     }
+    setLoading(false)
 
 };
 
+
 return (
   <Box p={2}>
-    {posts ? posts.map((post) => (
+    
+    {posts.length>0 ? posts.map((post) => (
       <Card key={post.id} variant="outlined" sx={{ mb: 2 }}>
         <CardContent>
           <Typography variant="body2" color="textSecondary">{post.timestamp}</Typography>
@@ -69,7 +80,8 @@ return (
       </Card>
     )) :
       <Typography variant="body1" color="textSecondary" align="center">
-        No posts available.
+        {canister && !loading && "No posts available."}
+        
       </Typography>}
   </Box>
 );

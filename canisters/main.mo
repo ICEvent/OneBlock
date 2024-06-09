@@ -140,6 +140,53 @@ actor {
         }
     };
 
+   public shared ({ caller }) func changeId(oid : Text, nid: Text) : async Result.Result<Nat, Text> {
+        if (Principal.isAnonymous(caller)) {
+            #err("no authenticated")
+        } else {
+
+            let p = profiles.get(oid);
+            switch (p) {
+                case (?p) {
+                    if (p.owner == caller or isAdmin(caller)) {
+                        let existp = profiles.get(nid);
+                        switch(existp){
+                            case(?existp){
+                                #err("this id has been taken");
+                            };
+                            case(_){
+                                profiles.put(
+                                    nid,
+                                    {
+                                        id = nid;
+                                        name = p.name;
+                                        bio = p.bio;
+                                        pfp = p.pfp;
+                                        links = p.links;
+                                        owner = p.owner;
+                                        createtime = p.createtime
+                                    },
+                                );
+                                ignore profiles.remove(oid);
+                                userprofiles.put(p.owner, nid);
+                                #ok(1)
+                            };
+
+                        };
+                        
+                    } else {
+                        #err("no permission to update")
+                    };
+
+                };
+                case (_) {
+                    #err("no profile found")
+                }
+            };
+
+        }
+    };
+    
     public shared ({ caller }) func addLink(id : Text, link : Types.Link) : async Result.Result<Nat, Text> {
         if (Principal.isAnonymous(caller)) {
             #err("no authenticated")
@@ -403,6 +450,7 @@ actor {
     //=======================================
     // system 
     //=======================================
+
     public query ({ caller }) func availableCycles() : async Nat {
         if (isAdmin(caller)) {
             return Cycles.balance()
@@ -422,6 +470,7 @@ actor {
             #err("no permission")
         }
     };
+
 
     private func isAdmin(pid : Principal) : Bool {
         let fa = Array.find(_admins, func(a : Text) : Bool { a == Principal.toText(pid) });

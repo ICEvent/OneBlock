@@ -79,6 +79,7 @@ service : {
   addLink: (text, Link) -> (Result);
   addWallet: (text, Wallet) -> (Result);
   availableCycles: () -> (nat) query;
+  changeId: (text, text) -> (Result);
   createProfile: (NewProfile) -> (Result);
   deleteLink: (text, text) -> (Result);
   editCanister: (Canister) -> (Result);

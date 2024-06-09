@@ -57,6 +57,7 @@ export const idlFactory = ({ IDL }) => {
     'addLink' : IDL.Func([IDL.Text, Link], [Result], []),
     'addWallet' : IDL.Func([IDL.Text, Wallet], [Result], []),
     'availableCycles' : IDL.Func([], [IDL.Nat], ['query']),
+    'changeId' : IDL.Func([IDL.Text, IDL.Text], [Result], []),
     'createProfile' : IDL.Func([NewProfile], [Result], []),
     'deleteLink' : IDL.Func([IDL.Text, IDL.Text], [Result], []),
     'editCanister' : IDL.Func([Canister], [Result], []),

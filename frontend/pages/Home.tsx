@@ -1,4 +1,6 @@
+//@ts-nocheck
 import React, { useState } from "react"
+
 import { useEffect } from "react"
 import { AuthClient } from "@dfinity/auth-client";
 import { HttpAgent, Identity } from "@dfinity/agent";
@@ -24,8 +26,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { ToastContainer, toast } from 'react-toastify';
 import { useOneblock, useSetAgent, useGlobalContext, useProfile } from "../components/Store";
 
-import Setting from "../components/Setting";
-import { Posts } from "../components/Posts";
+import Posts from "../components/Posts";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -114,7 +115,7 @@ const Home = (props) => {
   const login = async () => {
     authClient.login({
       identityProvider: IDENTITY_PROVIDER,
-      // derivationOrigin: "https://32pz7-5qaaa-aaaag-qacra-cai.raw.ic0.app",
+      derivationOrigin: "https://32pz7-5qaaa-aaaag-qacra-cai.raw.ic0.app",
       maxTimeToLive: ONE_WEEK_NS,
       onSuccess: () => handleAuthenticated(authClient),
     });
@@ -168,9 +169,8 @@ const Home = (props) => {
         {isAuthed && <Tabs value={value} onChange={handleChange} aria-label="basic tabs example">
           <Tab label="profile" {...a11yProps(0)} />
           {profile && <Tab label="links" {...a11yProps(1)} />}
-          {profile && <Tab label="wallets" {...a11yProps(2)} />}
-          {profile && <Tab label="Setting" {...a11yProps(3)} />}
-          {profile && <Tab label="posts" {...a11yProps(4)} />}
+          {profile && <Tab label="Posts" {...a11yProps(2)} />}
+
         </Tabs>
         }
         {isAuthed && <Box maxWidth="md">
@@ -182,12 +182,6 @@ const Home = (props) => {
             <LinkDialog profile={profile} />
           </TabPanel>
           <TabPanel value={value} index={2}>
-            building...
-          </TabPanel>
-          <TabPanel value={value} index={3}>
-            <Setting />
-          </TabPanel>
-          <TabPanel value={value} index={4}>
             <Posts />
           </TabPanel>
         </Box>}

@@ -1,3 +1,4 @@
+//@ts-nocheck
 import React, { createContext, useContext, useReducer } from "react";
 
 import { Actor, ActorSubclass, HttpAgent } from "@dfinity/agent";

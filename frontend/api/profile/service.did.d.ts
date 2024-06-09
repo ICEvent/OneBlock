@@ -57,6 +57,7 @@ export interface _SERVICE {
   'addLink' : ActorMethod<[string, Link], Result>,
   'addWallet' : ActorMethod<[string, Wallet], Result>,
   'availableCycles' : ActorMethod<[], bigint>,
+  'changeId' : ActorMethod<[string, string], Result>,
   'createProfile' : ActorMethod<[NewProfile], Result>,
   'deleteLink' : ActorMethod<[string, string], Result>,
   'editCanister' : ActorMethod<[Canister], Result>,
