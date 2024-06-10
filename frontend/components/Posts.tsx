@@ -138,7 +138,7 @@ export default function Posts() {
             } */}
 
                 <Box>
-                  Bring your own storage for posts {values.satelliteid}
+                  Bring your own storage for posts
                     <TextField
                         label="Storage (satellite id on https://juno.build)"
                         fullWidth

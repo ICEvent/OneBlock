@@ -149,7 +149,7 @@ const Home = (props) => {
             aria-label="menu"
             sx={{ mr: 2 }}
           >
-
+            <img src="/frontend/assets/logo.webp" alt="oneblock" style={{ width: 40, height: 40 }}/>
           </IconButton>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             ONEBLOCK
