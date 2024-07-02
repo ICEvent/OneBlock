@@ -1,25 +1,30 @@
 import React, { useEffect, useState } from "react";
 import { useOneblock } from "./Store";
 import { Profile } from "../api/profile/service.did";
-import { Box, Grid, Card, CardContent, Typography, Avatar, Button, Container } from "@mui/material";
+import { Box, Grid, Card, CardContent, Typography, Avatar, Button, Container, TextField } from "@mui/material";
 import { PAGING_LENGTH } from "../lib/constants";
 import { Link } from "react-router-dom";
+import { set } from "react-hook-form";
 
 const ProfileList = () => {
   const oneblock = useOneblock();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const fetchProfiles = async () => {
       try {
-        const profileCount = Number(await oneblock.getProfileCount());
-        const totalPages = Math.ceil(profileCount / PAGING_LENGTH);
-        setTotalPages(totalPages);
+        // const profileCount = Number(await oneblock.getProfileCount());
+        // const totalPages = Math.ceil(profileCount / PAGING_LENGTH);
+        // setTotalPages(totalPages);
 
-        const offset = (currentPage - 1) * PAGING_LENGTH;
+        // const offset = (currentPage - 1) * PAGING_LENGTH;
         const fetchedProfiles = await oneblock.getDefaultProfiles(BigInt(PAGING_LENGTH));
+        // const filteredProfiles = fetchedProfiles.filter((profile) =>
+        //   profile.name.toLowerCase().includes(searchTerm.toLowerCase())
+        // );
         setProfiles(fetchedProfiles);
       } catch (error) {
         console.error("Error fetching profiles:", error);
@@ -27,15 +32,31 @@ const ProfileList = () => {
     };
 
     fetchProfiles();
-  }, [oneblock, currentPage]);
+  }, [oneblock, currentPage, searchTerm]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+    
+  };
+
+  const handleSearchChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(event.target.value);
+    const fetchedProfiles = await oneblock.searchProfilesByName(event.target.value);
+    setProfiles(fetchedProfiles);
+
   };
 
   return (
     <Container maxWidth={false}>
       <Box p={4} border={1} borderColor="grey.300" borderRadius={4}>
+        <TextField
+          label="Search Profiles"
+          variant="outlined"
+          value={searchTerm}
+          onChange={handleSearchChange}
+          fullWidth
+          margin="normal"
+        />
         <Grid container spacing={2}>
           {profiles.map((profile) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={profile.id}>
@@ -59,27 +80,7 @@ const ProfileList = () => {
           ))}
         </Grid>
       </Box>
-      {/* <Box mt={2} display="flex" justifyContent="center">
-        <Button
-          variant="contained"
-          color="primary"
-          disabled={currentPage === 1}
-          onClick={() => handlePageChange(currentPage - 1)}
-        >
-          Previous
-        </Button>
-        <Box mx={2}>
-          Page {currentPage} of {totalPages}
-        </Box>
-        <Button
-          variant="contained"
-          color="primary"
-          disabled={currentPage === totalPages}
-          onClick={() => handlePageChange(currentPage + 1)}
-        >
-          Next
-        </Button>
-      </Box> */}
+      {/* Pagination controls */}
     </Container>
   );
 };

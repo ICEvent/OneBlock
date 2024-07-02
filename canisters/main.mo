@@ -237,6 +237,36 @@ actor {
         )
     };
 
+    public query func searchProfilesByName(q : Text) : async [Profile] {
+        let profileEntries = Iter.toArray(profiles.vals());
+        let filteredProfiles = Array.filter<Profile>(
+            profileEntries,
+            func(entry) {
+                let (profile) = entry;
+                Text.contains(profile.name, #text q)
+            },
+        );
+
+        let sortedProfiles = Array.sort<Profile>(
+            filteredProfiles,
+            func(x : Profile, y : Profile) : Order.Order {
+                if (y.createtime < x.createtime) { #less } else if (y.createtime == x.createtime) {
+                    #equal
+                } else {
+                    #greater
+                }
+            },
+        );
+
+        Array.tabulate<Profile>(
+            Nat.min(100, sortedProfiles.size()),
+            func(i) {
+                let (profile) = sortedProfiles[i];
+                profile
+            },
+        )
+    };
+
     public query func getProfileCount() : async Nat {
         Iter.size(profiles.entries())
     };

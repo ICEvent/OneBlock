@@ -95,5 +95,6 @@ service : {
   getProfileCount: () -> (nat) query;
   getProfiles: (nat, nat) -> (vec Profile) query;
   reserveid: (text) -> (Result);
+  searchProfilesByName: (text) -> (vec Profile) query;
   updateProfile: (text, UpdateProfile) -> (Result);
 }

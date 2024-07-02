@@ -73,6 +73,7 @@ export interface _SERVICE {
   'getProfileCount' : ActorMethod<[], bigint>,
   'getProfiles' : ActorMethod<[bigint, bigint], Array<Profile>>,
   'reserveid' : ActorMethod<[string], Result>,
+  'searchProfilesByName' : ActorMethod<[string], Array<Profile>>,
   'updateProfile' : ActorMethod<[string, UpdateProfile], Result>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;

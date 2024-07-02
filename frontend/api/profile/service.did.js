@@ -81,6 +81,11 @@ export const idlFactory = ({ IDL }) => {
     'getProfileCount' : IDL.Func([], [IDL.Nat], ['query']),
     'getProfiles' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Vec(Profile)], ['query']),
     'reserveid' : IDL.Func([IDL.Text], [Result], []),
+    'searchProfilesByName' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(Profile)],
+        ['query'],
+      ),
     'updateProfile' : IDL.Func([IDL.Text, UpdateProfile], [Result], []),
   });
 };
