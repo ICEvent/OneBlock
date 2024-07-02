@@ -149,7 +149,7 @@ const Home = (props) => {
             aria-label="menu"
             sx={{ mr: 2 }}
           >
-            <img src="/frontend/assets/logo.webp" alt="oneblock" style={{ width: 40, height: 40 }}/>
+            <img src="https://ruc7a-fiaaa-aaaal-ab4ha-cai.icp0.io/logos/ohg6t-vxkt4-biqom-c42y5-jbowf-jztkp-sysmb-i3i62-twlra-axtdy-eqe-oneblock.webp" alt="oneblock" style={{ width: 40, height: 40 }}/>
           </IconButton>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             ONEBLOCK
@@ -185,11 +185,11 @@ const Home = (props) => {
             <Posts />
           </TabPanel>
         </Box>}
-        {!isAuthed &&
-          <Box m={10}><DefaultHome /></Box>
-        }
-      </Container>
 
+      </Container>
+      {!isAuthed &&
+          <DefaultHome />
+        }
     </Box>
 
   )

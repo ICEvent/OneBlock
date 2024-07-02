@@ -31,7 +31,6 @@ export const idlFactory = ({ IDL }) => {
     'canisterid' : IDL.Principal,
     'gallery' : IDL.Text,
   });
-  const Inbox = IDL.Record({ 'owner' : IDL.Principal, 'inboxid' : IDL.Text });
   const Profile = IDL.Record({
     'id' : IDL.Text,
     'bio' : IDL.Text,
@@ -41,6 +40,7 @@ export const idlFactory = ({ IDL }) => {
     'createtime' : IDL.Int,
     'links' : IDL.Vec(Link),
   });
+  const Inbox = IDL.Record({ 'owner' : IDL.Principal, 'inboxid' : IDL.Text });
   const UpdateProfile = IDL.Record({
     'bio' : IDL.Text,
     'pfp' : IDL.Text,
@@ -61,6 +61,7 @@ export const idlFactory = ({ IDL }) => {
     'createProfile' : IDL.Func([NewProfile], [Result], []),
     'deleteLink' : IDL.Func([IDL.Text, IDL.Text], [Result], []),
     'editCanister' : IDL.Func([Canister], [Result], []),
+    'getDefaultProfiles' : IDL.Func([IDL.Nat], [IDL.Vec(Profile)], ['query']),
     'getInbox' : IDL.Func([IDL.Text], [IDL.Opt(Inbox)], ['query']),
     'getMyCanister' : IDL.Func([], [IDL.Opt(Canister)], ['query']),
     'getMyFavorites' : IDL.Func([], [IDL.Vec(Favorite)], ['query']),
@@ -77,6 +78,9 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(Canister)],
         ['query'],
       ),
+    'getProfileCount' : IDL.Func([], [IDL.Nat], ['query']),
+    'getProfiles' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Vec(Profile)], ['query']),
+    'reserveid' : IDL.Func([IDL.Text], [Result], []),
     'updateProfile' : IDL.Func([IDL.Text, UpdateProfile], [Result], []),
   });
 };

@@ -61,6 +61,7 @@ export interface _SERVICE {
   'createProfile' : ActorMethod<[NewProfile], Result>,
   'deleteLink' : ActorMethod<[string, string], Result>,
   'editCanister' : ActorMethod<[Canister], Result>,
+  'getDefaultProfiles' : ActorMethod<[bigint], Array<Profile>>,
   'getInbox' : ActorMethod<[string], [] | [Inbox]>,
   'getMyCanister' : ActorMethod<[], [] | [Canister]>,
   'getMyFavorites' : ActorMethod<[], Array<Favorite>>,
@@ -69,6 +70,9 @@ export interface _SERVICE {
   'getProfile' : ActorMethod<[string], [] | [Profile]>,
   'getProfileByPrincipal' : ActorMethod<[string], [] | [Profile]>,
   'getProfileCanister' : ActorMethod<[Principal], [] | [Canister]>,
+  'getProfileCount' : ActorMethod<[], bigint>,
+  'getProfiles' : ActorMethod<[bigint, bigint], Array<Profile>>,
+  'reserveid' : ActorMethod<[string], Result>,
   'updateProfile' : ActorMethod<[string, UpdateProfile], Result>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;

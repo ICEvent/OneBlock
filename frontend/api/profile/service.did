@@ -83,6 +83,7 @@ service : {
   createProfile: (NewProfile) -> (Result);
   deleteLink: (text, text) -> (Result);
   editCanister: (Canister) -> (Result);
+  getDefaultProfiles: (nat) -> (vec Profile) query;
   getInbox: (text) -> (opt Inbox) query;
   getMyCanister: () -> (opt Canister) query;
   getMyFavorites: () -> (vec Favorite) query;
@@ -91,5 +92,8 @@ service : {
   getProfile: (text) -> (opt Profile) query;
   getProfileByPrincipal: (text) -> (opt Profile) query;
   getProfileCanister: (principal) -> (opt Canister) query;
+  getProfileCount: () -> (nat) query;
+  getProfiles: (nat, nat) -> (vec Profile) query;
+  reserveid: (text) -> (Result);
   updateProfile: (text, UpdateProfile) -> (Result);
 }

@@ -1,4 +1,5 @@
 import Cycles "mo:base/ExperimentalCycles";
+import Nat "mo:base/Nat";
 import Text "mo:base/Text";
 import TrieMap "mo:base/TrieMap";
 import Principal "mo:base/Principal";
@@ -7,6 +8,7 @@ import Result "mo:base/Result";
 import Time "mo:base/Time";
 import Buffer "mo:base/Buffer";
 import Array "mo:base/Array";
+import Order "mo:base/Order";
 
 import Types "types";
 
@@ -21,7 +23,9 @@ actor {
     stable var upgradeInboxes : [(Text, Inbox)] = [];
     stable var userWallets : [(Text, [Types.Wallet])] = [];
     stable var upgradeFavorites : [(Principal, [Favorite])] = [];
-    stable var upgradeCanisters: [(Principal, Canister )] = [];
+    stable var upgradeCanisters : [(Principal, Canister)] = [];
+
+    stable var reserveIds : [Text] = ["oneblock", "block", "about", "admin", "status", "update"];
 
     stable var _admins : [Text] = ["3z4ue-dry77-pvwdh-4ugn3-lu2wi-sbfp6-7xzaf-jupqw-vqiit-zi7m7-gae"];
 
@@ -41,7 +45,7 @@ actor {
     myFavorites := TrieMap.fromEntries<Principal, [Favorite]>(Iter.fromArray(upgradeFavorites), Principal.equal, Principal.hash);
 
     var myCanisters = TrieMap.TrieMap<Principal, Canister>(Principal.equal, Principal.hash);
-    myCanisters := TrieMap.fromEntries<Principal,Canister>(Iter.fromArray(upgradeCanisters), Principal.equal, Principal.hash);
+    myCanisters := TrieMap.fromEntries<Principal, Canister>(Iter.fromArray(upgradeCanisters), Principal.equal, Principal.hash);
 
     system func preupgrade() {
         stableProfiles := Iter.toArray(profiles.entries());
@@ -49,7 +53,7 @@ actor {
         upgradeInboxes := Iter.toArray(inboxes.entries());
         userWallets := Iter.toArray(wallets.entries());
         upgradeFavorites := Iter.toArray(myFavorites.entries());
-        upgradeCanisters := Iter.toArray(myCanisters.entries());
+        upgradeCanisters := Iter.toArray(myCanisters.entries())
     };
 
     system func postupgrade() {
@@ -58,7 +62,7 @@ actor {
         upgradeInboxes := [];
         userWallets := [];
         upgradeFavorites := [];
-        upgradeCanisters := [];
+        upgradeCanisters := []
     };
 
     public shared ({ caller }) func createProfile(newProfile : Types.NewProfile) : async Result.Result<Nat, Text> {
@@ -80,6 +84,8 @@ actor {
 
                             if (Text.size(newProfile.id) < 4) {
                                 #err("profile id length must be greater than 3")
+                            } else if (Array.find(reserveIds, func(id : Text) : Bool { id == newProfile.id }) != null) {
+                                #err("the id is reserved")
                             } else {
                                 profiles.put(
                                     newProfile.id,
@@ -140,7 +146,7 @@ actor {
         }
     };
 
-   public shared ({ caller }) func changeId(oid : Text, nid: Text) : async Result.Result<Nat, Text> {
+    public shared ({ caller }) func changeId(oid : Text, nid : Text) : async Result.Result<Nat, Text> {
         if (Principal.isAnonymous(caller)) {
             #err("no authenticated")
         } else {
@@ -150,11 +156,11 @@ actor {
                 case (?p) {
                     if (p.owner == caller or isAdmin(caller)) {
                         let existp = profiles.get(nid);
-                        switch(existp){
-                            case(?existp){
-                                #err("this id has been taken");
+                        switch (existp) {
+                            case (?existp) {
+                                #err("this id has been taken")
                             };
-                            case(_){
+                            case (_) {
                                 profiles.put(
                                     nid,
                                     {
@@ -173,7 +179,7 @@ actor {
                             };
 
                         };
-                        
+
                     } else {
                         #err("no permission to update")
                     };
@@ -186,7 +192,55 @@ actor {
 
         }
     };
-    
+
+    public query func getProfiles(pageSize : Nat, pageNumber : Nat) : async [Profile] {
+        let profileEntries = Iter.toArray(profiles.entries());
+        let totalProfiles = profileEntries.size();
+        let startIndex = pageNumber * pageSize;
+        let endIndex = startIndex + pageSize;
+
+        let slicedProfiles = Array.tabulate<Profile>(
+            Nat.min(endIndex - startIndex, totalProfiles - startIndex),
+            func(i) {
+                let (_, profile) = profileEntries[startIndex + i];
+                profile
+            },
+        );
+
+        slicedProfiles
+    };
+
+    public query func getDefaultProfiles(size : Nat) : async [Profile] {
+
+        let profileEntries = Iter.toArray(profiles.vals());
+        let filteredProfiles = Array.filter<Profile>(
+            profileEntries,
+            func(profile) {
+                profile.name != "" and profile.pfp != ""
+            },
+        );
+
+        let sortedProfiles = Array.sort<Profile>(
+            filteredProfiles,
+            func(x : Profile, y : Profile) : Order.Order {
+                if (y.createtime < x.createtime) { #less } else if (y.createtime == x.createtime) {
+                    #equal
+                } else {
+                    #greater
+                }
+            },
+        );
+
+        Array.tabulate<Profile>(
+            Nat.min(size, sortedProfiles.size()),
+            func(i) { sortedProfiles[i] },
+        )
+    };
+
+    public query func getProfileCount() : async Nat {
+        Iter.size(profiles.entries())
+    };
+
     public shared ({ caller }) func addLink(id : Text, link : Types.Link) : async Result.Result<Nat, Text> {
         if (Principal.isAnonymous(caller)) {
             #err("no authenticated")
@@ -421,35 +475,45 @@ actor {
         Array.find<Inbox>(inboxArr, func(i : Inbox) : Bool { i.owner == caller })
     };
 
-
     //===================================
     // Canister
     //===================================
 
     public shared ({ caller }) func editCanister(canister : Canister) : async Result.Result<Nat, Text> {
 
-  
-                            myCanisters.put(
-                                caller,
-                                canister,
-                            );
-                            #ok(1)
-                 
- 
+        myCanisters.put(
+            caller,
+            canister,
+        );
+        #ok(1)
 
     };
 
-    public query({caller}) func getMyCanister() : async ?Canister {
-        myCanisters.get(caller);
+    public query ({ caller }) func getMyCanister() : async ?Canister {
+        myCanisters.get(caller)
     };
 
-    public query func getProfileCanister(uid: Principal) : async ?Canister {
-        myCanisters.get(uid);
+    public query func getProfileCanister(uid : Principal) : async ?Canister {
+        myCanisters.get(uid)
     };
 
     //=======================================
-    // system 
+    // system
     //=======================================
+
+    public shared ({ caller }) func reserveid(id : Text) : async Result.Result<Nat, Text> {
+        if (isAdmin(caller)) {
+            if (Array.find(reserveIds, func(existingId : Text) : Bool { existingId == id }) != null) {
+                return #err("ID already reserved")
+            };
+            let b = Buffer.fromArray<Text>(reserveIds);
+            b.add(id);
+            reserveIds := Buffer.toArray<Text>(b);
+            #ok(1)
+        } else {
+            #err("no permission")
+        }
+    };
 
     public query ({ caller }) func availableCycles() : async Nat {
         if (isAdmin(caller)) {
@@ -471,12 +535,11 @@ actor {
         }
     };
 
-
     private func isAdmin(pid : Principal) : Bool {
         let fa = Array.find(_admins, func(a : Text) : Bool { a == Principal.toText(pid) });
         switch (fa) {
             case (?fa) { true };
-            case (_)(false)
+            case (_) (false)
         }
     }
 }
