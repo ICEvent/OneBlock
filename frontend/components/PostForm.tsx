@@ -1,6 +1,6 @@
 import React from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { TextField, Button, Box } from '@mui/material';
+import { TextField, Button, Box, CircularProgress } from '@mui/material';
 
 interface PostFormData {
   title: string;
@@ -8,19 +8,18 @@ interface PostFormData {
 }
 
 interface PostFormProps {
-    onSubmit: (data: PostFormData) => void;
-  }
+  onSubmit: (data: PostFormData) => void;
+}
 
 const PostForm: React.FC<PostFormProps> = ({ onSubmit }) => {
-  
-  const { control, handleSubmit, formState: { errors } } = useForm<PostFormData>();
+  const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<PostFormData>();
 
-  const onFormSubmit  = (data: PostFormData) => {
-     onSubmit(data);
+  const onFormSubmit = (data: PostFormData) => {
+    onSubmit(data);
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: 400, mx: 'auto', mt: 4 }}>
+    <Box component="form" onSubmit={handleSubmit(onFormSubmit)} sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: 400, mx: 'auto', mt: 4 }}>
       <Controller
         name="content"
         control={control}
@@ -39,8 +38,8 @@ const PostForm: React.FC<PostFormProps> = ({ onSubmit }) => {
         )}
       />
 
-      <Button type="submit" variant="contained" color="primary">
-        Post
+      <Button type="submit" variant="contained" color="primary" disabled={isSubmitting}>
+        {isSubmitting ? <CircularProgress size={24} /> : 'Post'}
       </Button>
     </Box>
   );

@@ -1,5 +1,5 @@
 //@ts-nocheck
-import { Box, Button, Container, TextField } from "@mui/material";
+import { Box, Button, Container, Grid,TextField } from "@mui/material";
 import React, { useEffect, useState } from "react";
 import { Principal } from "@dfinity/principal";
 import { useOneblock, useProfile } from "./Store";
@@ -8,7 +8,7 @@ import { Inbox,Canister} from "../api/profile/service.did";
 import moment from "moment";
 import { setDoc,initSatellite } from "@junobuild/core";
 import PostForm from "./PostForm";
-
+import PostList from "./PostList";
 
 interface State {
     inboxid: string;
@@ -32,7 +32,7 @@ export default function Posts() {
         satelliteid: null,
 
         posts: "posts",
-        gallery: "gallery"
+        gallery: "pictures"
     });
 
 
@@ -120,46 +120,48 @@ export default function Posts() {
 
       
     return (
-        <Container>
-            {/* {inbox && inbox.inboxid}
-            
-            {!inbox &&
-                <Box>
-                    <TextField
-                        label="inbox canister id"
-                        fullWidth
-                        sx={{ m: 1 }}
-                        value={values.inboxid}
-                        onChange={handleChange('inboxid')}
-                    />
-                   
-                    <Button onClick={importInbox}>Import</Button>
-                </Box>
-            } */}
 
+        <Grid container spacing={3}>
+            <Grid item xs={12} md={4}>
+                {/* Post storage */}
                 <Box>
-                  Bring your own storage for posts
+                    Setup your own storage for posts
                     <TextField
                         label="Storage (satellite id on https://juno.build)"
                         fullWidth
-                        variant="outlined" 
+                        variant="outlined"
                         autoFocus
                         sx={{ m: 1 }}
                         value={values.satelliteid}
-                        onChange={handleChange('satelliteid')}
-                    />  
-                   
+                        onChange={handleChange("satelliteid")}
+                    />
+
                     <TextField
-                        label="Posts(collection name of datastore on Juno)"
+                        label="collection name for post"
                         fullWidth
                         sx={{ m: 1 }}
                         value={values.posts}
-                        onChange={handleChange('posts')}
-                    />  
-                                      
-                    <Button disabled={loading} onClick={updateSatellite}>Save</Button>
+                        onChange={handleChange("posts")}
+                    />
+                    <TextField
+                        label="collection name for picture"
+                        fullWidth
+                        sx={{ m: 1 }}
+                        value={values.gallery}
+                        onChange={handleChange("gallery")}
+                    />
+                    <Button disabled={loading} onClick={updateSatellite}>
+                        Save
+                    </Button>
                 </Box>
-                {values.satelliteid && <PostForm onSubmit={savePost}/>}
-        </Container>
+                
+            </Grid>
+            <Grid item xs={12} md={8}>
+                {/* Post form */}
+                {values.satelliteid && <PostForm onSubmit={savePost} />}
+                {values.satelliteid && <PostList canister={{ posts: values.posts }} />}
+            </Grid>
+        </Grid>
+
     );
 };
