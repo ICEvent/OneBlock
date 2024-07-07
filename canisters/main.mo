@@ -19,6 +19,8 @@ actor {
     type Canister = Types.Canister;
 
     stable var stableProfiles : [(Text, Profile)] = [];
+    stable var stableFeaturedProfiles : [Profile] = [];
+
     stable var userProfiles : [(Principal, Text)] = [];
     stable var upgradeInboxes : [(Text, Inbox)] = [];
     stable var userWallets : [(Text, [Types.Wallet])] = [];
@@ -31,6 +33,8 @@ actor {
 
     var profiles = TrieMap.TrieMap<Text, Profile>(Text.equal, Text.hash);
     profiles := TrieMap.fromEntries<Text, Profile>(Iter.fromArray(stableProfiles), Text.equal, Text.hash);
+
+    var featuredProfiles = Buffer.Buffer<Profile>(0);
 
     var inboxes = TrieMap.TrieMap<Text, Inbox>(Text.equal, Text.hash);
     inboxes := TrieMap.fromEntries<Text, Inbox>(Iter.fromArray(upgradeInboxes), Text.equal, Text.hash);
@@ -53,7 +57,8 @@ actor {
         upgradeInboxes := Iter.toArray(inboxes.entries());
         userWallets := Iter.toArray(wallets.entries());
         upgradeFavorites := Iter.toArray(myFavorites.entries());
-        upgradeCanisters := Iter.toArray(myCanisters.entries())
+        upgradeCanisters := Iter.toArray(myCanisters.entries());
+        stableFeaturedProfiles := Buffer.toArray(featuredProfiles)
     };
 
     system func postupgrade() {
@@ -62,7 +67,8 @@ actor {
         upgradeInboxes := [];
         userWallets := [];
         upgradeFavorites := [];
-        upgradeCanisters := []
+        upgradeCanisters := [];
+        featuredProfiles := Buffer.fromArray(stableFeaturedProfiles)
     };
 
     public shared ({ caller }) func createProfile(newProfile : Types.NewProfile) : async Result.Result<Nat, Text> {
@@ -108,6 +114,39 @@ actor {
                 }
             };
 
+        }
+    };
+
+    public shared ({ caller }) func addFeaturedProfile(pid : Text) : async Result.Result<Nat, Text> {
+        if (isAdmin(caller)) {
+            let featuredProfile = profiles.get(pid);
+            switch (featuredProfile) {
+                case (?featuredProfile) {
+                    featuredProfiles.add(featuredProfile);
+                    #ok(1)
+                };
+                case (_) {
+                    #err("the profile is not found")
+                }
+            };
+
+        } else {
+            #err("No permission to add featured profile")
+        }
+    };
+
+    public shared ({ caller }) func removeFeaturedProfile(id : Text) : async Result.Result<Nat, Text> {
+        if (isAdmin(caller)) {
+            let newFeaturedProfiles = Buffer.Buffer<Profile>(0);
+            for (featuredProfile in featuredProfiles.vals()) {
+                if (featuredProfile.id != id) {
+                    newFeaturedProfiles.add(featuredProfile)
+                }
+            };
+            featuredProfiles := newFeaturedProfiles;
+            #ok(1)
+        } else {
+            #err("No permission to remove featured profile")
         }
     };
 
