@@ -4,7 +4,7 @@ import { Profile } from "../api/profile/service.did";
 import { Box, Grid, Card, CardContent, Typography, Avatar, Button, Container, TextField } from "@mui/material";
 import { PAGING_LENGTH } from "../lib/constants";
 import { Link } from "react-router-dom";
-import { set } from "react-hook-form";
+import moment from 'moment';
 
 const ProfileList = () => {
   const oneblock = useOneblock();
@@ -36,7 +36,7 @@ const ProfileList = () => {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    
+
   };
 
   const handleSearchChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -72,6 +72,7 @@ const ProfileList = () => {
                       <Typography variant="body2" color="textSecondary">
                         {profile.bio}
                       </Typography>
+
                     </Box>
                   </Box>
                 </CardContent>
