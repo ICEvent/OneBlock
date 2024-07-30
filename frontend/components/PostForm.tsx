@@ -1,9 +1,7 @@
-import React from 'react';
-import { useForm, Controller } from 'react-hook-form';
-import { TextField, Button, Box, CircularProgress } from '@mui/material';
+import React, { useState } from 'react';
+import { TextField, Button, Box } from '@mui/material';
 
 interface PostFormData {
-  title: string;
   content: string;
 }
 
@@ -12,34 +10,40 @@ interface PostFormProps {
 }
 
 const PostForm: React.FC<PostFormProps> = ({ onSubmit }) => {
-  const { control, handleSubmit, formState: { errors, isSubmitting } } = useForm<PostFormData>();
+  const [content, setContent] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const onFormSubmit = (data: PostFormData) => {
-    onSubmit(data);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    if (content.trim() === '') {
+      setError('Post is required');
+      setIsSubmitting(false);
+      return;
+    }
+
+    onSubmit({ content });
+    setContent('');
+    setError('');
+    setIsSubmitting(false);
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit(onFormSubmit)} sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: 400, mx: 'auto', mt: 4 }}>
-      <Controller
-        name="content"
-        control={control}
-        defaultValue=""
-        rules={{ required: 'Post is required' }}
-        render={({ field }) => (
-          <TextField
-            {...field}
-            label="What's new?"
-            variant="outlined"
-            multiline
-            rows={4}
-            error={!!errors.content}
-            helperText={errors.content ? errors.content.message : ''}
-          />
-        )}
+    <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: 400, mx: 'auto', mt: 4 }}>
+      <TextField
+        label="What's new?"
+        variant="outlined"
+        multiline
+        rows={4}
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        error={!!error}
+        helperText={error}
       />
-
       <Button type="submit" variant="contained" color="primary" disabled={isSubmitting}>
-        {isSubmitting ? <CircularProgress size={24} /> : 'Post'}
+        {isSubmitting ? 'Posting...' : 'Post'}
       </Button>
     </Box>
   );
