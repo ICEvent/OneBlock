@@ -51,6 +51,7 @@ module {
         owner: Principal;
     };
 
+    //satellite on Juno to store posts
     public type Canister = {
         canisterid: Principal;
         name: Text;

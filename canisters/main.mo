@@ -545,7 +545,10 @@ actor {
     };
 
     //===================================
-    // Canister
+    // Canister on Juno for posts
+    // 1 create a satellite on Juno
+    // 2 set principal id of Oneblock as controller of satellite
+    // 3 set satellite id and datastore/srorage id in OneBlock
     //===================================
 
     public shared ({ caller }) func editCanister(canister : Canister) : async Result.Result<Nat, Text> {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TextField, Button, Box } from '@mui/material';
+import CircularProgress from '@mui/material/CircularProgress';
 
 interface PostFormData {
   content: string;
@@ -42,9 +43,10 @@ const PostForm: React.FC<PostFormProps> = ({ onSubmit }) => {
         error={!!error}
         helperText={error}
       />
-      <Button type="submit" variant="contained" color="primary" disabled={isSubmitting}>
+      <Button type="submit" variant="contained" color="primary" disabled={isSubmitting} startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}>
         {isSubmitting ? 'Posting...' : 'Post'}
       </Button>
+      
     </Box>
   );
 };
