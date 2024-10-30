@@ -5,3 +5,4 @@ dist-ssr
 *.local
 .dfx
 canister_ids.json
+.vscode

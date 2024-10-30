@@ -21,7 +21,7 @@ import Tab from '@mui/material/Tab';
 
 import { ProfileForm } from "../components/ProfileForm";
 import { LinkDialog } from "../components/LinkDialog";
-import { DefaultHome } from "../components/DefaultHome";
+import  DefaultHome  from "../components/DefaultHome";
 import Tooltip from '@mui/material/Tooltip';
 import { ToastContainer, toast } from 'react-toastify';
 import { useOneblock, useSetAgent, useGlobalContext, useProfile } from "../components/Store";
