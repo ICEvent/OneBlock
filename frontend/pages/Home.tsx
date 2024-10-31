@@ -22,6 +22,7 @@ import Tab from '@mui/material/Tab';
 import { ProfileForm } from "../components/ProfileForm";
 import { LinkDialog } from "../components/LinkDialog";
 import  DefaultHome  from "../components/DefaultHome";
+import Scores from "../components/Scores";
 import Tooltip from '@mui/material/Tooltip';
 import { ToastContainer, toast } from 'react-toastify';
 import { useOneblock, useSetAgent, useGlobalContext, useProfile } from "../components/Store";
@@ -115,7 +116,7 @@ const Home = (props) => {
   const login = async () => {
     authClient.login({
       identityProvider: IDENTITY_PROVIDER,
-      // derivationOrigin: "https://32pz7-5qaaa-aaaag-qacra-cai.raw.ic0.app",//profile backend canister
+      derivationOrigin: "https://32pz7-5qaaa-aaaag-qacra-cai.raw.ic0.app",//profile backend canister
       maxTimeToLive: ONE_WEEK_NS,
       onSuccess: () => handleAuthenticated(authClient),
     });
@@ -170,6 +171,7 @@ const Home = (props) => {
           <Tab label="profile" {...a11yProps(0)} />
           {profile && <Tab label="links" {...a11yProps(1)} />}
           {profile && <Tab label="Posts" {...a11yProps(2)} />}
+          {profile && <Tab label="Scores" {...a11yProps(3)} />}
 
         </Tabs>
         }
@@ -183,6 +185,9 @@ const Home = (props) => {
           </TabPanel>
           <TabPanel value={value} index={2}>
             <Posts />
+          </TabPanel>
+          <TabPanel value={value} index={3}>
+            <Scores />
           </TabPanel>
         </Box>}
 
