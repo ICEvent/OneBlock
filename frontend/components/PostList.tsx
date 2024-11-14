@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 
 import moment from 'moment';
 import { Box, Card, CardContent, Typography } from '@mui/material';
-import { Post } from './types';
+import { Post } from '../lib/types';
 import { Canister } from '../api/profile/service.did';
 
 import { listDocs } from "@junobuild/core";

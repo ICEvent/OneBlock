@@ -28,6 +28,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import { useOneblock, useSetAgent, useGlobalContext, useProfile } from "../components/Store";
 
 import Posts from "../components/Posts";
+import Inbox from "../components/Inbox";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -171,7 +172,8 @@ const Home = (props) => {
           <Tab label="profile" {...a11yProps(0)} />
           {profile && <Tab label="links" {...a11yProps(1)} />}
           {profile && <Tab label="Posts" {...a11yProps(2)} />}
-          {profile && <Tab label="Scores" {...a11yProps(3)} />}
+          {/* {profile && <Tab label="Inbox" {...a11yProps(3)} />} */}
+          {profile && <Tab label="Scores" {...a11yProps(4)} />}
 
         </Tabs>
         }
@@ -187,6 +189,9 @@ const Home = (props) => {
             <Posts />
           </TabPanel>
           <TabPanel value={value} index={3}>
+            <Inbox />
+          </TabPanel>
+          <TabPanel value={value} index={4}>
             <Scores />
           </TabPanel>
         </Box>}
