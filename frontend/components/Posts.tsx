@@ -113,9 +113,9 @@ export default function Posts() {
         })
     }, []);
 
-    useEffect(() => {
-        if (values.satelliteid) initSatellite({ satelliteId: values.satelliteid });
-    }, [values.satelliteid]);
+    // useEffect(() => {
+    //     if (values.satelliteid) initSatellite({ satelliteId: values.satelliteid });
+    // }, [values.satelliteid]);
 
     const handleChange = (prop: keyof typeof values) => (event: React.ChangeEvent<HTMLInputElement>) => {
         setValues({ ...values, [prop]: event.target.value });
@@ -160,6 +160,7 @@ export default function Posts() {
     const savePost = (data: PostFormData) => {
         setLoading(true);
         setDoc<Post>({
+            satellite:{ "satelliteId": values.satelliteid},
             collection: values.posts,
             doc: {
                 key: moment().format("YYYYMMHHhhmmss"),

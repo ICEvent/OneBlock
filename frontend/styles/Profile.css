@@ -1,0 +1,89 @@
+.profile-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.profile-header {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.profile-avatar img {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-info h1 {
+  margin: 0 0 0.5rem;
+  font-size: 2rem;
+}
+
+.profile-date {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.profile-nav {
+  border-bottom: 2px solid #eee;
+  margin-bottom: 2rem;
+}
+
+.nav-button {
+  background: none;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  cursor: pointer;
+  position: relative;
+}
+
+.nav-button.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #000;
+}
+
+.links-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.link-card {
+  padding: 1rem;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s;
+}
+
+.link-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.setup-guide {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.setup-guide ol {
+  margin-top: 1rem;
+  padding-left: 1.5rem;
+}
+
+.setup-guide li {
+  margin-bottom: 0.5rem;
+}

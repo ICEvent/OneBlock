@@ -1,79 +1,112 @@
 //@ts-nocheck
 import React, { useEffect, useState } from "react"
-import { useParams } from "react-router-dom";
-
-import moment from "moment";
-import { initSatellite } from "@junobuild/core";
-import { Profile, Link, Canister } from "../api/profile/service.did";
-import LinkList from "../components/LinkList";
-import NameCard from "../components/NameCard";
-import PostList from "../components/PostList";
-import { Hikings } from "../components/Hikings";
-import { useOneblock } from "../components/Store";
-import { Container, Grid, Box, Paper } from '@mui/material';
-
+import { useParams } from "react-router-dom"
+import { Profile, Link, Canister } from "../api/profile/service.did"
+import { useOneblock } from "../components/Store"
+import "../styles/Profile.css"
+import PostList from "../components/PostList"
+import moment from "moment"
 const ProfilePage = () => {
-
-
   const oneblock = useOneblock()
   const [links, setLinks] = useState<Link[]>([])
-  const [currentTab, setCurrentTab] = useState(0);
-
   const [canister, setCanister] = useState<Canister | null>(null)
-  const [profile, setProfile] = React.useState<Profile | null>(null);
-  const { id } = useParams<{ id: string }>();
-  const [loading, setLoading] = useState(false);
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [activeTab, setActiveTab] = useState('posts')
+  const { id } = useParams<{ id: string }>()
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    loadProfile()
+  }, [])
+
+  const loadProfile = async () => {
     setLoading(true)
-    oneblock.getProfile(id).then(res => {
-      if (res[0]) {
-        console.log("profile:", res[0])
-        setLinks(res[0].links);
-        setProfile(res[0]);
-        oneblock.getProfileCanister(res[0].owner).then(canister => {
-          
-          if (canister[0]) {
-            console.log("canister: ", canister[0])
-            initSatellite({
-              satelliteId: canister[0].canisterid.toString()
-            });
-            setCanister(canister[0])
-
-          }
-          setLoading(false)
-        })
-      };
-    });
-
-  }, []);
-
-
+    const [profileData] = await oneblock.getProfile(id)
+    if (profileData) {
+      setLinks(profileData.links)
+      setProfile(profileData)
+      const [canisterData] = await oneblock.getProfileCanister(profileData.owner)
+      if (canisterData) {
+        setCanister(canisterData)
+      }
+    }
+    setLoading(false)
+  }
   return (
+    <div className="profile-container">
+      <header className="profile-header">
+        <div className="profile-avatar">
+          <img src={profile?.pfp || '/default-avatar.png'} alt={profile?.name} />
+        </div>
+        <div className="profile-info">
+          <h1>{profile?.name}</h1>
+          <p className="bio">{profile?.bio}</p>
+          
+        </div>
+      </header>
 
-    <Container>
-      <Grid container spacing={3}>
-        <Grid item xs={3}>
-          <Paper>
-            <NameCard profile={profile} />
-            <LinkList links={links} />
-          </Paper>
-        </Grid>
-        <Grid item xs={9}>
-          <Paper>
-            {canister && <PostList canister={canister} />}
-            {!canister && !loading && <>
-              <h2>Bring your own post storage</h2>
-              follow below steps to setup your own storage:
-              <li>create a satellite on Juno(https://juno.build)</li>
-              <li>create a collection(e.g "posts") under datastore</li>
-              <li>copy satellite id, then login https://oneblock.page, go to "Posts", input satelliteid and update posts name "posts" created at previous step, and save it</li>
-            </>}
-          </Paper>
-        </Grid>
-      </Grid>
-    </Container>
-  )
-}
+      <hr style={{
+        width: '100%',
+        height: '1px',
+        backgroundColor: '#e0e0e0',
+        border: 'none',
+        margin: '32px 0'
+      }} />
+
+      <main style={{
+        display: 'grid',
+        gridTemplateColumns: '300px 1fr',
+        gap: '32px'
+      }}>
+        <div className="links-section">
+          <div className="links-grid" style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}>
+            {links.map((link, index) => (
+              <a 
+                key={index}
+                href={link.url}
+                className="link-item"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-block',
+                  backgroundColor: '#f0f0f0',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  textDecoration: 'none',
+                  color: '#333',
+                  margin: '4px',
+                  whiteSpace: 'nowrap',
+                  
+                }}
+              >
+                {link.name}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <div className="posts-section">
+          {canister ? (
+            <PostList canister={canister} />
+          ) : (
+            !loading && (
+              <div className="setup-guide">
+                <h2>Setup Your Post Storage</h2>
+                <ol>
+                  <li>Create a satellite on <a href="https://juno.build">Juno</a></li>
+                  <li>Create a collection named "posts" under datastore</li>
+                  <li>Copy satellite ID and configure it in your OneBlock settings</li>
+                </ol>
+              </div>
+            )
+          )}
+        </div>
+      </main>
+    </div>
+  )}
 
 export { ProfilePage }

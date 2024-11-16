@@ -172,8 +172,7 @@ const Home = (props) => {
           <Tab label="profile" {...a11yProps(0)} />
           {profile && <Tab label="links" {...a11yProps(1)} />}
           {profile && <Tab label="Posts" {...a11yProps(2)} />}
-          {/* {profile && <Tab label="Inbox" {...a11yProps(3)} />} */}
-          {profile && <Tab label="Scores" {...a11yProps(4)} />}
+          {profile && <Tab label="Scores" {...a11yProps(3)} />}
 
         </Tabs>
         }
@@ -187,11 +186,8 @@ const Home = (props) => {
           </TabPanel>
           <TabPanel value={value} index={2}>
             <Posts />
-          </TabPanel>
+          </TabPanel> 
           <TabPanel value={value} index={3}>
-            <Inbox />
-          </TabPanel>
-          <TabPanel value={value} index={4}>
             <Scores />
           </TabPanel>
         </Box>}

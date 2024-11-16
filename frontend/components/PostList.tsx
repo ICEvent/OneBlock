@@ -1,24 +1,18 @@
 //@ts-nocheck
 import React, { useEffect, useState } from 'react';
-
 import moment from 'moment';
-import { Box, Card, CardContent, Typography } from '@mui/material';
+import { listDocs } from "@junobuild/core";
 import { Post } from '../lib/types';
 import { Canister } from '../api/profile/service.did';
-
-import { listDocs } from "@junobuild/core";
-
 import { useGlobalContext } from './Store';
-
 
 interface PostsProps {
   canister: Canister;
 }
 
-
 const PostList: React.FC<PostsProps> = ({ canister }) => {
   const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(false);
   const { state: { isAuthed, principal } } = useGlobalContext();
 
   useEffect(() => {
@@ -26,13 +20,21 @@ const PostList: React.FC<PostsProps> = ({ canister }) => {
   }, [canister]);
 
   const loadPosts = async () => {
-    setLoading(true)
+    setLoading(true);
     if (canister) {
-      console.log(canister.posts);
-
       const docs = await listDocs({
+        satellite: { satelliteId: canister.canisterid },
         collection: canister.posts,
         filter: {
+          matcher: {            
+            updatedAt: {
+              matcher: "between",
+              timestamps: {
+                start: BigInt((new Date().getTime() - 30* 24 * 60 * 60 * 1000) * 1000000),
+                end: BigInt(new Date().getTime() *1000000)
+              }
+            }
+          },
           order: {
             desc: true,
             field: "created_at",
@@ -41,50 +43,68 @@ const PostList: React.FC<PostsProps> = ({ canister }) => {
       });
 
       if (docs.items_length > 0) {
-        let parsePosts: Post[] = [];
-
-        docs.items.map(item => {
-
-          if (item.created_at && item.data && typeof item.data == "object") {
-
-            const createat = parseInt(item.created_at.toString());
-            console.log("createat: ", createat);
-
-            parsePosts.push({
-              id: item.key,
-              post: item.data.post,
-              timestamp: moment.unix(createat / 1000000000).format("MMMM Do YYYY, h:mm a")
-            })
-
-          }
-        }
-        );
+        const parsePosts = docs.items.map(item => ({
+          id: item.key,
+          post: item.data.post,
+          timestamp: moment.unix(parseInt(item.created_at.toString()) / 1000000000).format("MMMM Do YYYY, h:mm a")
+        }));
         setPosts(parsePosts);
       }
-
     }
-    setLoading(false)
+    setLoading(false);
+  };
 
-};
-
-
-return (
-  <Box p={2}>
-    
-    {posts.length>0 ? posts.map((post) => (
-      <Card key={post.id} variant="outlined" sx={{ mb: 2 }}>
-        <CardContent>
-          <Typography variant="body2" color="textSecondary">{post.timestamp}</Typography>
-          <Typography variant="body2">{post.post}</Typography>
-        </CardContent>
-      </Card>
-    )) :
-      <Typography variant="body1" color="textSecondary" align="center">
-        {canister && !loading && "No posts available."}
-        
-      </Typography>}
-  </Box>
-);
+  return (
+    <div style={{
+      maxWidth: '800px',
+      margin: '0 auto',
+      padding: '20px'
+    }}>
+      {posts.length > 0 ? (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px'
+        }}>
+          {posts.map((post) => (
+            <article key={post.id} style={{
+              padding: '24px',
+              borderRadius: '12px',
+              backgroundColor: '#fff',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              transition: 'transform 0.2s ease',
+              cursor: 'pointer'
+            }}>
+              <time style={{
+                display: 'block',
+                fontSize: '14px',
+                color: '#666',
+                marginBottom: '12px'
+              }}>
+                {post.timestamp}
+              </time>
+              <p style={{
+                fontSize: '16px',
+                lineHeight: '1.6',
+                margin: 0,
+                color: '#333'
+              }}>
+                {post.post}
+              </p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div style={{
+          textAlign: 'center',
+          color: '#666',
+          padding: '40px'
+        }}>
+          {canister && !loading && "No posts available."}
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default PostList;

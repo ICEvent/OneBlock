@@ -11,7 +11,24 @@ export default function Scores() {
   const [totalScore, setTotalScore] = useState(0);
   const [loading, setLoading] = useState(true);
 
-
+  const [totalDistance, setTotalDistance] = useState(0);
+  const [totalDuration, setTotalDuration] = useState(0);
+  const [elevationGain, setElevationGain] = useState(0);
+  const [completedTrails, setCompletedTrails] = useState(0);
+  
+  const calculateHikingPoints = () => {
+    // Points formula: 
+    // Distance: 10 points per km
+    // Duration: 5 points per hour
+    // Elevation: 1 point per 10m gained
+    // Completed trails: 100 points per trail
+    const distancePoints = totalDistance * 10;
+    const durationPoints = totalDuration * 5;
+    const elevationPoints = Math.floor(elevationGain / 10);
+    const completedTrailPoints = completedTrails * 100;
+    
+    return distancePoints + durationPoints + elevationPoints + completedTrailPoints;
+  };
   const calculateDaysActive = () => {
     if (!profile?.createtime) return 0;
     const created = moment(Number(profile.createtime)/1000000);
@@ -24,6 +41,12 @@ export default function Scores() {
       value: calculateDaysActive(),
       points: calculateDaysActive(),
       description: "1 points per day since profile creation"
+    },
+    {
+      title: "Hiking Performance",
+      value: `${totalDistance}km • ${totalDuration}h • ${elevationGain}m`,
+      points: calculateHikingPoints(),
+      description: "Points based on distance, duration, elevation gain and completed trails"
     },
     {
       title: "Defund Donations",
@@ -39,6 +62,8 @@ export default function Scores() {
     setLoading(false);
   }, [profile]);
 
+
+  
   return (
     <Container maxWidth="lg">
       <Box sx={{ py: 4 }}>
@@ -107,3 +132,5 @@ export default function Scores() {
     </Container>
   );
 }
+
+
