@@ -55,11 +55,7 @@ const PostList: React.FC<PostsProps> = ({ canister }) => {
   };
 
   return (
-    <div style={{
-      maxWidth: '800px',
-      margin: '0 auto',
-      padding: '20px'
-    }}>
+    <div >
       {posts.length > 0 ? (
         <div style={{
           display: 'flex',

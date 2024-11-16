@@ -36,34 +36,14 @@ const ProfilePage = () => {
     <div className="profile-container">
       <header className="profile-header">
         <div className="profile-avatar">
-          <img src={profile?.pfp || '/default-avatar.png'} alt={profile?.name} />
+          <img src={profile?.pfp || '/logo.webp'} alt={profile?.name} />
         </div>
         <div className="profile-info">
-          <h1>{profile?.name}</h1>
-          <p className="bio">{profile?.bio}</p>
-          
-        </div>
-      </header>
-
-      <hr style={{
-        width: '100%',
-        height: '1px',
-        backgroundColor: '#e0e0e0',
-        border: 'none',
-        margin: '32px 0'
-      }} />
-
-      <main style={{
-        display: 'grid',
-        gridTemplateColumns: '300px 1fr',
-        gap: '32px'
-      }}>
-        <div className="links-section">
-          <div className="links-grid" style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
+          <h1>{canister ? profile?.name : "No Setup Yet"}</h1>
+          <p className="bio">{canister ? profile?.bio : "no bio either, go to create one "}</p>
+          <div className="links-section">
+          <div className="links-grid" >
+            
             {links.map((link, index) => (
               <a 
                 key={index}
@@ -71,24 +51,40 @@ const ProfilePage = () => {
                 className="link-item"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{
-                  display: 'inline-block',
-                  backgroundColor: '#f0f0f0',
-                  padding: '8px 16px',
-                  borderRadius: '20px',
-                  textDecoration: 'none',
-                  color: '#333',
-                  margin: '4px',
-                  whiteSpace: 'nowrap',
-                  
-                }}
+                
               >
                 {link.name}
               </a>
             ))}
+          
+            {links.length == 0 && <a 
+                key={1}
+                href="https://icevent.app"
+                className="link-item"
+                target="_blank"
+                rel="noopener noreferrer"
+                
+              >
+                ICEvent
+              </a>}    
+              {links.length == 0 && <a 
+                key={2}
+                href="https://alltracks.icevent.app"
+                className="link-item"
+                target="_blank"
+                rel="noopener noreferrer"
+                
+              >
+                AllTracks
+              </a>}       
+          
           </div>
         </div>
 
+        </div>
+      </header>
+      <main >
+        
         <div className="posts-section">
           {canister ? (
             <PostList canister={canister} />
