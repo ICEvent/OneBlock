@@ -19,3 +19,4 @@ export const IDENTITY_PROVIDER = "https://identity.ic0.app";
 
 //paging
 export const PAGING_LENGTH = 20;
+export const CANISTER_ALLTRACKS = "orkad-xyaaa-aaaal-ai7ta-cai";
