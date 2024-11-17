@@ -11,7 +11,8 @@ import Store from "./components/Store";
 
 import 'react-toastify/dist/ReactToastify.css';
 import { ProfilePage } from "./pages/Profile"
-import { Home } from "./pages/Home";
+import  Home  from "./pages/Home";
+import  Console  from "./pages/Console";
 
 export default () => {
 
@@ -22,6 +23,7 @@ export default () => {
         <Routes>
           <Route path="/:id" element={<ProfilePage />} />
           <Route path="/" element={<Home />} />
+          <Route path="/console" element={<Console />} />
         </Routes>
       </Store>
     </BrowserRouter>

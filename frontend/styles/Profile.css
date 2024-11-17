@@ -125,3 +125,42 @@
   font-weight: bold;
   margin: 8px 0;
 }
+
+@media (max-width: 768px) {
+  .profile-container {
+    padding: 16px;
+  }
+
+  .profile-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 24px;
+  }
+
+  .profile-avatar img {
+    width: 120px;
+    height: 120px;
+  }
+
+  .profile-info {
+    width: 100%;
+  }
+
+  .links-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .link-item {
+    width: 100%;
+  }
+
+  .posts-section {
+    margin-top: 24px;
+  }
+
+  .post-item {
+    padding: 16px;
+  }
+}
