@@ -5,8 +5,10 @@ import { useGlobalContext, useOneblock, useSetAgent, useProfile } from './Store'
 import { AuthClient } from "@dfinity/auth-client";
 import { HttpAgent, Identity } from "@dfinity/agent";
 import { HOST } from "../lib/canisters";
-import { ONE_WEEK_NS, IDENTITY_PROVIDER } from "../lib/constants";
+import { ONE_WEEK_NS, IDENTITY_PROVIDER, DERIVATION_ORIGION } from "../lib/constants";
 import '../styles/Navbar.css';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -51,6 +53,7 @@ const Navbar = () => {
   const login = async () => {
     if (!authClient) return;
     authClient.login({
+      derivationOrigin: DERIVATION_ORIGION,
       identityProvider: IDENTITY_PROVIDER,
       maxTimeToLive: ONE_WEEK_NS,
       onSuccess: () => handleAuthenticated(authClient),
@@ -64,6 +67,7 @@ const Navbar = () => {
   };
 
   return (
+    <>
     <nav className="navbar">
       <div className="nav-brand">
       <img src="/logo.webp" alt="OneBlock" className="nav-logo" />
@@ -90,6 +94,8 @@ const Navbar = () => {
         )}
       </div>
     </nav>
+    <ToastContainer />
+    </>
   );
 };
 export default Navbar;

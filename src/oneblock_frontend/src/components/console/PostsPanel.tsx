@@ -38,6 +38,11 @@ export const PostsPanel = () => {
     const [canisterData] = await oneblock.getProfileCanister(principal);
     if (canisterData) {
       setCanister(canisterData);
+      setValues({
+        satelliteid: canisterData.canisterid.toText(),
+        posts: canisterData.posts,
+        gallery: canisterData.gallery
+      });
       loadPosts(canisterData);
     }
   };
@@ -88,29 +93,37 @@ export const PostsPanel = () => {
     }
   };
 
-  function updateSatellite() {
+  const updateSatellite = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true)
     try {
-
-      oneblock.editCanister({
+      console.log('values', values)
+      const res = await oneblock.editCanister({
         canisterid: Principal.fromText(values.satelliteid),
         name: "Posts",
         desc: "user storage for post and photo",
         posts: values.posts,
         gallery: values.gallery
-      }).then((res: Result) => {
-        setLoading(false)
-        if ('ok' in res) {
-          toast.success("update satellite id successfully!")
-          setConfigOpen(false);
-          loadCanister();
-        }
-      })
+      });
+
+      if ('ok' in res) {
+        console.log('Satellite updated successfully:', res.ok);
+        toast.success("update satellite id successfully!")
+        setConfigOpen(false);
+        loadCanister();
+      } else {
+        console.log('Failed to update satellite:', res.err);
+        toast.error("error when update satellite id!")
+      }
+      setLoading(false)
+
     } catch (err) {
       setLoading(false)
       toast.error("satellite id is not valid!")
     }
   };
+
+
   return (
     <div className="panel">
       <div className="panel-header">
@@ -153,14 +166,7 @@ export const PostsPanel = () => {
                   onChange={(e) => setValues({ ...values, gallery: e.target.value })}
                 />
               </div>
-              <div className="modal-actions">
-                <button type="button" onClick={() => setConfigOpen(false)}>Cancel</button>
-                <button type="submit">Save</button>
-              </div>
-              
-
-            </form>
-            <div className="notice-box" style={{
+              <div className="notice-box" style={{
                 background: '#f8f9fa',
                 padding: '15px',
                 borderRadius: '4px',
@@ -173,6 +179,16 @@ export const PostsPanel = () => {
                   <li>Add this principal as a controller to your collection</li>
                 </ol>
               </div>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setConfigOpen(false)}>Cancel</button>
+                <button disabled={loading} type="submit">
+                  {loading ? <CircularProgress size={20} /> : 'Save'}
+                </button>
+              </div>
+
+
+            </form>
+
           </div>
         </div>
       )}
@@ -195,7 +211,11 @@ export const PostsPanel = () => {
                 rows={4}
               />
             </div>
-            <button type="submit" disabled={postProgress}>
+            <button type="submit" disabled={postProgress} style={{
+              width: 'auto',
+              minWidth: '100px',
+              alignSelf: 'flex-start'
+            }}>
               {postProgress ? <CircularProgress size={20} /> : 'Publish'}
             </button>
             {error && (
@@ -217,4 +237,6 @@ export const PostsPanel = () => {
     </div>
   );
 };
+
+
 

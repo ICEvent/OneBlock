@@ -16,6 +16,8 @@ export const LEDGER_E6S = 1000000; //ICET
 
 
 export const IDENTITY_PROVIDER = "https://identity.ic0.app";
+export const DERIVATION_ORIGION = "https://32pz7-5qaaa-aaaag-qacra-cai.raw.ic0.app";
+
 
 //paging
 export const PAGING_LENGTH = 20;

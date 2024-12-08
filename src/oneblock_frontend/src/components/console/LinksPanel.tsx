@@ -23,7 +23,7 @@ export const LinksPanel = ({ profile, onLinkChange }: LinksPanelProps) => {
 
   const addLink = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (profile) {
+    if (profile && newLink.name && newLink.url) {
       setProgress(true);
       try {
         await oneblock.addLink(profile.id, newLink);
@@ -69,7 +69,12 @@ export const LinksPanel = ({ profile, onLinkChange }: LinksPanelProps) => {
         </div>
         <button
           type="submit"
-          disabled={progress}
+          disabled={progress || !newLink.name || !newLink.url}
+          style={{
+            width: 'auto',
+            minWidth: '100px',
+            alignSelf: 'flex-start'
+          }}
         >
           {progress ? <CircularProgress size={20} /> : 'Add Link'}
         </button>

@@ -63,14 +63,14 @@ const ProfilePage = () => {
   const loadCanister = async () => {
 
     const [canisterData] = await oneblock.getProfileCanister(profile.owner);
-    console.log("canisterData", canisterData);
+
     if (canisterData) {
       setCanister(canisterData);
     }
   };
 
   const loadPosts = async (canisterData: Canister) => {
-    console.log("canisterData", canisterData);
+
     const docs = await listDocs<Post>({
       satellite: { satelliteId: canisterData.canisterid.toText() },
       collection: canisterData.posts,
@@ -118,7 +118,7 @@ const ProfilePage = () => {
       key: profile.owner.toText()
     });
 
-    console.log(stats)
+
     setUserStats(stats?.data || {
       totalDistance: 0,
       totalHours: 0,
