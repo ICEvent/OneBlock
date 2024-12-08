@@ -11,7 +11,7 @@ import { Post } from '../../types/post';
 import '../../styles/Post.css'
 
 
-export const PostsPanel = () => {
+export const PostsPanel: React.FC = () => {
   const oneblock = useOneblock();
   const { state: { principal } } = useGlobalContext();
   const [canister, setCanister] = useState<Canister | null>(null);

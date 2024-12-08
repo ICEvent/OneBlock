@@ -1,6 +1,6 @@
 //@ts-nocheck
 import React, { useEffect, useState } from "react"
-import { useParams } from "react-router-dom"
+import { useParams, Link as NavLink } from "react-router-dom"
 import { Profile, Link, Canister } from "../api/profile/service.did.d"
 import { useOneblock } from "../components/Store"
 import "../styles/Profile.css"
@@ -162,11 +162,41 @@ const ProfilePage = () => {
       </main>
     </div>
   );
-
+  const ProfileNotFound = () => (
+    <div style={{ 
+      textAlign: 'center', 
+      padding: '40px',
+      margin: '40px auto',
+      maxWidth: '500px',
+      background: '#fff',
+      borderRadius: '8px',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    }}>
+      <span className="material-icons" style={{ fontSize: '48px', color: '#666' }}>
+        person_off
+      </span>
+      <h2>Profile Not Found</h2>
+      <p>The profile you're looking for doesn't exist or has been removed.</p>
+      <NavLink to="/" style={{ 
+        display: 'inline-block',
+        marginTop: '20px',
+        padding: '8px 16px',
+        background: '#4CAF50',
+        color: 'white',
+        borderRadius: '4px',
+        textDecoration: 'none'
+      }}>
+        Return Home
+      </NavLink>
+    </div>
+  );
+  
   return (
     <>
-      {loading || !profile ? (
-        <ProfilePlaceholder />
+      {loading ? (
+        <ProfilePlaceholder />        
+      ) : !profile ? (
+        <ProfileNotFound />
       ) : (
         <ProfileLayout
           sidebar={<ProfileSidebar profile={profile} tags={[]} />}
