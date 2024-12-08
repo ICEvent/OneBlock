@@ -6,3 +6,4 @@ dist-ssr
 .dfx
 canister_ids.json
 .vscode
+.env

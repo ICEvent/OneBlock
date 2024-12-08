@@ -75,7 +75,7 @@ export const PostsPanel: React.FC = () => {
       setPostProgress(true);
       setError(null);
       try {
-        await setDoc({
+        const res = await setDoc({
           satellite: { satelliteId: canister.canisterid.toText() },
           collection: canister.posts,
           doc: {
