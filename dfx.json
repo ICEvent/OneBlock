@@ -1,39 +1,26 @@
 {
   "canisters": {
     "profile": {
-      "main": "canisters/main.mo",
+      "main": "src/oneblock_backend/main.mo",
       "type": "motoko"
     },
     "profile_assets": {
       "dependencies": [
         "profile"
       ],
-      "frontend": {
-        "entrypoint": "dist/index.html"
-      },
       "source": [
-        "dist/",
-        "frontend"
+        "src/oneblock_frontend/dist"
       ],
-      "type": "assets"
+      "type": "assets",
+      "workspace": "oneblock_frontend"
     }
   },
   "defaults": {
     "build": {
+      "args": "",
       "packtool": ""
     }
   },
-  "networks": {
-    "local": {
-      "bind": "127.0.0.1:8000",
-      "type": "ephemeral"
-    },
-    "ic": {
-      "providers": [
-        "https://mainnet.dfinity.network"
-      ],
-      "type": "persistent"
-    }
-  },
+  "output_env_file": ".env",
   "version": 1
 }

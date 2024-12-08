@@ -1,38 +1,36 @@
 {
-  "name": "OneBlock",
-  "version": "0.0.1",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "serve": "vite preview"
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=7.0.0"
   },
+  "name": "oneblock",
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "prebuild": "npm run prebuild --workspaces --if-present",
+    "pretest": "npm run prebuild --workspaces --if-present",
+    "start": "npm start --workspaces --if-present",
+    "test": "npm test --workspaces --if-present"
+  },
+  "type": "module",
+  "workspaces": [
+    "src/oneblock_frontend"
+  ],
   "dependencies": {
-    "@dfinity/agent": "^0.19.2",
-    "@dfinity/auth-client": "^0.19.2",
-    "@dfinity/authentication": "^0.14.2",
-    "@dfinity/candid": "^0.19.2",
-    "@dfinity/identity": "^0.19.2",
-    "@dfinity/principal": "^0.19.2",
-    "@emotion/react": "^11.11.4",
-    "@emotion/styled": "^11.11.5",
-    "@junobuild/core": "^0.0.62",
+    "@dfinity/agent": "^2.1.3",
+    "@dfinity/auth-client": "^2.1.3",
+    "@dfinity/candid": "^2.1.3",
+    "@dfinity/principal": "^2.1.3",
+    "@emotion/react": "^11.13.5",
+    "@emotion/styled": "^11.13.5",
+    "@junobuild/core": "^0.0.63",
     "@mui/icons-material": "^5.15.19",
-    "@mui/material": "^5.15.19",
-    "icevent-calendar": "^1.0.13",
+    "@mui/material": "^5.16.9",
+    "@mui/system": "^6.1.10",
     "moment": "^2.29.4",
-    "react": "^18.1.0",
-    "react-dom": "^18.1.0",
-    "react-router-dom": "^6.4.5",
-    "react-toastify": "^10.0.5"
+    "react-router-dom": "^7.0.2",
+    "react-toastify": "^10.0.6"
   },
   "devDependencies": {
-    "@types/node": "^17.0.36",
-    "@types/react": "^18.0.9",
-    "@types/react-dom": "^18.0.5",
-    "@vitejs/plugin-react-refresh": "^1.3.6",
-    "buffer": "^6.0.3",
-    "sass": "^1.56.2",
-    "typescript": "^4.4.3",
-    "vite": "^4.1.0"
+    "vite-plugin-environment": "^1.1.3"
   }
 }

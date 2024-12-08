@@ -1,0 +1,102 @@
+type Wallet = 
+ record {
+   addresses: vec record {
+                    address: text;
+                    network: Network;
+                  };
+   name: text;
+ };
+type UpdateProfile = 
+ record {
+   bio: text;
+   name: text;
+   pfp: text;
+ };
+type Result_1 = 
+ variant {
+   err: text;
+   ok: Favorite;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok: nat;
+ };
+type Profile = 
+ record {
+   bio: text;
+   createtime: int;
+   id: text;
+   links: vec Link;
+   name: text;
+   owner: principal;
+   pfp: text;
+ };
+type NewProfile = 
+ record {
+   bio: text;
+   id: text;
+   name: text;
+   pfp: text;
+ };
+type Network = 
+ variant {
+   bitcoin;
+   ethereum;
+   ic;
+ };
+type Link = 
+ record {
+   name: text;
+   url: text;
+ };
+type Inbox = 
+ record {
+   inboxid: text;
+   owner: principal;
+ };
+type Favorite = 
+ record {
+   address: text;
+   name: text;
+   owner: principal;
+ };
+type Canister = 
+ record {
+   canisterid: principal;
+   desc: text;
+   gallery: text;
+   name: text;
+   posts: text;
+ };
+service : {
+  addAdmin: (text) -> (Result);
+  addFavorite: (record {
+                  address: text;
+                  name: text;
+                }) -> (Result_1);
+  addFeaturedProfile: (text) -> (Result);
+  addInbox: (text) -> (Result);
+  addLink: (text, Link) -> (Result);
+  addWallet: (text, Wallet) -> (Result);
+  availableCycles: () -> (nat) query;
+  changeId: (text, text) -> (Result);
+  createProfile: (NewProfile) -> (Result);
+  deleteLink: (text, text) -> (Result);
+  editCanister: (Canister) -> (Result);
+  getDefaultProfiles: (nat) -> (vec Profile) query;
+  getInbox: (text) -> (opt Inbox) query;
+  getMyCanister: () -> (opt Canister) query;
+  getMyFavorites: () -> (vec Favorite) query;
+  getMyInbox: () -> (opt Inbox) query;
+  getMyProfile: () -> (opt Profile) query;
+  getProfile: (text) -> (opt Profile) query;
+  getProfileByPrincipal: (text) -> (opt Profile) query;
+  getProfileCanister: (principal) -> (opt Canister) query;
+  getProfileCount: () -> (nat) query;
+  getProfiles: (nat, nat) -> (vec Profile) query;
+  removeFeaturedProfile: (text) -> (Result);
+  reserveid: (text) -> (Result);
+  searchProfilesByName: (text) -> (vec Profile) query;
+  updateProfile: (text, UpdateProfile) -> (Result);
+}

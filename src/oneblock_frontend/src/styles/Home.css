@@ -1,0 +1,91 @@
+.home {
+  margin-top: 70px;
+}
+
+.home-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.profile-column, .stats-column {
+  background: #fff;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.profile-card h2 {
+  margin-bottom: 1rem;
+  font-size: 1.8rem;
+}
+
+.intro {
+  color: #666;
+  margin-bottom: 2rem;
+}
+
+.links-section, .tags-section {
+  margin-top: 2rem;
+}
+
+.links-section ul {
+  list-style: none;
+  padding: 0;
+}
+
+.links-section li {
+  margin: 0.5rem 0;
+}
+
+.links-section a {
+  color: #0066cc;
+  text-decoration: none;
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tag {
+  background: #f0f0f0;
+  padding: 0.3rem 0.8rem;
+  border-radius: 15px;
+  font-size: 0.9rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.stat-item h4 {
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.stat-item p {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #333;
+}
+
+@media (max-width: 768px) {
+  .home-container {
+    grid-template-columns: 1fr;
+  }
+}
