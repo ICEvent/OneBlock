@@ -56,7 +56,10 @@ const Navbar = () => {
       derivationOrigin: DERIVATION_ORIGION,
       identityProvider: IDENTITY_PROVIDER,
       maxTimeToLive: ONE_WEEK_NS,
-      onSuccess: () => handleAuthenticated(authClient),
+      onSuccess: () => {
+        handleAuthenticated(authClient);
+        navigate('/console');
+      }
     });
   };
 

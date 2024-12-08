@@ -60,19 +60,22 @@ const Console = () => {
             className={`menu-item ${activePanel === 'profile' ? 'active' : ''}`}
             onClick={() => setActivePanel('profile')}
           >
+            <span className="material-icons">person</span>
             Profile
           </div>
           <div
             className={`menu-item ${activePanel === 'links' ? 'active' : ''}`}
             onClick={() => setActivePanel('links')}
-          >
+          > <span className="material-icons">link</span>
             Links
           </div>
           <div
             className={`menu-item ${activePanel === 'posts' ? 'active' : ''}`}
             onClick={() => setActivePanel('posts')}
           >
+            <span className="material-icons">article</span>
             Posts
+            
           </div>
           
         </nav>

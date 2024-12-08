@@ -15,13 +15,19 @@
   border-right: 1px solid #eee;
   align-self: start;
 }
-
 .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 12px 24px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
+.menu-item .material-icons {
+  font-size: 20px;
+  opacity: 0.8;
+}
 .menu-item:hover {
   background: #f0f0f0;
 }
