@@ -116,9 +116,17 @@ export const ProfileForm : React.FC<ProfileFormProps>= ({ profile: initialProfil
           {/* Profile Info Section */}
           <Box mb={3}>
             <Typography variant="h6" gutterBottom>Profile Information</Typography>
-            
             <TextField
-              label="ID"
+              label="Principal ID"
+              required
+              fullWidth
+              sx={{ mb: 2 }}
+              value={principal?.toText()}              
+              disabled={true}
+              
+            />
+            <TextField
+              label="User ID"
               required
               fullWidth
               sx={{ mb: 2 }}
