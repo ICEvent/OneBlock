@@ -6,7 +6,7 @@ import { useOneblock } from "../components/Store"
 import "../styles/Profile.css"
 import PostList from "../components/PostList"
 import moment from "moment"
-import { getDoc , listDocs} from "@junobuild/core"
+import { getDoc, listDocs } from "@junobuild/core"
 import { CANISTER_ALLTRACKS } from "../lib/constants"
 import ProfileLayout from "../layouts/ProfileLayout";
 import ProfileSidebar from "../components/ProfileSidebar"
@@ -38,7 +38,7 @@ const ProfilePage = () => {
     }
   });
 
- 
+
   useEffect(() => {
     setLoading(true)
     loadProfile()
@@ -47,14 +47,14 @@ const ProfilePage = () => {
   }, [])
 
   useEffect(() => {
-    if(canister) {
+    if (canister) {
       loadPosts(canister)
     }
 
   }, [canister])
 
   useEffect(() => {
-    if(profile) {
+    if (profile) {
       loadCanister()
     }
 
@@ -69,34 +69,34 @@ const ProfilePage = () => {
     }
   };
 
-const loadPosts = async (canisterData: Canister) => {
-  console.log("canisterData", canisterData);
-  const docs = await listDocs<Post>({
-    satellite: { satelliteId: canisterData.canisterid.toText() },
-    collection: canisterData.posts,
-    filter: {
-      order: {
-        desc: true,
-        field: "created_at",
+  const loadPosts = async (canisterData: Canister) => {
+    console.log("canisterData", canisterData);
+    const docs = await listDocs<Post>({
+      satellite: { satelliteId: canisterData.canisterid.toText() },
+      collection: canisterData.posts,
+      filter: {
+        order: {
+          desc: true,
+          field: "created_at",
+        },
       },
-    },
-  });
-  console.log("docs", docs);
-  if (docs.items_length > 0) {
-    const parsePosts = docs.items.map(item => ({
-      id: item.key,
-      post: item.data.post,
-      timestamp: item.created_at ? moment.unix(parseInt(item.created_at.toString()) / 1000000000).format("MMMM Do YYYY, h:mm a") : "",
-    }));
-    setPosts(parsePosts);
-  }
-};
+    });
+    console.log("docs", docs);
+    if (docs.items_length > 0) {
+      const parsePosts = docs.items.map(item => ({
+        id: item.key,
+        post: item.data.post,
+        timestamp: item.created_at ? moment.unix(parseInt(item.created_at.toString()) / 1000000000).format("MMMM Do YYYY, h:mm a") : "",
+      }));
+      setPosts(parsePosts);
+    }
+  };
 
 
 
   const loadProfile = async () => {
     const [profileData] = await oneblock.getProfile(id);
-    
+
     if (profileData) {
       setProfile({
         id: profileData.id,
@@ -104,9 +104,9 @@ const loadPosts = async (canisterData: Canister) => {
         bio: profileData.bio,
         pfp: profileData.pfp,
         links: profileData.links,
-        owner: profileData.owner,      
+        owner: profileData.owner,
       })
-      
+
     }
 
   }
@@ -169,9 +169,9 @@ const loadPosts = async (canisterData: Canister) => {
         <ProfilePlaceholder />
       ) : (
         <ProfileLayout
-        sidebar={<ProfileSidebar profile={profile} tags={[]} />}
-        main={<ProfileMain posts={posts} stats={stats} />} />
-    
+          sidebar={<ProfileSidebar profile={profile} tags={[]} />}
+          main={<ProfileMain posts={posts} stats={stats} />} />
+
       )}
     </>
   )

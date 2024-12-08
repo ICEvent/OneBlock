@@ -10,5 +10,5 @@ export interface Profile {
     owner: Principal | null;
     links: Link[];
     name: string;
-    pfp: string;
+    pfp: string| null;
 }

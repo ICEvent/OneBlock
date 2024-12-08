@@ -33,7 +33,7 @@ const ProfileStats: React.FC<ProfileStatsProps> = ({ stats, posts }) => {
       })}
     </div>
     <div className="posts-section">
-        <h3>Recent Posts</h3>
+
         <PostList posts={posts} />
       </div>
     </>

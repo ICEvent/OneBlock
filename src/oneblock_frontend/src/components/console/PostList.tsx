@@ -20,8 +20,9 @@ export const PostList: React.FC<PostListProps> = ({ posts }) => {
     <div className="posts-list">
       {posts.map((post, index) => (
         <div key={index} className="post-item">
-          <p className="post-content">{post.post}</p>
           <time>{post.timestamp}</time>
+          <p className="post-content">{post.post}</p>
+          
         </div>
       ))}
     </div>
