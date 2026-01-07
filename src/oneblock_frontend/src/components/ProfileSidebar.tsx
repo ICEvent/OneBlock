@@ -4,9 +4,12 @@ import { Profile } from '../types/profile';
 
 interface ProfileSidebarProps  {
   profile: Profile;
-    tags: string[]  
+  tags: string[];
+  blockCount?: number;
+  traitCount?: number;
 }
-const ProfileSidebar: React.FC<ProfileSidebarProps>  = ( {profile, tags} ) => {
+
+const ProfileSidebar: React.FC<ProfileSidebarProps>  = ( {profile, tags, blockCount = 0, traitCount = 0} ) => {
 
   return (
     <div className="profile-sidebar-container">
@@ -25,6 +28,23 @@ const ProfileSidebar: React.FC<ProfileSidebarProps>  = ( {profile, tags} ) => {
       
       <p className="intro">{profile.bio}</p>
       
+      {(blockCount > 0 || traitCount > 0) && (
+        <div className="chain-stats">
+          {blockCount > 0 && (
+            <div className="chain-stat">
+              <span className="stat-value">{blockCount}</span>
+              <span className="stat-label">block{blockCount !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+          {traitCount > 0 && (
+            <div className="chain-stat">
+              <span className="stat-value">{traitCount}</span>
+              <span className="stat-label">trait{traitCount !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {tags.length > 0 && <div className="tags-section">
         
         <div className="tags-list">

@@ -194,6 +194,35 @@
   border-bottom: 1px solid #eee;
 }
 
+.chain-stats {
+  display: flex;
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  justify-content: center;
+}
+
+.chain-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.chain-stat .stat-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #1976d2;
+}
+
+.chain-stat .stat-label {
+  font-size: 0.85rem;
+  color: #666;
+  text-transform: lowercase;
+}
+
 .stats-grid.single-item {
   grid-template-columns: 1fr;
 }
