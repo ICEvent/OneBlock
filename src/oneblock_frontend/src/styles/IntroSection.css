@@ -1,0 +1,229 @@
+.intro-section {
+  min-height: calc(100vh - 70px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: #fafafa;
+}
+
+.intro-content {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 3rem 2rem;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.intro-title {
+  font-size: 2.5rem;
+  font-weight: 400;
+  letter-spacing: -0.5px;
+  margin: 0 0 0.5rem 0;
+  color: #1a1a1a;
+}
+
+.intro-tagline {
+  font-size: 1.1rem;
+  color: #666;
+  margin: 0 0 2.5rem 0;
+  font-weight: 300;
+}
+
+.intro-philosophy {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: #333;
+}
+
+.intro-philosophy p {
+  margin: 0 0 1.5rem 0;
+}
+
+.philosophy-statement {
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin-bottom: 2rem !important;
+  color: #1a1a1a;
+}
+
+.philosophy-contrast {
+  margin: 2rem 0;
+  padding-left: 1rem;
+  border-left: 2px solid #e0e0e0;
+}
+
+.philosophy-contrast p {
+  margin: 0.5rem 0;
+  color: #555;
+}
+
+.philosophy-explanation {
+  margin: 2rem 0;
+}
+
+.philosophy-explanation p {
+  font-size: 1.05rem;
+  color: #1a1a1a;
+  line-height: 1.7;
+}
+
+.block-properties {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.block-properties p {
+  margin: 0.5rem 0;
+}
+
+.block-properties ul {
+  list-style: none;
+  padding: 0.5rem 0;
+  margin: 0.5rem 0 1rem 0;
+}
+
+.block-properties ul li {
+  padding: 0.25rem 0;
+  padding-left: 1.5rem;
+  position: relative;
+  color: #444;
+}
+
+.block-properties ul li::before {
+  content: "•";
+  position: absolute;
+  left: 0.5rem;
+  color: #999;
+}
+
+.block-properties .parallel {
+  font-style: italic;
+  color: #666;
+  margin-top: 1rem;
+}
+
+.philosophy-core {
+  margin: 2.5rem 0;
+}
+
+.philosophy-core strong {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.core-principle {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-top: 1rem !important;
+  color: #1a1a1a;
+}
+
+.values-list {
+  margin: 2rem 0;
+  padding-left: 1rem;
+}
+
+.values-list p {
+  margin: 0.4rem 0;
+  color: #555;
+}
+
+.mission-statement {
+  margin: 2rem 0;
+}
+
+.mission-statement p {
+  font-size: 1.05rem;
+  color: #1a1a1a;
+  line-height: 1.7;
+}
+
+.world-context {
+  margin: 2rem 0;
+}
+
+.world-context p {
+  font-size: 1rem;
+  color: #444;
+  line-height: 1.7;
+  font-style: italic;
+}
+
+.closing-statement {
+  margin: 2.5rem 0 2rem 0;
+}
+
+.closing-statement p {
+  font-size: 1.05rem;
+  color: #1a1a1a;
+}
+
+.call-to-action-text {
+  font-weight: 500;
+  margin-top: 0.5rem !important;
+}
+
+.view-example-btn {
+  display: inline-block;
+  margin: 2rem 0 0.5rem 0;
+  padding: 0.85rem 1.75rem;
+  background: #1a1a1a;
+  color: #ffffff;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: background 0.2s ease;
+}
+
+.view-example-btn:hover {
+  background: #333;
+}
+
+.no-signup {
+  font-size: 0.9rem;
+  color: #888;
+  margin-top: 0.5rem !important;
+  font-style: italic;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .intro-content {
+    padding: 2rem 1.5rem;
+  }
+
+  .intro-title {
+    font-size: 2rem;
+  }
+
+  .intro-tagline {
+    font-size: 1rem;
+  }
+
+  .philosophy-statement {
+    font-size: 1.1rem;
+  }
+
+  .intro-philosophy {
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .intro-section {
+    padding: 1rem 0.5rem;
+  }
+
+  .intro-content {
+    padding: 1.5rem 1rem;
+  }
+
+  .intro-title {
+    font-size: 1.75rem;
+  }
+}

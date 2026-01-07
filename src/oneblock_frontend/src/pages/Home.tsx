@@ -4,6 +4,7 @@ import '../styles/Home.css';
 import ProfileLayout from '../layouts/ProfileLayout';
 import ProfileSidebar from '../components/ProfileSidebar';
 import ProfileMain from '../components/ProfileStats';
+import IntroSection from '../components/IntroSection';
 import { StatsCollection } from '../types/userStat';
 import Navbar from '../components/Navbar';
 import {  useOneblock } from '../components/Store';
@@ -93,11 +94,7 @@ const Home = () => {
   return (
     <>
       <Navbar />
-      <div className="main-content">
-      <ProfileLayout      
-        sidebar={<ProfileSidebar profile={profile} tags={ ["Web3", "Blockchain", "Profile", "Decentralized", "Internet Computer"]} />}
-        main={<ProfileMain posts={posts} stats={stats} />} />
-        </div>
+      <IntroSection exampleProfileId="demo" />
     </>
   );
 };

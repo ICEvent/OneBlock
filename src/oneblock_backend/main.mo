@@ -17,9 +17,15 @@ actor {
     type Favorite = Types.Favorite;
     type Inbox = Types.Inbox;
     type Canister = Types.Canister;
+    type Block = Types.Block;
+    type Trait = Types.Trait;
+    type NewBlock = Types.NewBlock;
+    type NewTrait = Types.NewTrait;
 
     stable var stableProfiles : [(Text, Profile)] = [];
     stable var stableFeaturedProfiles : [Profile] = [];
+    stable var stableBlocks : [(Text, Block)] = [];
+    stable var stableTraits : [(Text, Trait)] = [];
 
     stable var userProfiles : [(Principal, Text)] = [];
     stable var upgradeInboxes : [(Text, Inbox)] = [];
@@ -31,8 +37,17 @@ actor {
 
     stable var _admins : [Text] = ["3z4ue-dry77-pvwdh-4ugn3-lu2wi-sbfp6-7xzaf-jupqw-vqiit-zi7m7-gae"];
 
+    stable var blockIdCounter : Nat = 0;
+    stable var traitIdCounter : Nat = 0;
+
     var profiles = TrieMap.TrieMap<Text, Profile>(Text.equal, Text.hash);
     profiles := TrieMap.fromEntries<Text, Profile>(Iter.fromArray(stableProfiles), Text.equal, Text.hash);
+
+    var blocks = TrieMap.TrieMap<Text, Block>(Text.equal, Text.hash);
+    blocks := TrieMap.fromEntries<Text, Block>(Iter.fromArray(stableBlocks), Text.equal, Text.hash);
+
+    var traits = TrieMap.TrieMap<Text, Trait>(Text.equal, Text.hash);
+    traits := TrieMap.fromEntries<Text, Trait>(Iter.fromArray(stableTraits), Text.equal, Text.hash);
 
     var featuredProfiles = Buffer.Buffer<Profile>(0);
 
@@ -53,6 +68,8 @@ actor {
 
     system func preupgrade() {
         stableProfiles := Iter.toArray(profiles.entries());
+        stableBlocks := Iter.toArray(blocks.entries());
+        stableTraits := Iter.toArray(traits.entries());
         userProfiles := Iter.toArray(userprofiles.entries());
         upgradeInboxes := Iter.toArray(inboxes.entries());
         userWallets := Iter.toArray(wallets.entries());
@@ -63,6 +80,8 @@ actor {
 
     system func postupgrade() {
         stableProfiles := [];
+        stableBlocks := [];
+        stableTraits := [];
         userProfiles := [];
         upgradeInboxes := [];
         userWallets := [];
@@ -101,8 +120,12 @@ actor {
                                         bio = newProfile.bio;
                                         pfp = newProfile.pfp;
                                         links = [];
+                                        blocks = [];
+                                        traits = [];
                                         owner = caller;
-                                        createtime = Time.now()
+                                        createtime = Time.now();
+                                        visibility = #public;
+                                        last_updated = Time.now();
                                     },
                                 );
                                 userprofiles.put(caller, newProfile.id);
@@ -167,8 +190,12 @@ actor {
                                 bio = updateProfile.bio;
                                 pfp = updateProfile.pfp;
                                 links = p.links;
+                                blocks = p.blocks;
+                                traits = p.traits;
                                 owner = p.owner;
-                                createtime = p.createtime
+                                createtime = p.createtime;
+                                visibility = p.visibility;
+                                last_updated = Time.now();
                             },
                         );
                         #ok(1)
@@ -208,8 +235,12 @@ actor {
                                         bio = p.bio;
                                         pfp = p.pfp;
                                         links = p.links;
+                                        blocks = p.blocks;
+                                        traits = p.traits;
                                         owner = p.owner;
-                                        createtime = p.createtime
+                                        createtime = p.createtime;
+                                        visibility = p.visibility;
+                                        last_updated = Time.now();
                                     },
                                 );
                                 ignore profiles.remove(oid);
@@ -332,8 +363,12 @@ actor {
                                 bio = p.bio;
                                 pfp = p.pfp;
                                 links = Buffer.toArray(blinks);
+                                blocks = p.blocks;
+                                traits = p.traits;
                                 owner = p.owner;
-                                createtime = p.createtime
+                                createtime = p.createtime;
+                                visibility = p.visibility;
+                                last_updated = Time.now();
                             },
                         );
                         #ok(1)
@@ -374,8 +409,12 @@ actor {
                                 bio = p.bio;
                                 pfp = p.pfp;
                                 links = blinks;
+                                blocks = p.blocks;
+                                traits = p.traits;
                                 owner = p.owner;
-                                createtime = p.createtime
+                                createtime = p.createtime;
+                                visibility = p.visibility;
+                                last_updated = Time.now();
                             },
                         );
                         #ok(1)
@@ -420,6 +459,205 @@ actor {
             }
         }
 
+    };
+
+    //----------------------------- Block Management ------------------------------------
+    
+    private func generateBlockId() : Text {
+        blockIdCounter := blockIdCounter + 1;
+        "block_" # Nat.toText(blockIdCounter)
+    };
+
+    private func generateTraitId() : Text {
+        traitIdCounter := traitIdCounter + 1;
+        "trait_" # Nat.toText(traitIdCounter)
+    };
+
+    private func generateHash(text : Text) : Text {
+        // Simple hash implementation - in production use proper crypto hash
+        let size = Text.size(text);
+        "hash_" # Nat.toText(size) # "_" # Nat.toText(Time.now())
+    };
+
+    public shared ({ caller }) func createBlock(newBlock : NewBlock) : async Result.Result<Text, Text> {
+        if (Principal.isAnonymous(caller)) {
+            return #err("not authenticated");
+        };
+
+        let profile = profiles.get(newBlock.profile_id);
+        switch (profile) {
+            case (?p) {
+                if (p.owner != caller) {
+                    return #err("not authorized to add blocks to this profile");
+                };
+
+                let blockId = generateBlockId();
+                let now = Time.now();
+                
+                // Create block content for hashing
+                let blockContent = blockId # newBlock.profile_id # Nat.toText(newBlock.start_time);
+                let hash = generateHash(blockContent);
+
+                let block : Block = {
+                    id = blockId;
+                    profile_id = newBlock.profile_id;
+                    start_time = newBlock.start_time;
+                    end_time = newBlock.end_time;
+                    evidence_refs = newBlock.evidence_refs;
+                    derived_traits = [];
+                    narrative = newBlock.narrative;
+                    visibility = newBlock.visibility;
+                    hash = hash;
+                    created_at = now;
+                };
+
+                blocks.put(blockId, block);
+
+                // Update profile's block list
+                let bblocks = Buffer.fromArray<Text>(p.blocks);
+                bblocks.add(blockId);
+
+                profiles.put(
+                    newBlock.profile_id,
+                    {
+                        id = p.id;
+                        name = p.name;
+                        bio = p.bio;
+                        pfp = p.pfp;
+                        links = p.links;
+                        blocks = Buffer.toArray(bblocks);
+                        traits = p.traits;
+                        owner = p.owner;
+                        createtime = p.createtime;
+                        visibility = p.visibility;
+                        last_updated = now;
+                    },
+                );
+
+                #ok(blockId)
+            };
+            case null {
+                #err("profile not found")
+            };
+        };
+    };
+
+    public query func getBlock(blockId : Text) : async ?Block {
+        blocks.get(blockId)
+    };
+
+    public query func listBlocks(profileId : Text) : async [Block] {
+        let profile = profiles.get(profileId);
+        switch (profile) {
+            case (?p) {
+                let blockList = Buffer.Buffer<Block>(0);
+                for (blockId in p.blocks.vals()) {
+                    let block = blocks.get(blockId);
+                    switch (block) {
+                        case (?b) {
+                            blockList.add(b);
+                        };
+                        case null {};
+                    };
+                };
+                Buffer.toArray(blockList)
+            };
+            case null { [] };
+        };
+    };
+
+    public query func getChain(profileId : Text) : async [Block] {
+        let blockList = await listBlocks(profileId);
+        // Sort by start_time (chronological order)
+        Array.sort<Block>(
+            blockList,
+            func(a : Block, b : Block) : Order.Order {
+                if (a.start_time < b.start_time) { #less }
+                else if (a.start_time == b.start_time) { #equal }
+                else { #greater }
+            }
+        )
+    };
+
+    public shared ({ caller }) func createTrait(profileId : Text, newTrait : NewTrait) : async Result.Result<Text, Text> {
+        if (Principal.isAnonymous(caller)) {
+            return #err("not authenticated");
+        };
+
+        let profile = profiles.get(profileId);
+        switch (profile) {
+            case (?p) {
+                if (p.owner != caller) {
+                    return #err("not authorized to add traits to this profile");
+                };
+
+                let traitId = generateTraitId();
+                let now = Time.now();
+
+                let trait : Trait = {
+                    id = traitId;
+                    label = newTrait.label;
+                    strength = newTrait.strength;
+                    confidence = newTrait.confidence;
+                    explanation = newTrait.explanation;
+                    derived_from = newTrait.derived_from;
+                    visibility = newTrait.visibility;
+                    updated_at = now;
+                };
+
+                traits.put(traitId, trait);
+
+                // Update profile's trait list
+                let btraits = Buffer.fromArray<Text>(p.traits);
+                btraits.add(traitId);
+
+                profiles.put(
+                    profileId,
+                    {
+                        id = p.id;
+                        name = p.name;
+                        bio = p.bio;
+                        pfp = p.pfp;
+                        links = p.links;
+                        blocks = p.blocks;
+                        traits = Buffer.toArray(btraits);
+                        owner = p.owner;
+                        createtime = p.createtime;
+                        visibility = p.visibility;
+                        last_updated = now;
+                    },
+                );
+
+                #ok(traitId)
+            };
+            case null {
+                #err("profile not found")
+            };
+        };
+    };
+
+    public query func getTrait(traitId : Text) : async ?Trait {
+        traits.get(traitId)
+    };
+
+    public query func getTraits(profileId : Text) : async [Trait] {
+        let profile = profiles.get(profileId);
+        switch (profile) {
+            case (?p) {
+                let traitList = Buffer.Buffer<Trait>(0);
+                for (traitId in p.traits.vals()) {
+                    let trait = traits.get(traitId);
+                    switch (trait) {
+                        case (?t) {
+                            traitList.add(t);
+                        };
+                        case null {};
+                    };
+                };
+                Buffer.toArray(traitList)
+            };
+            case null { [] };
+        };
     };
 
     //----------------------------- Favorites ------------------------------------
