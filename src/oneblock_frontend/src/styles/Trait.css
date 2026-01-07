@@ -1,0 +1,189 @@
+.trait-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: transform 0.2s ease;
+}
+
+.trait-badge:hover {
+  transform: translateY(-2px);
+}
+
+.trait-badge.compact {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.trait-badge .trait-label {
+  flex: 1;
+}
+
+.trait-badge .trait-confidence {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+/* Strength-based coloring */
+.trait-badge.strength-high {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #4caf50;
+}
+
+.trait-badge.strength-medium {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ff9800;
+}
+
+.trait-badge.strength-low {
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #2196f3;
+}
+
+/* Trait Card (expanded view) */
+.trait-card {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  transition: box-shadow 0.2s ease;
+}
+
+.trait-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.trait-card.strength-high {
+  border-left: 4px solid #4caf50;
+}
+
+.trait-card.strength-medium {
+  border-left: 4px solid #ff9800;
+}
+
+.trait-card.strength-low {
+  border-left: 4px solid #2196f3;
+}
+
+.trait-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.trait-label {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.trait-meta {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.trait-strength {
+  padding: 0.3rem 0.7rem;
+  background: #f5f5f5;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: capitalize;
+  color: #666;
+}
+
+.trait-confidence {
+  padding: 0.3rem 0.7rem;
+  background: #e3f2fd;
+  color: #1565c0;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.trait-explanation {
+  color: #555;
+  line-height: 1.6;
+  margin: 0.5rem 0 1rem 0;
+}
+
+.trait-blocks {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #999;
+  font-size: 0.85rem;
+}
+
+.trait-blocks .material-icons {
+  font-size: 16px;
+}
+
+/* Trait List Container */
+.traits-list {
+  margin-top: 2rem;
+}
+
+.traits-list h3 {
+  margin-bottom: 1rem;
+  color: #333;
+  font-size: 1.3rem;
+}
+
+/* Compact Traits Container */
+.traits-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+/* Empty State */
+.traits-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #999;
+}
+
+.traits-empty .material-icons {
+  font-size: 48px;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.traits-empty p {
+  margin: 0.5rem 0;
+  font-size: 1.1rem;
+}
+
+.traits-empty span {
+  font-size: 0.9rem;
+  color: #bbb;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .trait-card {
+    padding: 1rem;
+  }
+
+  .trait-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .trait-meta {
+    gap: 0.5rem;
+  }
+}
