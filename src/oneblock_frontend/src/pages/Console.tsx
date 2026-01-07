@@ -7,6 +7,7 @@ import '../styles/Console.css';
 import { ProfilePanel } from "../components/console/ProfilePanel";
 import { LinksPanel } from "../components/console/LinksPanel";
 import { PostsPanel } from "../components/console/PostsPanel";
+import { BlocksPanel } from "../components/console/BlocksPanel";
 
 import { ProfileForm } from "../components/ProfileForm";
 
@@ -43,6 +44,8 @@ const Console = () => {
         return <ProfileForm profile={profile} />;
       case 'links':
         return <LinksPanel profile={profile} onLinkChange={loadProfile}  />;
+      case 'blocks':
+        return <BlocksPanel />;
       case 'posts':
         return <PostsPanel />;
       
@@ -68,6 +71,13 @@ const Console = () => {
             onClick={() => setActivePanel('links')}
           > <span className="material-icons">link</span>
             Links
+          </div>
+          <div
+            className={`menu-item ${activePanel === 'blocks' ? 'active' : ''}`}
+            onClick={() => setActivePanel('blocks')}
+          >
+            <span className="material-icons">view_timeline</span>
+            Blocks
           </div>
           <div
             className={`menu-item ${activePanel === 'posts' ? 'active' : ''}`}
