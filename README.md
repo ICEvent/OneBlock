@@ -1,13 +1,31 @@
-# OneBlock - Web3 Profile Platform
+# oneblock - Life Path Profile System
 
-A decentralized profile platform built on Internet Computer, allowing users to create and manage their Web3 identity, posts, and links.
+A decentralized profile platform built on Internet Computer that treats each person as a block in time — defined not by titles, but by actions, persistence, and change.
+
+## Philosophy
+
+We believe a person is not a résumé.
+
+A résumé is edited, compressed, and optimized for approval. A life is not.
+
+At oneblock, each person is treated as a block in time with:
+- a timestamp
+- a history  
+- evidence of what actually happened
+
+**Your life unfolds forward. It does not reset.**
+
+We do not rank people. We do not score lives. We do not optimize for attention.
+
+We make life paths readable through verified activity, long-term behavior, and honest narrative.
 
 ## Features
+- Block-based profile system (time-ordered life events)
+- Verifiable evidence and activity tracking
+- Trait derivation from accumulated blocks
+- Public, transparent profile chains
 - Web3 Authentication with Internet Identity
-- Profile Management
-- Post Creation & Management
-- Link Management
-- Juno Integration for Storage
+- Decentralized storage with Juno integration
 
 ## Prerequisites
 - Node.js (v14 or higher)
