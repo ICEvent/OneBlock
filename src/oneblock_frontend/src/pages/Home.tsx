@@ -8,14 +8,11 @@ import IntroSection from '../components/IntroSection';
 import { StatsCollection } from '../types/userStat';
 import Navbar from '../components/Navbar';
 import {  useOneblock } from '../components/Store';
-import { Post } from "../types/post"
-import { getDoc, listDocs } from "@junobuild/core"
 import moment from 'moment';
 
 const Home = () => {
   const oneblock = useOneblock();
   const [count, setCount] = useState(0);
-  const [posts, setPosts] = useState<Post[]>([])
   const [profile, setProfile] = useState({
     id: "",
     name: '',
@@ -65,32 +62,7 @@ const Home = () => {
     });
   }, [count]);
 
-  useEffect(() => {
-    loadPosts();
-  }, []);
 
-  const loadPosts = async () => {
-
-    const docs = await listDocs<Post>({
-      satellite: { satelliteId: "ruc7a-fiaaa-aaaal-ab4ha-cai" },
-      collection: "oneblock",
-      filter: {
-        order: {
-          desc: true,
-          field: "created_at",
-        },
-      },
-    });
-    
-    if (docs.items_length > 0) {
-      const parsePosts = docs.items.map(item => ({
-        id: item.key,
-        post: item.data.post,
-        timestamp: item.created_at ? moment.unix(parseInt(item.created_at.toString()) / 1000000000).format("MMMM Do YYYY, h:mm a") : "",
-      }));
-      setPosts(parsePosts);
-    }
-  };
   return (
     <>
       <Navbar />

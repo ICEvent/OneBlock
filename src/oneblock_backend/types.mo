@@ -8,9 +8,9 @@ module {
 
     // ========== Enums ==========
     public type Visibility = {
-        #public;
+        #global;
         #unlisted;
-        #private;
+        #personal;
     };
 
     public type VerificationLevel = {
@@ -47,7 +47,7 @@ module {
 
     public type Trait = {
         id : TraitId;
-        label : Text;
+        tlabel : Text;
         
         strength : Strength;
         confidence : Float; // 0.0 to 1.0
@@ -125,7 +125,6 @@ module {
         owner: Principal;
     };
 
-    //satellite on Juno to store posts
     public type Canister = {
         canisterid: Principal;
         name: Text;
@@ -145,7 +144,7 @@ module {
     };
 
     public type NewTrait = {
-        label : Text;
+        tlabel : Text;
         strength : Strength;
         confidence : Float;
         explanation : Text;

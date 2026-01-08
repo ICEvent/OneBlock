@@ -4,14 +4,11 @@ import { useParams, Link as NavLink } from "react-router-dom"
 import { Profile, Link, Canister } from "../api/profile/service.did.d"
 import { useOneblock } from "../components/Store"
 import "../styles/Profile.css"
-import PostList from "../components/PostList"
 import moment from "moment"
-import { getDoc, listDocs } from "@junobuild/core"
 import { CANISTER_ALLTRACKS } from "../lib/constants"
 import ProfileLayout from "../layouts/ProfileLayout";
 import ProfileSidebar from "../components/ProfileSidebar"
 import ProfileMain from "../components/ProfileStats";
-import { Post } from "../types/post"
 
 
 const ProfilePage = () => {
@@ -19,10 +16,8 @@ const ProfilePage = () => {
   const [links, setLinks] = useState<Link[]>([])
   const [canister, setCanister] = useState<Canister | null>(null)
 
-  const [activeTab, setActiveTab] = useState('posts')
   const { id } = useParams<{ id: string }>()
   const [loading, setLoading] = useState(false)
-  const [posts, setPosts] = useState<Post[]>([])
   const [profile, setProfile] = useState<Profile | null>(null);
 
   const [stats, setStats] = useState<StatsCollection>({
@@ -47,13 +42,6 @@ const ProfilePage = () => {
   }, [])
 
   useEffect(() => {
-    if (canister) {
-      loadPosts(canister)
-    }
-
-  }, [canister])
-
-  useEffect(() => {
     if (profile) {
       loadCanister()
     }
@@ -66,29 +54,6 @@ const ProfilePage = () => {
 
     if (canisterData) {
       setCanister(canisterData);
-    }
-  };
-
-  const loadPosts = async (canisterData: Canister) => {
-
-    const docs = await listDocs<Post>({
-      satellite: { satelliteId: canisterData.canisterid.toText() },
-      collection: canisterData.posts,
-      filter: {
-        order: {
-          desc: true,
-          field: "created_at",
-        },
-      },
-    });
-    console.log("docs", docs);
-    if (docs.items_length > 0) {
-      const parsePosts = docs.items.map(item => ({
-        id: item.key,
-        post: item.data.post,
-        timestamp: item.created_at ? moment.unix(parseInt(item.created_at.toString()) / 1000000000).format("MMMM Do YYYY, h:mm a") : "",
-      }));
-      setPosts(parsePosts);
     }
   };
 
@@ -156,8 +121,8 @@ const ProfilePage = () => {
         </div>
       </header>
       <main>
-        <div className="posts-section">
-          <div className="placeholder-posts animate-pulse"></div>
+        <div className="content-section">
+          <div className="placeholder-content animate-pulse"></div>
         </div>
       </main>
     </div>
@@ -200,7 +165,7 @@ const ProfilePage = () => {
       ) : (
         <ProfileLayout
           sidebar={<ProfileSidebar profile={profile} tags={[]} />}
-          main={<ProfileMain posts={posts} stats={stats} />} />
+          main={<ProfileMain stats={stats} />} />
 
       )}
     </>

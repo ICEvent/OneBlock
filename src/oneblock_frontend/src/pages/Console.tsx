@@ -2,11 +2,9 @@ import React, { useEffect, useState } from "react";
 import { Profile, Link, Canister } from "../api/profile/service.did.d";
 import { useNavigate } from 'react-router-dom';
 
-import { setDoc } from "@junobuild/core";
 import '../styles/Console.css';
 import { ProfilePanel } from "../components/console/ProfilePanel";
 import { LinksPanel } from "../components/console/LinksPanel";
-import { PostsPanel } from "../components/console/PostsPanel";
 import { BlocksPanel } from "../components/console/BlocksPanel";
 
 import { ProfileForm } from "../components/ProfileForm";
@@ -46,8 +44,6 @@ const Console = () => {
         return <LinksPanel profile={profile} onLinkChange={loadProfile}  />;
       case 'blocks':
         return <BlocksPanel />;
-      case 'posts':
-        return <PostsPanel />;
       
       default:
         return <ProfilePanel />;
@@ -78,14 +74,6 @@ const Console = () => {
           >
             <span className="material-icons">view_timeline</span>
             Blocks
-          </div>
-          <div
-            className={`menu-item ${activePanel === 'posts' ? 'active' : ''}`}
-            onClick={() => setActivePanel('posts')}
-          >
-            <span className="material-icons">article</span>
-            Posts
-            
           </div>
           
         </nav>

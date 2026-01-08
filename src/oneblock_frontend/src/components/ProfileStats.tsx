@@ -1,14 +1,11 @@
 import React from 'react';
 import { StatsCollection } from '../types/userStat';
-import { Post } from '../types/post';
-import { PostList } from './console/PostList';
 
 interface ProfileStatsProps {
   stats: StatsCollection;
-  posts: Post[]; // Add posts prop
 }
 
-const ProfileStats: React.FC<ProfileStatsProps> = ({ stats, posts }) => {
+const ProfileStats: React.FC<ProfileStatsProps> = ({ stats }) => {
   return (
     <>
     <div className="stats-container">
@@ -32,10 +29,6 @@ const ProfileStats: React.FC<ProfileStatsProps> = ({ stats, posts }) => {
         );
       })}
     </div>
-    <div className="posts-section">
-
-        <PostList posts={posts} />
-      </div>
     </>
   );
 };

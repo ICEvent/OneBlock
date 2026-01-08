@@ -1,9 +1,4 @@
 import { Principal } from '@dfinity/principal';
-export interface Post {
-    id: string;
-    post: string;
-    timestamp: string;
-}
 
 export interface Message {
   id: string;

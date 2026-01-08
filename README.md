@@ -25,7 +25,6 @@ We make life paths readable through verified activity, long-term behavior, and h
 - Trait derivation from accumulated blocks
 - Public, transparent profile chains
 - Web3 Authentication with Internet Identity
-- Decentralized storage with Juno integration
 
 ## Prerequisites
 - Node.js (v14 or higher)

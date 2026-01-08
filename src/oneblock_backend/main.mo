@@ -1,5 +1,6 @@
 import Cycles "mo:base/ExperimentalCycles";
 import Nat "mo:base/Nat";
+import Int "mo:base/Int";
 import Text "mo:base/Text";
 import TrieMap "mo:base/TrieMap";
 import Principal "mo:base/Principal";
@@ -12,7 +13,7 @@ import Order "mo:base/Order";
 
 import Types "types";
 
-actor {
+persistent actor {
     type Profile = Types.Profile;
     type Favorite = Types.Favorite;
     type Inbox = Types.Inbox;
@@ -22,48 +23,48 @@ actor {
     type NewBlock = Types.NewBlock;
     type NewTrait = Types.NewTrait;
 
-    stable var stableProfiles : [(Text, Profile)] = [];
-    stable var stableFeaturedProfiles : [Profile] = [];
-    stable var stableBlocks : [(Text, Block)] = [];
-    stable var stableTraits : [(Text, Trait)] = [];
+    var stableProfiles : [(Text, Profile)] = [];
+    var stableFeaturedProfiles : [Profile] = [];
+    var stableBlocks : [(Text, Block)] = [];
+    var stableTraits : [(Text, Trait)] = [];
 
-    stable var userProfiles : [(Principal, Text)] = [];
-    stable var upgradeInboxes : [(Text, Inbox)] = [];
-    stable var userWallets : [(Text, [Types.Wallet])] = [];
-    stable var upgradeFavorites : [(Principal, [Favorite])] = [];
-    stable var upgradeCanisters : [(Principal, Canister)] = [];
+    var userProfiles : [(Principal, Text)] = [];
+    var upgradeInboxes : [(Text, Inbox)] = [];
+    var userWallets : [(Text, [Types.Wallet])] = [];
+    var upgradeFavorites : [(Principal, [Favorite])] = [];
+    var upgradeCanisters : [(Principal, Canister)] = [];
 
-    stable var reserveIds : [Text] = ["oneblock", "block", "about", "admin", "status", "update"];
+    var reserveIds : [Text] = ["oneblock", "block", "about", "admin", "status", "update"];
 
-    stable var _admins : [Text] = ["3z4ue-dry77-pvwdh-4ugn3-lu2wi-sbfp6-7xzaf-jupqw-vqiit-zi7m7-gae"];
+    var _admins : [Text] = ["3z4ue-dry77-pvwdh-4ugn3-lu2wi-sbfp6-7xzaf-jupqw-vqiit-zi7m7-gae"];
 
-    stable var blockIdCounter : Nat = 0;
-    stable var traitIdCounter : Nat = 0;
+    var blockIdCounter : Nat = 0;
+    var traitIdCounter : Nat = 0;
 
-    var profiles = TrieMap.TrieMap<Text, Profile>(Text.equal, Text.hash);
+    transient var profiles = TrieMap.TrieMap<Text, Profile>(Text.equal, Text.hash);
     profiles := TrieMap.fromEntries<Text, Profile>(Iter.fromArray(stableProfiles), Text.equal, Text.hash);
 
-    var blocks = TrieMap.TrieMap<Text, Block>(Text.equal, Text.hash);
+    transient var blocks = TrieMap.TrieMap<Text, Block>(Text.equal, Text.hash);
     blocks := TrieMap.fromEntries<Text, Block>(Iter.fromArray(stableBlocks), Text.equal, Text.hash);
 
-    var traits = TrieMap.TrieMap<Text, Trait>(Text.equal, Text.hash);
+    transient var traits = TrieMap.TrieMap<Text, Trait>(Text.equal, Text.hash);
     traits := TrieMap.fromEntries<Text, Trait>(Iter.fromArray(stableTraits), Text.equal, Text.hash);
 
-    var featuredProfiles = Buffer.Buffer<Profile>(0);
+    transient var featuredProfiles = Buffer.Buffer<Profile>(0);
 
-    var inboxes = TrieMap.TrieMap<Text, Inbox>(Text.equal, Text.hash);
+    transient var inboxes = TrieMap.TrieMap<Text, Inbox>(Text.equal, Text.hash);
     inboxes := TrieMap.fromEntries<Text, Inbox>(Iter.fromArray(upgradeInboxes), Text.equal, Text.hash);
 
-    var userprofiles = TrieMap.TrieMap<Principal, Text>(Principal.equal, Principal.hash);
+    transient var userprofiles = TrieMap.TrieMap<Principal, Text>(Principal.equal, Principal.hash);
     userprofiles := TrieMap.fromEntries<Principal, Text>(Iter.fromArray(userProfiles), Principal.equal, Principal.hash);
 
-    var wallets = TrieMap.TrieMap<Text, [Types.Wallet]>(Text.equal, Text.hash);
+    transient var wallets = TrieMap.TrieMap<Text, [Types.Wallet]>(Text.equal, Text.hash);
     wallets := TrieMap.fromEntries<Text, [Types.Wallet]>(Iter.fromArray(userWallets), Text.equal, Text.hash);
 
-    var myFavorites = TrieMap.TrieMap<Principal, [Favorite]>(Principal.equal, Principal.hash);
+    transient var myFavorites = TrieMap.TrieMap<Principal, [Favorite]>(Principal.equal, Principal.hash);
     myFavorites := TrieMap.fromEntries<Principal, [Favorite]>(Iter.fromArray(upgradeFavorites), Principal.equal, Principal.hash);
 
-    var myCanisters = TrieMap.TrieMap<Principal, Canister>(Principal.equal, Principal.hash);
+    transient var myCanisters = TrieMap.TrieMap<Principal, Canister>(Principal.equal, Principal.hash);
     myCanisters := TrieMap.fromEntries<Principal, Canister>(Iter.fromArray(upgradeCanisters), Principal.equal, Principal.hash);
 
     system func preupgrade() {
@@ -124,7 +125,7 @@ actor {
                                         traits = [];
                                         owner = caller;
                                         createtime = Time.now();
-                                        visibility = #public;
+                                        visibility = #global;
                                         last_updated = Time.now();
                                     },
                                 );
@@ -195,8 +196,8 @@ actor {
                                 owner = p.owner;
                                 createtime = p.createtime;
                                 visibility = p.visibility;
-                                last_updated = Time.now();
-                            },
+                                last_updated = Time.now()
+                            }
                         );
                         #ok(1)
                     } else {
@@ -240,8 +241,8 @@ actor {
                                         owner = p.owner;
                                         createtime = p.createtime;
                                         visibility = p.visibility;
-                                        last_updated = Time.now();
-                                    },
+                                        last_updated = Time.now()
+                                    }
                                 );
                                 ignore profiles.remove(oid);
                                 userprofiles.put(p.owner, nid);
@@ -368,8 +369,8 @@ actor {
                                 owner = p.owner;
                                 createtime = p.createtime;
                                 visibility = p.visibility;
-                                last_updated = Time.now();
-                            },
+                                last_updated = Time.now()
+                            }
                         );
                         #ok(1)
                     } else {
@@ -414,8 +415,8 @@ actor {
                                 owner = p.owner;
                                 createtime = p.createtime;
                                 visibility = p.visibility;
-                                last_updated = Time.now();
-                            },
+                                last_updated = Time.now()
+                            }
                         );
                         #ok(1)
                     } else {
@@ -476,7 +477,7 @@ actor {
     private func generateHash(text : Text) : Text {
         // Simple hash implementation - in production use proper crypto hash
         let size = Text.size(text);
-        "hash_" # Nat.toText(size) # "_" # Nat.toText(Time.now())
+        "hash_" # Nat.toText(size) # "_" # Int.toText(Time.now())
     };
 
     public shared ({ caller }) func createBlock(newBlock : NewBlock) : async Result.Result<Text, Text> {
@@ -495,7 +496,7 @@ actor {
                 let now = Time.now();
                 
                 // Create block content for hashing
-                let blockContent = blockId # newBlock.profile_id # Nat.toText(newBlock.start_time);
+                let blockContent = blockId # newBlock.profile_id # Int.toText(newBlock.start_time);
                 let hash = generateHash(blockContent);
 
                 let block : Block = {
@@ -508,7 +509,7 @@ actor {
                     narrative = newBlock.narrative;
                     visibility = newBlock.visibility;
                     hash = hash;
-                    created_at = now;
+                    created_at = now
                 };
 
                 blocks.put(blockId, block);
@@ -530,8 +531,8 @@ actor {
                         owner = p.owner;
                         createtime = p.createtime;
                         visibility = p.visibility;
-                        last_updated = now;
-                    },
+                        last_updated = now
+                    }
                 );
 
                 #ok(blockId)
@@ -567,7 +568,21 @@ actor {
     };
 
     public query func getChain(profileId : Text) : async [Block] {
-        let blockList = await listBlocks(profileId);
+        let profile = profiles.get(profileId);
+        let blockList = switch (profile) {
+            case (?p) {
+                let list = Buffer.Buffer<Block>(0);
+                for (blockId in p.blocks.vals()) {
+                    let block = blocks.get(blockId);
+                    switch (block) {
+                        case (?b) { list.add(b); };
+                        case null {};
+                    };
+                };
+                Buffer.toArray(list)
+            };
+            case null { [] };
+        };
         // Sort by start_time (chronological order)
         Array.sort<Block>(
             blockList,
@@ -596,13 +611,13 @@ actor {
 
                 let trait : Trait = {
                     id = traitId;
-                    label = newTrait.label;
+                    tlabel = newTrait.tlabel;
                     strength = newTrait.strength;
                     confidence = newTrait.confidence;
                     explanation = newTrait.explanation;
                     derived_from = newTrait.derived_from;
                     visibility = newTrait.visibility;
-                    updated_at = now;
+                    updated_at = now
                 };
 
                 traits.put(traitId, trait);
@@ -624,8 +639,8 @@ actor {
                         owner = p.owner;
                         createtime = p.createtime;
                         visibility = p.visibility;
-                        last_updated = now;
-                    },
+                        last_updated = now
+                    }
                 );
 
                 #ok(traitId)
@@ -730,82 +745,7 @@ actor {
         }
     };
 
-    //===================================
-    // inbox
-    //===================================
-
-    public shared ({ caller }) func addInbox(inboxid : Text) : async Result.Result<Nat, Text> {
-        let pid = userprofiles.get(caller);
-        switch (pid) {
-            case (?pid) {
-                let i = inboxes.get(pid);
-                switch (i) {
-                    case (?i) {
-                        if (i.owner == caller) {
-                            inboxes.put(
-                                pid,
-                                {
-                                    inboxid = inboxid;
-                                    owner = caller
-                                },
-                            );
-                            #ok(1)
-                        } else {
-                            #err("no permission")
-                        }
-                    };
-                    case (_) {
-                        inboxes.put(
-                            pid,
-                            {
-                                inboxid = inboxid;
-                                owner = caller
-                            },
-                        );
-                        #ok(1)
-                    }
-                }
-            };
-            case (_) {
-                #err("no profile found")
-            }
-        };
-
-    };
-
-    public query func getInbox(name : Text) : async ?Inbox {
-        inboxes.get(name)
-    };
-
-    public query ({ caller }) func getMyInbox() : async ?Inbox {
-        let inboxArr = Iter.toArray(inboxes.vals());
-        Array.find<Inbox>(inboxArr, func(i : Inbox) : Bool { i.owner == caller })
-    };
-
-    //===================================
-    // Canister on Juno for posts
-    // 1 create a satellite on Juno
-    // 2 set principal id of Oneblock as controller of satellite
-    // 3 set satellite id and datastore/srorage id in OneBlock
-    //===================================
-
-    public shared ({ caller }) func editCanister(canister : Canister) : async Result.Result<Nat, Text> {
-
-        myCanisters.put(
-            caller,
-            canister,
-        );
-        #ok(1)
-
-    };
-
-    public query ({ caller }) func getMyCanister() : async ?Canister {
-        myCanisters.get(caller)
-    };
-
-    public query func getProfileCanister(uid : Principal) : async ?Canister {
-        myCanisters.get(uid)
-    };
+    
 
     //=======================================
     // system
