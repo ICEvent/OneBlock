@@ -13,6 +13,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { ProfilePage } from "./pages/Profile"
 import  Home  from "./pages/Home";
 import  Console  from "./pages/Console";
+import  BlockPage  from "./pages/Block";
 
 export default () => {
 
@@ -21,7 +22,8 @@ export default () => {
     <BrowserRouter>
       <Store>
         <Routes>
-          <Route path="/:id" element={<ProfilePage />} />
+          <Route path="/:id" element={<BlockPage />} />
+          <Route path="/profile/:id" element={<ProfilePage />} />
           <Route path="/" element={<Home />} />
           <Route path="/console" element={<Console />} />
         </Routes>

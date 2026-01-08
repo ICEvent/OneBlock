@@ -1,216 +1,243 @@
 .intro-section {
   min-height: calc(100vh - 70px);
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: center;
   padding: 2rem 1rem;
-  background: #fafafa;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
 }
 
-.intro-content {
-  max-width: 680px;
-  margin: 0 auto;
-  padding: 3rem 2rem;
+.intro-hero {
+  max-width: 1200px;
+  margin: 0 auto 2rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: center;
   background: #ffffff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 3rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.hero-left {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .intro-title {
-  font-size: 2.5rem;
+  font-size: 3.5rem;
+  font-weight: 600;
+  letter-spacing: -1px;
+  margin: 0;
+  color: #1a1a1a;
+  line-height: 1;
+}
+
+.intro-tagline {
+  font-size: 1.2rem;
+  color: #666;
+  margin: 0;
   font-weight: 400;
-  letter-spacing: -0.5px;
+}
+
+.hero-description {
+  font-size: 1.05rem;
+  color: #444;
+  line-height: 1.6;
+  margin: 0.5rem 0 1rem 0;
+  max-width: 90%;
+}
+
+.hero-right {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.blockchain-visual {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-items: center;
+}
+
+.block-item {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  width: 180px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.block-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+.block-item.active {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  box-shadow: 0 6px 16px rgba(245, 87, 108, 0.4);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.block-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.block-label {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.chain-connector {
+  width: 3px;
+  height: 20px;
+  background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+  position: relative;
+}
+
+.chain-connector::before,
+.chain-connector::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #667eea;
+  border-radius: 50%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.chain-connector::before { top: 0; }
+.chain-connector::after { bottom: 0; }
+
+.intro-features {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.feature-card {
+  background: #ffffff;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.feature-card h3 {
+  font-size: 1.3rem;
+  font-weight: 600;
   margin: 0 0 0.5rem 0;
   color: #1a1a1a;
 }
 
-.intro-tagline {
-  font-size: 1.1rem;
+.feature-card p {
+  font-size: 0.95rem;
   color: #666;
-  margin: 0 0 2.5rem 0;
-  font-weight: 300;
-}
-
-.intro-philosophy {
-  font-size: 1rem;
-  line-height: 1.8;
-  color: #333;
-}
-
-.intro-philosophy p {
-  margin: 0 0 1.5rem 0;
-}
-
-.philosophy-statement {
-  font-size: 1.2rem;
-  font-weight: 500;
-  margin-bottom: 2rem !important;
-  color: #1a1a1a;
-}
-
-.philosophy-contrast {
-  margin: 2rem 0;
-  padding-left: 1rem;
-  border-left: 2px solid #e0e0e0;
-}
-
-.philosophy-contrast p {
-  margin: 0.5rem 0;
-  color: #555;
-}
-
-.philosophy-explanation {
-  margin: 2rem 0;
-}
-
-.philosophy-explanation p {
-  font-size: 1.05rem;
-  color: #1a1a1a;
-  line-height: 1.7;
-}
-
-.block-properties {
-  margin: 2rem 0;
-  padding: 1.5rem;
-  background: #f8f9fa;
-  border-radius: 6px;
-}
-
-.block-properties p {
-  margin: 0.5rem 0;
-}
-
-.block-properties ul {
-  list-style: none;
-  padding: 0.5rem 0;
-  margin: 0.5rem 0 1rem 0;
-}
-
-.block-properties ul li {
-  padding: 0.25rem 0;
-  padding-left: 1.5rem;
-  position: relative;
-  color: #444;
-}
-
-.block-properties ul li::before {
-  content: "•";
-  position: absolute;
-  left: 0.5rem;
-  color: #999;
-}
-
-.block-properties .parallel {
-  font-style: italic;
-  color: #666;
-  margin-top: 1rem;
-}
-
-.philosophy-core {
-  margin: 2.5rem 0;
-}
-
-.philosophy-core strong {
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-.core-principle {
-  font-size: 1.1rem;
-  font-weight: 500;
-  margin-top: 1rem !important;
-  color: #1a1a1a;
-}
-
-.values-list {
-  margin: 2rem 0;
-  padding-left: 1rem;
-}
-
-.values-list p {
-  margin: 0.4rem 0;
-  color: #555;
-}
-
-.mission-statement {
-  margin: 2rem 0;
-}
-
-.mission-statement p {
-  font-size: 1.05rem;
-  color: #1a1a1a;
-  line-height: 1.7;
-}
-
-.world-context {
-  margin: 2rem 0;
-}
-
-.world-context p {
-  font-size: 1rem;
-  color: #444;
-  line-height: 1.7;
-  font-style: italic;
-}
-
-.closing-statement {
-  margin: 2.5rem 0 2rem 0;
-}
-
-.closing-statement p {
-  font-size: 1.05rem;
-  color: #1a1a1a;
-}
-
-.call-to-action-text {
-  font-weight: 500;
-  margin-top: 0.5rem !important;
+  margin: 0;
+  line-height: 1.5;
 }
 
 .view-example-btn {
   display: inline-block;
-  margin: 2rem 0 0.5rem 0;
+  margin-top: 0.5rem;
   padding: 0.85rem 1.75rem;
   background: #1a1a1a;
   color: #ffffff;
   text-decoration: none;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 1rem;
-  font-weight: 500;
-  transition: background 0.2s ease;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  border: 2px solid #1a1a1a;
 }
 
 .view-example-btn:hover {
   background: #333;
-}
-
-.no-signup {
-  font-size: 0.9rem;
-  color: #888;
-  margin-top: 0.5rem !important;
-  font-style: italic;
+  border-color: #333;
+  transform: translateX(4px);
 }
 
 /* Responsive Design */
+@media (max-width: 1024px) {
+  .intro-hero {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  
+  .blockchain-visual {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .chain-connector {
+    width: 20px;
+    height: 3px;
+  }
+  
+  .chain-connector::before,
+  .chain-connector::after {
+    width: 8px;
+    height: 8px;
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+  
+  .chain-connector::before { left: 0; }
+  .chain-connector::after { left: 100%; }
+}
+
 @media (max-width: 768px) {
-  .intro-content {
+  .intro-hero {
     padding: 2rem 1.5rem;
   }
 
   .intro-title {
-    font-size: 2rem;
+    font-size: 2.5rem;
   }
 
   .intro-tagline {
     font-size: 1rem;
   }
-
-  .philosophy-statement {
-    font-size: 1.1rem;
-  }
-
-  .intro-philosophy {
+  
+  .hero-description {
     font-size: 0.95rem;
+  }
+  
+  .intro-features {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .feature-card {
+    padding: 1.5rem;
+  }
+  
+  .block-item {
+    width: 140px;
+    padding: 1.2rem 1.5rem;
   }
 }
 
@@ -218,6 +245,28 @@
   .intro-section {
     padding: 1rem 0.5rem;
   }
+  
+  .intro-hero {
+    padding: 1.5rem 1rem;
+  }
+  
+  .intro-title {
+    font-size: 2rem;
+  }
+  
+  .blockchain-visual {
+    gap: 0.5rem;
+  }
+  
+  .block-item {
+    width: 100px;
+    padding: 1rem;
+  }
+  
+  .block-icon {
+    font-size: 1.5rem;
+  }
+}
 
   .intro-content {
     padding: 1.5rem 1rem;

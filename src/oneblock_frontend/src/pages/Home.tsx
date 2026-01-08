@@ -94,7 +94,7 @@ const Home = () => {
   return (
     <>
       <Navbar />
-      <IntroSection exampleProfileId="demo" />
+      <IntroSection blockId="oneblock" />
     </>
   );
 };
