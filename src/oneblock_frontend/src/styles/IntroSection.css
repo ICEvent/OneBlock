@@ -125,8 +125,7 @@
 .chain-connector::after { bottom: 0; }
 
 .intro-features {
-  max-width: 1200px;
-  margin: 0 auto;
+  margin-top: 2rem;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;

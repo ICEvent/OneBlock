@@ -20,6 +20,21 @@ const IntroSection: React.FC<IntroSectionProps> = ({ blockId = "oneblock" }) => 
           <Link to={`/${blockId}`} className="view-example-btn">
             View a real oneblock →
           </Link>
+          
+          <div className="intro-features">
+            <div className="feature-card">
+              <h3>No Rankings</h3>
+              <p>We don't score lives or optimize for attention</p>
+            </div>
+            <div className="feature-card">
+              <h3>Verified Path</h3>
+              <p>Real activity, behavior, and honest narrative</p>
+            </div>
+            <div className="feature-card">
+              <h3>Forward Only</h3>
+              <p>Your life unfolds forward. It does not reset.</p>
+            </div>
+          </div>
         </div>
         
         <div className="hero-right">
@@ -44,21 +59,6 @@ const IntroSection: React.FC<IntroSectionProps> = ({ blockId = "oneblock" }) => 
               <div className="block-label">you</div>
             </div>
           </div>
-        </div>
-      </div>
-      
-      <div className="intro-features">
-        <div className="feature-card">
-          <h3>No Rankings</h3>
-          <p>We don't score lives or optimize for attention</p>
-        </div>
-        <div className="feature-card">
-          <h3>Verified Path</h3>
-          <p>Real activity, behavior, and honest narrative</p>
-        </div>
-        <div className="feature-card">
-          <h3>Forward Only</h3>
-          <p>Your life unfolds forward. It does not reset.</p>
         </div>
       </div>
     </div>
