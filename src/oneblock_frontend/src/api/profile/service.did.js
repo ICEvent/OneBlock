@@ -102,6 +102,7 @@ export const idlFactory = ({ IDL }) => {
   // Integration system types
   const AppCategory = IDL.Variant({
     'donation' : IDL.Null,
+    'escrow' : IDL.Null,
     'fitness' : IDL.Null,
     'education' : IDL.Null,
     'finance' : IDL.Null,

@@ -160,6 +160,7 @@ module {
 
     public type AppCategory = {
         #donation;
+        #escrow;
         #fitness;
         #education;
         #finance;

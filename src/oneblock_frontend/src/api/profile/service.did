@@ -242,6 +242,7 @@ type Attestation =
 type AppCategory = 
  variant {
    donation;
+   escrow;
    education;
    finance;
    fitness;

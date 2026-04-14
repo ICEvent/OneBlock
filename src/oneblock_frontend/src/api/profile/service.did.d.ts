@@ -65,6 +65,7 @@ export type ProfileId = string;
 
 export type AppCategory =
   { 'donation' : null } |
+  { 'escrow' : null } |
   { 'fitness' : null } |
   { 'education' : null } |
   { 'finance' : null } |

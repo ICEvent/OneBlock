@@ -7,11 +7,17 @@ export type ProfileId = string;
 
 export type AppCategory =
   | { donation: null }
+  | { escrow: null }
   | { fitness: null }
   | { education: null }
   | { finance: null }
   | { social: null }
   | { other: null };
+
+export type Visibility =
+  | { global: null }
+  | { unlisted: null }
+  | { personal: null };
 
 export type VerificationPolicy =
   | { none: null }
@@ -95,7 +101,7 @@ export interface ActivityRecord {
   idempotency_key: string;
   attestation: [] | [Attestation];
   verification_level: { self: null } | { platform: null } | { verifiable: null } | { third_party: null };
-  visibility: { global: null } | { unlisted: null } | { personal: null };
+  visibility: Visibility;
   hash: string;
 }
 
@@ -138,5 +144,5 @@ export interface NewActivityRecord {
   schema_version: bigint;
   idempotency_key: string;
   attestation: [] | [Attestation];
-  visibility: { global: null } | { unlisted: null } | { personal: null };
+  visibility: Visibility;
 }
