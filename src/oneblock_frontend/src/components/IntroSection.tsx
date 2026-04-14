@@ -11,11 +11,15 @@ const IntroSection: React.FC<IntroSectionProps> = ({ blockId = "oneblock" }) => 
     <div className="intro-section">
       <div className="intro-hero">
         <div className="hero-left">
-          <h1 className="intro-title">Oneblock</h1>
-          <p className="intro-tagline">One identity. One block. A story in sequence.</p>
+          <span className="hero-eyebrow">Built on Internet Computer</span>
+          <h1 className="intro-title">
+            One identity.<br />
+            <span className="gradient-text">One block.</span>
+          </h1>
+          <p className="intro-tagline">A story in sequence — defined by actions, persistence, and change.</p>
           <p className="hero-description">
-            An identity is not a résumé. At oneblock, each identity is a block in time — 
-            defined by actions, persistence, and change.
+            An identity is not a résumé. At OneBlock, each identity is a block in time — 
+            verified on-chain, forward-only, and owned by you.
           </p>
           <Link to={`/${blockId}`} className="view-example-btn">
             View a real oneblock →
@@ -40,7 +44,7 @@ const IntroSection: React.FC<IntroSectionProps> = ({ blockId = "oneblock" }) => 
         <div className="hero-right">
           <div className="blockchain-visual">
             <div className="block-item">
-              <div className="block-icon">⏱️</div>
+              <div className="block-icon">⏱</div>
               <div className="block-label">timestamp</div>
             </div>
             <div className="chain-connector"></div>
