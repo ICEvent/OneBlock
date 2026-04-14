@@ -270,7 +270,7 @@ export interface _SERVICE {
   'createTrait' : ActorMethod<[string, NewTrait], Result_2>,
   'deleteLink' : ActorMethod<[string, string], Result>,
   'editCanister' : ActorMethod<[Canister], Result>,
-  'getActivitiyType' : ActorMethod<[AppId, ActivityTypeKey], [] | [ActivityType]>,
+  'getActivityType' : ActorMethod<[AppId, ActivityTypeKey], [] | [ActivityType]>,
   'getActivityRecord' : ActorMethod<[RecordId], [] | [ActivityRecord]>,
   'getActivityRecords' : ActorMethod<[ProfileId, [] | [AppId], [] | [ActivityTypeKey]], Array<ActivityRecord>>,
   'getApp' : ActorMethod<[AppId], [] | [IntegrationApp]>,

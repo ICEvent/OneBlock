@@ -23,7 +23,8 @@ export interface IntegrationApp {
   name: string;
   description: string;
   category: AppCategory;
-  owner: string; // principal text
+  /** Serialized IC Principal text of the app principal authorized to submit records. */
+  owner: string;
   verification_policy: VerificationPolicy;
   schema_version: bigint;
   active: boolean;
