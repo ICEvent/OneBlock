@@ -23,6 +23,21 @@ persistent actor {
     type NewBlock = Types.NewBlock;
     type NewTrait = Types.NewTrait;
 
+    type AppId = Types.AppId;
+    type ActivityTypeKey = Types.ActivityTypeKey;
+    type RecordId = Types.RecordId;
+    type ProfileId = Types.ProfileId;
+    type IntegrationApp = Types.IntegrationApp;
+    type IntegrationConnection = Types.IntegrationConnection;
+    type ActivityType = Types.ActivityType;
+    type ActivityRecord = Types.ActivityRecord;
+    type Attestation = Types.Attestation;
+    type MetadataEntry = Types.MetadataEntry;
+    type DerivedSummary = Types.DerivedSummary;
+    type NewIntegrationApp = Types.NewIntegrationApp;
+    type NewActivityType = Types.NewActivityType;
+    type NewActivityRecord = Types.NewActivityRecord;
+
     var stableProfiles : [(Text, Profile)] = [];
     var stableFeaturedProfiles : [Profile] = [];
     var stableBlocks : [(Text, Block)] = [];
@@ -34,12 +49,21 @@ persistent actor {
     var upgradeFavorites : [(Principal, [Favorite])] = [];
     var upgradeCanisters : [(Principal, Canister)] = [];
 
+    var stableIntegrationApps : [(Text, IntegrationApp)] = [];
+    var stableActivityTypes : [(Text, ActivityType)] = [];
+    var stableConnections : [(Text, IntegrationConnection)] = [];
+    var stableActivityRecords : [(Text, ActivityRecord)] = [];
+    var stableIdempotencyKeys : [(Text, Text)] = []; // idempotency_key -> record_id
+    var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]
+    var stableDerivedSummaries : [(Text, DerivedSummary)] = [];
+
     var reserveIds : [Text] = ["oneblock", "block", "about", "admin", "status", "update"];
 
     var _admins : [Text] = ["3z4ue-dry77-pvwdh-4ugn3-lu2wi-sbfp6-7xzaf-jupqw-vqiit-zi7m7-gae"];
 
     var blockIdCounter : Nat = 0;
     var traitIdCounter : Nat = 0;
+    var activityRecordCounter : Nat = 0;
 
     transient var profiles = TrieMap.TrieMap<Text, Profile>(Text.equal, Text.hash);
     profiles := TrieMap.fromEntries<Text, Profile>(Iter.fromArray(stableProfiles), Text.equal, Text.hash);
@@ -67,6 +91,27 @@ persistent actor {
     transient var myCanisters = TrieMap.TrieMap<Principal, Canister>(Principal.equal, Principal.hash);
     myCanisters := TrieMap.fromEntries<Principal, Canister>(Iter.fromArray(upgradeCanisters), Principal.equal, Principal.hash);
 
+    transient var integrationApps = TrieMap.TrieMap<Text, IntegrationApp>(Text.equal, Text.hash);
+    integrationApps := TrieMap.fromEntries<Text, IntegrationApp>(Iter.fromArray(stableIntegrationApps), Text.equal, Text.hash);
+
+    transient var activityTypesMap = TrieMap.TrieMap<Text, ActivityType>(Text.equal, Text.hash);
+    activityTypesMap := TrieMap.fromEntries<Text, ActivityType>(Iter.fromArray(stableActivityTypes), Text.equal, Text.hash);
+
+    transient var connections = TrieMap.TrieMap<Text, IntegrationConnection>(Text.equal, Text.hash);
+    connections := TrieMap.fromEntries<Text, IntegrationConnection>(Iter.fromArray(stableConnections), Text.equal, Text.hash);
+
+    transient var activityRecordsMap = TrieMap.TrieMap<Text, ActivityRecord>(Text.equal, Text.hash);
+    activityRecordsMap := TrieMap.fromEntries<Text, ActivityRecord>(Iter.fromArray(stableActivityRecords), Text.equal, Text.hash);
+
+    transient var idempotencyKeys = TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);
+    idempotencyKeys := TrieMap.fromEntries<Text, Text>(Iter.fromArray(stableIdempotencyKeys), Text.equal, Text.hash);
+
+    transient var profileActivityIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
+    profileActivityIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileActivityIndex), Text.equal, Text.hash);
+
+    transient var derivedSummaries = TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
+    derivedSummaries := TrieMap.fromEntries<Text, DerivedSummary>(Iter.fromArray(stableDerivedSummaries), Text.equal, Text.hash);
+
     system func preupgrade() {
         stableProfiles := Iter.toArray(profiles.entries());
         stableBlocks := Iter.toArray(blocks.entries());
@@ -76,7 +121,14 @@ persistent actor {
         userWallets := Iter.toArray(wallets.entries());
         upgradeFavorites := Iter.toArray(myFavorites.entries());
         upgradeCanisters := Iter.toArray(myCanisters.entries());
-        stableFeaturedProfiles := Buffer.toArray(featuredProfiles)
+        stableFeaturedProfiles := Buffer.toArray(featuredProfiles);
+        stableIntegrationApps := Iter.toArray(integrationApps.entries());
+        stableActivityTypes := Iter.toArray(activityTypesMap.entries());
+        stableConnections := Iter.toArray(connections.entries());
+        stableActivityRecords := Iter.toArray(activityRecordsMap.entries());
+        stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());
+        stableProfileActivityIndex := Iter.toArray(profileActivityIndex.entries());
+        stableDerivedSummaries := Iter.toArray(derivedSummaries.entries())
     };
 
     system func postupgrade() {
@@ -88,7 +140,14 @@ persistent actor {
         userWallets := [];
         upgradeFavorites := [];
         upgradeCanisters := [];
-        featuredProfiles := Buffer.fromArray(stableFeaturedProfiles)
+        featuredProfiles := Buffer.fromArray(stableFeaturedProfiles);
+        stableIntegrationApps := [];
+        stableActivityTypes := [];
+        stableConnections := [];
+        stableActivityRecords := [];
+        stableIdempotencyKeys := [];
+        stableProfileActivityIndex := [];
+        stableDerivedSummaries := []
     };
 
     public shared ({ caller }) func createProfile(newProfile : Types.NewProfile) : async Result.Result<Nat, Text> {
@@ -673,6 +732,322 @@ persistent actor {
             };
             case null { [] };
         };
+    };
+
+    //----------------------------- Integration System ------------------------------------
+
+    private func generateActivityRecordId() : Text {
+        activityRecordCounter := activityRecordCounter + 1;
+        "activity_" # Nat.toText(activityRecordCounter)
+    };
+
+    // Composite keys used in TrieMaps
+    private func connectionKey(profileId : Text, appId : Text) : Text {
+        profileId # ":" # appId
+    };
+
+    private func activityTypeKey(appId : Text, typeKey : Text) : Text {
+        appId # ":" # typeKey
+    };
+
+    private func summaryKey(profileId : Text, appId : Text, activityType : Text) : Text {
+        profileId # ":" # appId # ":" # activityType
+    };
+
+    // Register a new 3rd-party app (admin only).
+    public shared ({ caller }) func registerApp(newApp : NewIntegrationApp) : async Result.Result<Text, Text> {
+        if (not isAdmin(caller)) {
+            return #err("no permission")
+        };
+        switch (integrationApps.get(newApp.id)) {
+            case (?_) { #err("app id already registered") };
+            case null {
+                let app : IntegrationApp = {
+                    id = newApp.id;
+                    name = newApp.name;
+                    description = newApp.description;
+                    category = newApp.category;
+                    owner = caller;
+                    verification_policy = newApp.verification_policy;
+                    schema_version = 1;
+                    active = true;
+                    created_at = Time.now()
+                };
+                integrationApps.put(newApp.id, app);
+                #ok(newApp.id)
+            }
+        }
+    };
+
+    // Register or update an activity type schema (app owner or admin).
+    public shared ({ caller }) func registerActivityType(newType : NewActivityType) : async Result.Result<Text, Text> {
+        if (Principal.isAnonymous(caller)) {
+            return #err("not authenticated")
+        };
+        let app = integrationApps.get(newType.app_id);
+        switch (app) {
+            case null { #err("app not found") };
+            case (?a) {
+                if (a.owner != caller and not isAdmin(caller)) {
+                    return #err("not authorized")
+                };
+                let key = activityTypeKey(newType.app_id, newType.type_key);
+                let existing = activityTypesMap.get(key);
+                let version = switch (existing) {
+                    case (?e) { e.version + 1 };
+                    case null { 1 }
+                };
+                let at : ActivityType = {
+                    app_id = newType.app_id;
+                    type_key = newType.type_key;
+                    label = newType.label;
+                    description = newType.description;
+                    fields = newType.fields;
+                    version = version;
+                    created_at = Time.now()
+                };
+                activityTypesMap.put(key, at);
+                #ok(key)
+            }
+        }
+    };
+
+    // User connects their OneBlock profile to a 3rd-party app.
+    public shared ({ caller }) func connectApp(
+        appId : AppId,
+        externalUserId : Text,
+        scopes : [Text]
+    ) : async Result.Result<Nat, Text> {
+        if (Principal.isAnonymous(caller)) {
+            return #err("not authenticated")
+        };
+        let profileIdOpt = userprofiles.get(caller);
+        switch (profileIdOpt) {
+            case null { #err("profile not found") };
+            case (?profileId) {
+                switch (integrationApps.get(appId)) {
+                    case null { #err("app not found") };
+                    case (?a) {
+                        if (not a.active) {
+                            return #err("app is not active")
+                        };
+                        let key = connectionKey(profileId, appId);
+                        let conn : IntegrationConnection = {
+                            profile_id = profileId;
+                            app_id = appId;
+                            external_user_id = externalUserId;
+                            scopes = scopes;
+                            status = #active;
+                            created_at = Time.now();
+                            revoked_at = null
+                        };
+                        connections.put(key, conn);
+                        #ok(1)
+                    }
+                }
+            }
+        }
+    };
+
+    // User revokes a previously granted connection.
+    public shared ({ caller }) func revokeConnection(appId : AppId) : async Result.Result<Nat, Text> {
+        if (Principal.isAnonymous(caller)) {
+            return #err("not authenticated")
+        };
+        let profileIdOpt = userprofiles.get(caller);
+        switch (profileIdOpt) {
+            case null { #err("profile not found") };
+            case (?profileId) {
+                let key = connectionKey(profileId, appId);
+                switch (connections.get(key)) {
+                    case null { #err("connection not found") };
+                    case (?c) {
+                        let now = Time.now();
+                        connections.put(key, {
+                            profile_id = c.profile_id;
+                            app_id = c.app_id;
+                            external_user_id = c.external_user_id;
+                            scopes = c.scopes;
+                            status = #revoked;
+                            created_at = c.created_at;
+                            revoked_at = ?now
+                        });
+                        #ok(1)
+                    }
+                }
+            }
+        }
+    };
+
+    public query func getConnection(profileId : ProfileId, appId : AppId) : async ?IntegrationConnection {
+        connections.get(connectionKey(profileId, appId))
+    };
+
+    public query func listConnections(profileId : ProfileId) : async [IntegrationConnection] {
+        let buf = Buffer.Buffer<IntegrationConnection>(0);
+        for ((_, conn) in connections.entries()) {
+            if (conn.profile_id == profileId) {
+                buf.add(conn)
+            }
+        };
+        Buffer.toArray(buf)
+    };
+
+    // Submit an activity record on behalf of a user (called by the registered app owner).
+    public shared ({ caller }) func submitActivityRecord(newRecord : NewActivityRecord) : async Result.Result<Text, Text> {
+        if (Principal.isAnonymous(caller)) {
+            return #err("not authenticated")
+        };
+        // Verify caller is the registered app owner or an admin
+        let appOpt = integrationApps.get(newRecord.app_id);
+        let app = switch (appOpt) {
+            case null { return #err("app not found") };
+            case (?a) { a }
+        };
+        if (app.owner != caller and not isAdmin(caller)) {
+            return #err("not authorized to submit records for this app")
+        };
+        if (not app.active) {
+            return #err("app is not active")
+        };
+        // Check an active connection exists for this profile+app
+        let connKey = connectionKey(newRecord.profile_id, newRecord.app_id);
+        switch (connections.get(connKey)) {
+            case null { return #err("no active connection for this profile and app") };
+            case (?c) {
+                if (c.status != #active) {
+                    return #err("connection is not active")
+                }
+            }
+        };
+        // Enforce idempotency: reject duplicate external events
+        let idemKey = newRecord.app_id # ":" # newRecord.idempotency_key;
+        switch (idempotencyKeys.get(idemKey)) {
+            case (?existingId) { return #err("duplicate event: already recorded as " # existingId) };
+            case null {}
+        };
+        let recordId = generateActivityRecordId();
+        let now = Time.now();
+        let content = recordId # newRecord.profile_id # newRecord.app_id # Int.toText(newRecord.event_timestamp);
+        let record : ActivityRecord = {
+            id = recordId;
+            profile_id = newRecord.profile_id;
+            app_id = newRecord.app_id;
+            activity_type = newRecord.activity_type;
+            amount = newRecord.amount;
+            currency = newRecord.currency;
+            event_timestamp = newRecord.event_timestamp;
+            ingest_timestamp = now;
+            payload = newRecord.payload;
+            schema_version = newRecord.schema_version;
+            idempotency_key = newRecord.idempotency_key;
+            attestation = newRecord.attestation;
+            verification_level = #third_party;
+            visibility = newRecord.visibility;
+            hash = generateHash(content)
+        };
+        activityRecordsMap.put(recordId, record);
+        idempotencyKeys.put(idemKey, recordId);
+        // Update per-profile index
+        let currentIndex = switch (profileActivityIndex.get(newRecord.profile_id)) {
+            case (?ids) { ids };
+            case null { [] }
+        };
+        let idxBuf = Buffer.fromArray<Text>(currentIndex);
+        idxBuf.add(recordId);
+        profileActivityIndex.put(newRecord.profile_id, Buffer.toArray(idxBuf));
+        // Update derived summary
+        let sKey = summaryKey(newRecord.profile_id, newRecord.app_id, newRecord.activity_type);
+        let existing = derivedSummaries.get(sKey);
+        let (prevCount, prevTotal, prevCurrency) = switch (existing) {
+            case null { (0, null, newRecord.currency) };
+            case (?s) { (s.record_count, s.total_amount, s.currency) }
+        };
+        let newTotal : ?Float = switch (newRecord.amount) {
+            case null { prevTotal };
+            case (?amt) {
+                switch (prevTotal) {
+                    case null { ?amt };
+                    case (?prev) { ?(prev + amt) }
+                }
+            }
+        };
+        derivedSummaries.put(sKey, {
+            profile_id = newRecord.profile_id;
+            app_id = newRecord.app_id;
+            activity_type = newRecord.activity_type;
+            record_count = prevCount + 1;
+            total_amount = newTotal;
+            currency = prevCurrency;
+            last_updated = now
+        });
+        #ok(recordId)
+    };
+
+    public query func getActivityRecord(recordId : RecordId) : async ?ActivityRecord {
+        activityRecordsMap.get(recordId)
+    };
+
+    // List activity records for a profile, optionally filtered by app and/or activity type.
+    public query func getActivityRecords(
+        profileId : ProfileId,
+        appId : ?AppId,
+        activityType : ?ActivityTypeKey
+    ) : async [ActivityRecord] {
+        let ids = switch (profileActivityIndex.get(profileId)) {
+            case null { return [] };
+            case (?ids) { ids }
+        };
+        let buf = Buffer.Buffer<ActivityRecord>(0);
+        for (rid in ids.vals()) {
+            switch (activityRecordsMap.get(rid)) {
+                case null {};
+                case (?r) {
+                    let appMatch = switch (appId) {
+                        case null { true };
+                        case (?aid) { r.app_id == aid }
+                    };
+                    let typeMatch = switch (activityType) {
+                        case null { true };
+                        case (?at) { r.activity_type == at }
+                    };
+                    if (appMatch and typeMatch) {
+                        buf.add(r)
+                    }
+                }
+            }
+        };
+        Buffer.toArray(buf)
+    };
+
+    public query func getDerivedSummary(
+        profileId : ProfileId,
+        appId : AppId,
+        activityType : ActivityTypeKey
+    ) : async ?DerivedSummary {
+        derivedSummaries.get(summaryKey(profileId, appId, activityType))
+    };
+
+    public query func getApp(appId : AppId) : async ?IntegrationApp {
+        integrationApps.get(appId)
+    };
+
+    public query func listApps() : async [IntegrationApp] {
+        Iter.toArray(integrationApps.vals())
+    };
+
+    public query func getActivityType(appId : AppId, typeKey : ActivityTypeKey) : async ?ActivityType {
+        activityTypesMap.get(activityTypeKey(appId, typeKey))
+    };
+
+    public query func listActivityTypes(appId : AppId) : async [ActivityType] {
+        let buf = Buffer.Buffer<ActivityType>(0);
+        for ((_, at) in activityTypesMap.entries()) {
+            if (at.app_id == appId) {
+                buf.add(at)
+            }
+        };
+        Buffer.toArray(buf)
     };
 
     //----------------------------- Favorites ------------------------------------
