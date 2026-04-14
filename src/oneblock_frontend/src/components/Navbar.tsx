@@ -74,7 +74,7 @@ const Navbar = () => {
     <nav className="navbar">
       <div className="nav-brand">
       <img src="/logo.webp" alt="oneblock" className="nav-logo" />
-        <Link to="/">Oneblock</Link>
+        <Link to="/"><span>OneBlock</span></Link>
       </div>
       
       <button 

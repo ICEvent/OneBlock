@@ -3,7 +3,7 @@
 }
 
 .content-section {
-  margin-bottom: 3rem;
+  margin-bottom: 2rem;
 }
 
 .content-section:last-child {
@@ -12,31 +12,33 @@
 
 .posts-section h3 {
   margin-bottom: 1rem;
-  color: #333;
-  font-size: 1.3rem;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 700;
 }
 
 .profile-content-empty {
   text-align: center;
   padding: 4rem 2rem;
-  color: #999;
-  background: #fafafa;
-  border-radius: 8px;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
 }
 
 .profile-content-empty .material-icons {
-  font-size: 64px;
+  font-size: 56px;
   margin-bottom: 1rem;
-  opacity: 0.3;
+  opacity: 0.25;
 }
 
 .profile-content-empty p {
   margin: 0.5rem 0;
-  font-size: 1.2rem;
-  color: #666;
+  font-size: 1rem;
+  color: var(--text-secondary);
 }
 
 .profile-content-empty span {
-  font-size: 0.95rem;
-  color: #999;
+  font-size: 0.875rem;
+  color: var(--text-muted);
 }
