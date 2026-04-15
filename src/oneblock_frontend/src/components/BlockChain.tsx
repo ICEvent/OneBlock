@@ -21,8 +21,8 @@ const BlockChain: React.FC<BlockChainProps> = ({ blocks, showPrivacy = false }) 
 
   // Sort blocks by start_time (chronological order)
   const sortedBlocks = [...blocks].sort((a, b) => {
-    const timeA = typeof a.start_time === 'bigint' ? Number(a.start_time) : a.start_time;
-    const timeB = typeof b.start_time === 'bigint' ? Number(b.start_time) : b.start_time;
+    const timeA = Number(a.start_time);
+    const timeB = Number(b.start_time);
     return timeA - timeB;
   });
 

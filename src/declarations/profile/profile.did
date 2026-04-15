@@ -6,31 +6,95 @@ type Wallet =
                   };
    name: text;
  };
+type Visibility = 
+ variant {
+   global;
+   personal;
+   unlisted;
+ };
+type VerificationPolicy = 
+ variant {
+   idempotency_only;
+   none;
+   signed_payload;
+ };
+type VerificationLevel = 
+ variant {
+   platform;
+   self;
+   third_party;
+   verifiable;
+ };
 type UpdateProfile = 
  record {
    bio: text;
    name: text;
    pfp: text;
  };
-type Result_1 = 
+type TraitId = text;
+type Trait = 
+ record {
+   confidence: float64;
+   derived_from: vec BlockId;
+   explanation: text;
+   id: TraitId;
+   strength: Strength;
+   tlabel: text;
+   updated_at: Timestamp;
+   visibility: Visibility;
+ };
+type Timestamp = int;
+type Strength = 
+ variant {
+   high;
+   low;
+   medium;
+ };
+type SignatureStatus = 
+ variant {
+   invalid;
+   unverified;
+   verified;
+ };
+type Result_2 = 
  variant {
    err: text;
    ok: Favorite;
+ };
+type Result_1 = 
+ variant {
+   err: text;
+   ok: text;
  };
 type Result = 
  variant {
    err: text;
    ok: nat;
  };
+type RecordId = text;
+type ProfileId = text;
 type Profile = 
  record {
    bio: text;
+   blocks: vec BlockId;
    createtime: int;
-   id: text;
+   id: ProfileId;
+   last_updated: Timestamp;
    links: vec Link;
    name: text;
    owner: principal;
    pfp: text;
+   traits: vec TraitId;
+   visibility: Visibility;
+ };
+type NewTrait = 
+ record {
+   confidence: float64;
+   derived_from: vec BlockId;
+   explanation: text;
+   strength: Strength;
+   tlabel: text;
+   visibility: Visibility;
  };
 type NewProfile = 
  record {
@@ -39,21 +103,89 @@ type NewProfile =
    name: text;
    pfp: text;
  };
+type NewIntegrationApp = 
+ record {
+   category: AppCategory;
+   description: text;
+   id: AppId;
+   name: text;
+   verification_policy: VerificationPolicy;
+ };
+type NewBlock = 
+ record {
+   end_time: opt Timestamp;
+   evidence_refs: vec text;
+   narrative: opt text;
+   profile_id: ProfileId;
+   start_time: Timestamp;
+   visibility: Visibility;
+ };
+type NewActivityType = 
+ record {
+   app_id: AppId;
+   description: text;
+   fields: vec FieldDef;
+   type_key: ActivityTypeKey;
+   type_label: text;
+ };
+type NewActivityRecord = 
+ record {
+   activity_type: ActivityTypeKey;
+   amount: opt float64;
+   app_id: AppId;
+   attestation: opt Attestation;
+   currency: opt text;
+   event_timestamp: Timestamp;
+   idempotency_key: text;
+   payload: vec MetadataEntry;
+   profile_id: ProfileId;
+   schema_version: nat;
+   visibility: Visibility;
+ };
 type Network = 
  variant {
    bitcoin;
    ethereum;
    ic;
  };
+type MetadataEntry = 
+ record {
+   key: text;
+   value: text;
+ };
 type Link = 
  record {
    name: text;
    url: text;
  };
-type Inbox = 
+type IntegrationConnection = 
  record {
-   inboxid: text;
+   app_id: AppId;
+   created_at: Timestamp;
+   external_user_id: text;
+   profile_id: ProfileId;
+   revoked_at: opt Timestamp;
+   scopes: vec text;
+   status: ConnectionStatus;
+ };
+type IntegrationApp = 
+ record {
+   active: bool;
+   category: AppCategory;
+   created_at: Timestamp;
+   description: text;
+   id: AppId;
+   name: text;
    owner: principal;
+   schema_version: nat;
+   verification_policy: VerificationPolicy;
+ };
+type FieldDef = 
+ record {
+   description: text;
+   field_type: text;
+   name: text;
+   required: bool;
  };
 type Favorite = 
  record {
@@ -61,42 +193,132 @@ type Favorite =
    name: text;
    owner: principal;
  };
-type Canister = 
+type DerivedSummary = 
  record {
-   canisterid: principal;
-   desc: text;
-   gallery: text;
-   name: text;
-   posts: text;
+   activity_type: ActivityTypeKey;
+   app_id: AppId;
+   currency: opt text;
+   last_updated: Timestamp;
+   profile_id: ProfileId;
+   record_count: nat;
+   total_amount: opt float64;
+ };
+type ConnectionStatus = 
+ variant {
+   active;
+   pending;
+   revoked;
+ };
+type BlockId = text;
+type Block = 
+ record {
+   created_at: Timestamp;
+   derived_traits: vec TraitId;
+   end_time: opt Timestamp;
+   evidence_refs: vec text;
+   hash: text;
+   id: BlockId;
+   narrative: opt text;
+   profile_id: ProfileId;
+   start_time: Timestamp;
+   visibility: Visibility;
+ };
+type Attestation = 
+ record {
+   issuer: opt text;
+   receipt_url: opt text;
+   signature_status: SignatureStatus;
+   signed_payload: opt text;
+   tx_hash: opt text;
+ };
+type AppId = text;
+type AppCategory = 
+ variant {
+   donation;
+   education;
+   finance;
+   fitness;
+   other;
+   social;
+ };
+type ActivityTypeKey = text;
+type ActivityType = 
+ record {
+   app_id: AppId;
+   created_at: Timestamp;
+   description: text;
+   fields: vec FieldDef;
+   type_key: ActivityTypeKey;
+   type_label: text;
+   version: nat;
+ };
+type ActivityRecord = 
+ record {
+   activity_type: ActivityTypeKey;
+   amount: opt float64;
+   app_id: AppId;
+   attestation: opt Attestation;
+   currency: opt text;
+   event_timestamp: Timestamp;
+   hash: text;
+   id: RecordId;
+   idempotency_key: text;
+   ingest_timestamp: Timestamp;
+   payload: vec MetadataEntry;
+   profile_id: ProfileId;
+   schema_version: nat;
+   verification_level: VerificationLevel;
+   visibility: Visibility;
  };
 service : {
-  addAdmin: (text) -> (Result);
-  addFavorite: (record {
-                  address: text;
-                  name: text;
-                }) -> (Result_1);
-  addFeaturedProfile: (text) -> (Result);
-  addInbox: (text) -> (Result);
-  addLink: (text, Link) -> (Result);
-  addWallet: (text, Wallet) -> (Result);
+  addAdmin: (pid: text) -> (Result);
+  addFavorite: (favorite: record {
+                            address: text;
+                            name: text;
+                          }) -> (Result_2);
+  addFeaturedProfile: (pid: text) -> (Result);
+  addLink: (id: text, link: Link) -> (Result);
+  addWallet: (id: text, wallet: Wallet) -> (Result);
   availableCycles: () -> (nat) query;
-  changeId: (text, text) -> (Result);
-  createProfile: (NewProfile) -> (Result);
-  deleteLink: (text, text) -> (Result);
-  editCanister: (Canister) -> (Result);
-  getDefaultProfiles: (nat) -> (vec Profile) query;
-  getInbox: (text) -> (opt Inbox) query;
-  getMyCanister: () -> (opt Canister) query;
+  changeId: (oid: text, nid: text) -> (Result);
+  connectApp: (appId: AppId, externalUserId: text, scopes: vec text) ->
+   (Result);
+  createBlock: (newBlock: NewBlock) -> (Result_1);
+  createProfile: (newProfile: NewProfile) -> (Result);
+  createTrait: (profileId: text, newTrait: NewTrait) -> (Result_1);
+  deleteLink: (id: text, name: text) -> (Result);
+  getActivityRecord: (recordId: RecordId) -> (opt ActivityRecord) query;
+  getActivityRecords: (profileId: ProfileId, appId: opt AppId, activityType:
+   opt ActivityTypeKey) -> (vec ActivityRecord) query;
+  getActivityType: (appId: AppId, typeKey: ActivityTypeKey) ->
+   (opt ActivityType) query;
+  getApp: (appId: AppId) -> (opt IntegrationApp) query;
+  getBlock: (blockId: text) -> (opt Block) query;
+  getChain: (profileId: text) -> (vec Block) query;
+  getConnection: (profileId: ProfileId, appId: AppId) ->
+   (opt IntegrationConnection) query;
+  getDefaultProfiles: (size: nat) -> (vec Profile) query;
+  getDerivedSummary: (profileId: ProfileId, appId: AppId, activityType:
+   ActivityTypeKey) -> (opt DerivedSummary) query;
   getMyFavorites: () -> (vec Favorite) query;
-  getMyInbox: () -> (opt Inbox) query;
   getMyProfile: () -> (opt Profile) query;
-  getProfile: (text) -> (opt Profile) query;
-  getProfileByPrincipal: (text) -> (opt Profile) query;
-  getProfileCanister: (principal) -> (opt Canister) query;
+  getProfile: (id: text) -> (opt Profile) query;
+  getProfileByPrincipal: ("principal": text) -> (opt Profile) query;
   getProfileCount: () -> (nat) query;
-  getProfiles: (nat, nat) -> (vec Profile) query;
-  removeFeaturedProfile: (text) -> (Result);
-  reserveid: (text) -> (Result);
-  searchProfilesByName: (text) -> (vec Profile) query;
-  updateProfile: (text, UpdateProfile) -> (Result);
+  getProfiles: (pageSize: nat, pageNumber: nat) -> (vec Profile) query;
+  getTrait: (traitId: text) -> (opt Trait) query;
+  getTraits: (profileId: text) -> (vec Trait) query;
+  listActivityTypes: (appId: AppId) -> (vec ActivityType) query;
+  listApps: () -> (vec IntegrationApp) query;
+  listBlocks: (profileId: text) -> (vec Block) query;
+  listConnections: (profileId: ProfileId) ->
+   (vec IntegrationConnection) query;
+  registerActivityType: (newType: NewActivityType) -> (Result_1);
+  registerApp: (newApp: NewIntegrationApp) -> (Result_1);
+  removeFeaturedProfile: (id: text) -> (Result);
+  reserveid: (id: text) -> (Result);
+  revokeConnection: (appId: AppId) -> (Result);
+  searchProfilesByName: (q: text) -> (vec Profile) query;
+  submitActivityRecord: (newRecord: NewActivityRecord) -> (Result_1);
+  updateProfile: (id: text, updateProfile: UpdateProfile) -> (Result);
 }

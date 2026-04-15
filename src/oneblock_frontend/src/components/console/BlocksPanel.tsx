@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useGlobalContext, useOneblock } from '../Store';
 import { toast } from 'react-toastify';
 import { CircularProgress } from '@mui/material';
-import { Block, Visibility, NewBlock } from '../../types/block';
+import { Block } from '../../types/block';
+import type { NewBlock, Visibility } from '../../api/profile/service.did.d';
 import BlockChain from '../BlockChain';
 import '../../styles/Block.css';
 
@@ -19,13 +20,13 @@ export const BlocksPanel: React.FC = () => {
     end_time: string;
     narrative: string;
     evidence_refs: string;
-    visibility: Visibility;
+    visibilityKey: 'global' | 'unlisted' | 'personal';
   }>({
     start_time: '',
     end_time: '',
     narrative: '',
     evidence_refs: '',
-    visibility: Visibility.Public,
+    visibilityKey: 'global',
   });
 
   useEffect(() => {
@@ -72,9 +73,9 @@ export const BlocksPanel: React.FC = () => {
 
     setCreating(true);
     try {
-      const startTime = new Date(newBlock.start_time).getTime() * 1000000; // Convert to nanoseconds
+      const startTime = BigInt(new Date(newBlock.start_time).getTime()) * 1_000_000n; // Convert to nanoseconds
       const endTime = newBlock.end_time 
-        ? new Date(newBlock.end_time).getTime() * 1000000 
+        ? BigInt(new Date(newBlock.end_time).getTime()) * 1_000_000n
         : null;
 
       const evidenceRefs = newBlock.evidence_refs
@@ -85,10 +86,10 @@ export const BlocksPanel: React.FC = () => {
       const blockData: NewBlock = {
         profile_id: profileId,
         start_time: startTime,
-        end_time: endTime || undefined,
-        narrative: newBlock.narrative,
+        end_time: endTime ? [endTime] : [],
+        narrative: newBlock.narrative ? [newBlock.narrative] : [],
         evidence_refs: evidenceRefs,
-        visibility: newBlock.visibility,
+        visibility: { [newBlock.visibilityKey]: null } as Visibility,
       };
 
       const result = await oneblock.createBlock(blockData);
@@ -100,7 +101,7 @@ export const BlocksPanel: React.FC = () => {
           end_time: '',
           narrative: '',
           evidence_refs: '',
-          visibility: Visibility.Public,
+          visibilityKey: 'global',
         });
         loadBlocks(profileId);
       } else {
@@ -177,12 +178,12 @@ export const BlocksPanel: React.FC = () => {
         <div className="form-group">
           <label>Visibility</label>
           <select
-            value={newBlock.visibility}
-            onChange={(e) => setNewBlock({ ...newBlock, visibility: e.target.value as Visibility })}
+            value={newBlock.visibilityKey}
+            onChange={(e) => setNewBlock({ ...newBlock, visibilityKey: e.target.value as 'global' | 'unlisted' | 'personal' })}
           >
-            <option value={Visibility.Public}>Public</option>
-            <option value={Visibility.Unlisted}>Unlisted</option>
-            <option value={Visibility.Private}>Private</option>
+            <option value="global">Public</option>
+            <option value="unlisted">Unlisted</option>
+            <option value="personal">Private</option>
           </select>
         </div>
 

@@ -2,13 +2,12 @@
 export type BlockId = string;
 export type ProfileId = string;
 export type TraitId = string;
-export type Timestamp = bigint | number;
+export type Timestamp = bigint;
 
-export enum Visibility {
-  Public = 'public',
-  Unlisted = 'unlisted',
-  Private = 'private'
-}
+export type Visibility =
+  { 'global': null } |
+  { 'unlisted': null } |
+  { 'personal': null };
 
 export enum VerificationLevel {
   Self = 'self',
@@ -28,12 +27,12 @@ export interface Block {
   profile_id: ProfileId;
   
   start_time: Timestamp;
-  end_time?: Timestamp;
+  end_time: [] | [Timestamp];
   
   evidence_refs: string[]; // e.g. alltrack://route/123
   derived_traits: TraitId[];
   
-  narrative?: string;
+  narrative: [] | [string];
   
   visibility: Visibility;
   

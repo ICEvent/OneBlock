@@ -800,7 +800,7 @@ persistent actor {
                 let at : ActivityType = {
                     app_id = newType.app_id;
                     type_key = newType.type_key;
-                    label = newType.label;
+                    type_label = newType.type_label;
                     description = newType.description;
                     fields = newType.fields;
                     version = version;

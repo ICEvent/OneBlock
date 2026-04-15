@@ -121,7 +121,7 @@ type NewActivityType =
    app_id: text;
    description: text;
    fields: vec FieldDef;
-   label: text;
+   type_label: text;
    type_key: text;
  };
 type NewActivityRecord = 
@@ -254,7 +254,7 @@ type ActivityType =
    created_at: int;
    description: text;
    fields: vec FieldDef;
-   label: text;
+   type_label: text;
    type_key: text;
    version: nat;
  };

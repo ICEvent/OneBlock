@@ -154,7 +154,7 @@ export const idlFactory = ({ IDL }) => {
   const ActivityType = IDL.Record({
     'app_id' : IDL.Text,
     'type_key' : IDL.Text,
-    'label' : IDL.Text,
+    'type_label' : IDL.Text,
     'description' : IDL.Text,
     'fields' : IDL.Vec(FieldDef),
     'version' : IDL.Nat,
@@ -163,7 +163,7 @@ export const idlFactory = ({ IDL }) => {
   const NewActivityType = IDL.Record({
     'app_id' : IDL.Text,
     'type_key' : IDL.Text,
-    'label' : IDL.Text,
+    'type_label' : IDL.Text,
     'description' : IDL.Text,
     'fields' : IDL.Vec(FieldDef),
   });

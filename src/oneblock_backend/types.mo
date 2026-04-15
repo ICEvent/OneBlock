@@ -213,7 +213,7 @@ module {
     public type ActivityType = {
         app_id : AppId;
         type_key : ActivityTypeKey; // e.g. "donation.made"
-        label : Text;
+        type_label : Text;
         description : Text;
         fields : [FieldDef]; // schema for the payload entries
         version : Nat;
@@ -294,7 +294,7 @@ module {
     public type NewActivityType = {
         app_id : AppId;
         type_key : ActivityTypeKey;
-        label : Text;
+        type_label : Text;
         description : Text;
         fields : [FieldDef];
     };

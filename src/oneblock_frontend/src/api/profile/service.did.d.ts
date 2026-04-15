@@ -113,7 +113,7 @@ export interface FieldDef {
 export interface ActivityType {
   'app_id' : AppId,
   'type_key' : ActivityTypeKey,
-  'label' : string,
+  'type_label' : string,
   'description' : string,
   'fields' : Array<FieldDef>,
   'version' : bigint,
@@ -183,7 +183,7 @@ export interface NewIntegrationApp {
 export interface NewActivityType {
   'app_id' : AppId,
   'type_key' : ActivityTypeKey,
-  'label' : string,
+  'type_label' : string,
   'description' : string,
   'fields' : Array<FieldDef>,
 }

@@ -1,7 +1,9 @@
 import React from 'react';
 import moment from 'moment';
-import { Block, Visibility } from '../types/block';
+import { Block } from '../types/block';
 import '../styles/Block.css';
+
+type Visibility = Block['visibility'];
 
 interface BlockCardProps {
   block: Block;
@@ -9,28 +11,23 @@ interface BlockCardProps {
 }
 
 const BlockCard: React.FC<BlockCardProps> = ({ block, showPrivacy = false }) => {
-  const formatTimestamp = (timestamp: number | bigint): string => {
-    const ts = typeof timestamp === 'bigint' ? Number(timestamp) : timestamp;
+  const formatTimestamp = (timestamp: bigint): string => {
+    const ts = Number(timestamp);
     // Convert nanoseconds to milliseconds if needed
     const ms = ts > 1e12 ? ts / 1000000 : ts;
     return moment(ms).format('MMM DD, YYYY');
   };
 
   const getVisibilityIcon = (visibility: Visibility): string => {
-    switch (visibility) {
-      case Visibility.Public:
-        return 'public';
-      case Visibility.Unlisted:
-        return 'link';
-      case Visibility.Private:
-        return 'lock';
-      default:
-        return 'public';
-    }
+    if ('global' in visibility) return 'public';
+    if ('unlisted' in visibility) return 'link';
+    if ('personal' in visibility) return 'lock';
+    return 'public';
   };
 
-  const duration = block.end_time 
-    ? `${formatTimestamp(block.start_time)} → ${formatTimestamp(block.end_time)}`
+  const endTimestamp = block.end_time.length > 0 ? (block.end_time[0] as bigint) : undefined;
+  const duration = endTimestamp !== undefined
+    ? `${formatTimestamp(block.start_time)} → ${formatTimestamp(endTimestamp)}`
     : `${formatTimestamp(block.start_time)} → ongoing`;
 
   return (
@@ -47,9 +44,9 @@ const BlockCard: React.FC<BlockCardProps> = ({ block, showPrivacy = false }) => 
         )}
       </div>
 
-      {block.narrative && (
+      {block.narrative.length > 0 && (
         <div className="block-narrative">
-          <p>{block.narrative}</p>
+          <p>{block.narrative[0]}</p>
         </div>
       )}
 
