@@ -1342,7 +1342,7 @@ persistent actor {
                 };
                 let updatedFactors = Array.append(g.factors, [factor]);
                 let updatedScores = recomputeScoresInternal({ g with factors = updatedFactors }, null, now);
-                let event : Types.FactorEvent = { principal = input.principal; factor_id = ?factor.id; action = #created; reason = null; actor = callerText; timestamp = now; metadata = [] };
+                let event : Types.FactorEvent = { principal = input.principal; factor_id = ?factor.id; action = #created; reason = null; triggered_by = callerText; timestamp = now; metadata = [] };
                 identityGraphs.put(input.principal, { g with factors = updatedFactors; scores = updatedScores; history = Array.append(g.history, [event]); updated_at = now });
                 #ok(factor.id)
             }
@@ -1443,7 +1443,7 @@ persistent actor {
                 let policy = switch (policyId) { case null null; case (?id) contextPolicies.get(id) };
                 let now = Time.now();
                 let s = recomputeScoresInternal(g, policy, now);
-                let event : Types.FactorEvent = { principal = principal; factor_id = null; action = #recomputed; reason = policyId; actor = callerText; timestamp = now; metadata = [] };
+                let event : Types.FactorEvent = { principal = principal; factor_id = null; action = #recomputed; reason = policyId; triggered_by = callerText; timestamp = now; metadata = [] };
                 identityGraphs.put(principal, { g with scores = s; history = Array.append(g.history, [event]); updated_at = now });
                 #ok(s)
             }

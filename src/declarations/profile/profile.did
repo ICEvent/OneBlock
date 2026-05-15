@@ -31,6 +31,17 @@ type UpdateProfile =
    name: text;
    pfp: text;
  };
+type TrustEdge = 
+ record {
+   confidence: float64;
+   context: text;
+   created_at: Timestamp;
+   from_principal: IdentityPrincipal;
+   id: text;
+   to_principal: IdentityPrincipal;
+   trust: float64;
+   updated_at: Timestamp;
+ };
 type TraitId = text;
 type Trait = 
  record {
@@ -56,10 +67,20 @@ type SignatureStatus =
    unverified;
    verified;
  };
-type Result_2 = 
+type Result_4 = 
  variant {
    err: text;
    ok: Favorite;
+ };
+type Result_3 = 
+ variant {
+   err: text;
+   ok: PolicyEvaluation;
+ };
+type Result_2 = 
+ variant {
+   err: text;
+   ok: ProbabilityScores;
  };
 type Result_1 = 
  variant {
@@ -87,6 +108,50 @@ type Profile =
    traits: vec TraitId;
    visibility: Visibility;
  };
+type ProbabilityScores = 
+ record {
+   ai_probability: float64;
+   human_score: float64;
+   model_version: text;
+   organization_probability: float64;
+   reputation_score: float64;
+   trust_score: float64;
+   uniqueness_score: float64;
+   updated_at: Timestamp;
+ };
+type PolicyWeights = 
+ record {
+   continuity: float64;
+   economic: float64;
+   existence: float64;
+   human: float64;
+   reputation: float64;
+   social: float64;
+ };
+type PolicyRequirements = 
+ record {
+   min_human_score: opt float64;
+   min_reputation_score: opt float64;
+   min_trust_score: opt float64;
+   min_uniqueness_score: opt float64;
+   min_wallet_age_days: opt nat;
+ };
+type PolicyId = text;
+type PolicyEvaluationItem = 
+ record {
+   actual: text;
+   expected: text;
+   key: text;
+   passed: bool;
+ };
+type PolicyEvaluation = 
+ record {
+   evaluated_at: Timestamp;
+   items: vec PolicyEvaluationItem;
+   passed: bool;
+   policy_id: PolicyId;
+   "principal": IdentityPrincipal;
+ };
 type NewTrait = 
  record {
    confidence: float64;
@@ -110,6 +175,35 @@ type NewIntegrationApp =
    id: AppId;
    name: text;
    verification_policy: VerificationPolicy;
+ };
+type NewIdentityGraph = 
+ record {
+   entity_kind: EntityKind;
+   "principal": IdentityPrincipal;
+ };
+type NewFactor = 
+ record {
+   category: FactorCategory;
+   confidence: float64;
+   expires_at: opt Timestamp;
+   factor_type: text;
+   metadata: vec MetadataEntry;
+   "principal": IdentityPrincipal;
+   provider: text;
+   reliability: float64;
+   value: text;
+   verified: bool;
+   weight_hint: float64;
+ };
+type NewContextPolicy = 
+ record {
+   active: bool;
+   decay_lambda: float64;
+   description: text;
+   name: text;
+   policy_id: PolicyId;
+   requirements: PolicyRequirements;
+   weights: PolicyWeights;
  };
 type NewBlock = 
  record {
@@ -180,6 +274,7 @@ type IntegrationApp =
    schema_version: nat;
    verification_policy: VerificationPolicy;
  };
+type IdentityPrincipal = text;
 type FieldDef = 
  record {
    description: text;
@@ -192,6 +287,22 @@ type Favorite =
    address: text;
    name: text;
    owner: principal;
+ };
+type FactorCategory = 
+ variant {
+   continuity;
+   economic;
+   existence;
+   human;
+   reputation;
+   social;
+ };
+type EntityKind = 
+ variant {
+   ai_agent;
+   human;
+   hybrid;
+   organization;
  };
 type DerivedSummary = 
  record {
@@ -272,21 +383,27 @@ type ActivityRecord =
  };
 service : {
   addAdmin: (pid: text) -> (Result);
+  addFactor: (input: NewFactor) -> (Result_1);
   addFavorite: (favorite: record {
                             address: text;
                             name: text;
-                          }) -> (Result_2);
+                          }) -> (Result_4);
   addFeaturedProfile: (pid: text) -> (Result);
   addLink: (id: text, link: Link) -> (Result);
+  addTrustEdge: (to_principal: text, context: text, trust: float64,
+   confidence: float64) -> (Result);
   addWallet: (id: text, wallet: Wallet) -> (Result);
   availableCycles: () -> (nat) query;
   changeId: (oid: text, nid: text) -> (Result);
   connectApp: (appId: AppId, externalUserId: text, scopes: vec text) ->
    (Result);
   createBlock: (newBlock: NewBlock) -> (Result_1);
+  createIdentityGraph: (input: NewIdentityGraph) -> (Result);
+  createPolicy: (input: NewContextPolicy) -> (Result);
   createProfile: (newProfile: NewProfile) -> (Result);
   createTrait: (profileId: text, newTrait: NewTrait) -> (Result_1);
   deleteLink: (id: text, name: text) -> (Result);
+  evaluatePolicy: ("principal": text, policyId: text) -> (Result_3) query;
   getActivityRecord: (recordId: RecordId) -> (opt ActivityRecord) query;
   getActivityRecords: (profileId: ProfileId, appId: opt AppId, activityType:
    opt ActivityTypeKey) -> (vec ActivityRecord) query;
@@ -300,12 +417,14 @@ service : {
   getDefaultProfiles: (size: nat) -> (vec Profile) query;
   getDerivedSummary: (profileId: ProfileId, appId: AppId, activityType:
    ActivityTypeKey) -> (opt DerivedSummary) query;
+  getInboundTrust: ("principal": text) -> (vec TrustEdge) query;
   getMyFavorites: () -> (vec Favorite) query;
   getMyProfile: () -> (opt Profile) query;
   getProfile: (id: text) -> (opt Profile) query;
   getProfileByPrincipal: ("principal": text) -> (opt Profile) query;
   getProfileCount: () -> (nat) query;
   getProfiles: (pageSize: nat, pageNumber: nat) -> (vec Profile) query;
+  getScores: ("principal": text) -> (opt ProbabilityScores) query;
   getTrait: (traitId: text) -> (opt Trait) query;
   getTraits: (profileId: text) -> (vec Trait) query;
   listActivityTypes: (appId: AppId) -> (vec ActivityType) query;
@@ -313,11 +432,13 @@ service : {
   listBlocks: (profileId: text) -> (vec Block) query;
   listConnections: (profileId: ProfileId) ->
    (vec IntegrationConnection) query;
+  recomputeScores: ("principal": text, policyId: opt text) -> (Result_2);
   registerActivityType: (newType: NewActivityType) -> (Result_1);
   registerApp: (newApp: NewIntegrationApp) -> (Result_1);
   removeFeaturedProfile: (id: text) -> (Result);
   reserveid: (id: text) -> (Result);
   revokeConnection: (appId: AppId) -> (Result);
+  runDecaySweep: () -> (nat);
   searchProfilesByName: (q: text) -> (vec Profile) query;
   submitActivityRecord: (newRecord: NewActivityRecord) -> (Result_1);
   updateProfile: (id: text, updateProfile: UpdateProfile) -> (Result);
