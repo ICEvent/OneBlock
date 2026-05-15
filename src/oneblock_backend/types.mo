@@ -312,4 +312,153 @@ module {
         attestation : ?Attestation;
         visibility : Visibility;
     };
+
+    // ========== OIP v0.1 (M1) ==========
+    public type IdentityPrincipal = Text;
+    public type FactorId = Text;
+    public type PolicyId = Text;
+
+    public type EntityKind = {
+        #human;
+        #ai_agent;
+        #hybrid;
+        #organization;
+    };
+
+    public type FactorCategory = {
+        #existence;
+        #continuity;
+        #human;
+        #social;
+        #economic;
+        #reputation;
+    };
+
+    public type FactorStatus = { #active; #revoked; #expired };
+
+    public type Factor = {
+        id : FactorId;
+        principal : IdentityPrincipal;
+        category : FactorCategory;
+        factor_type : Text;
+        provider : Text;
+        value : Text;
+        verified : Bool;
+        confidence : Float;
+        reliability : Float;
+        weight_hint : Float;
+        issued_at : Timestamp;
+        updated_at : Timestamp;
+        expires_at : ?Timestamp;
+        revoked_at : ?Timestamp;
+        status : FactorStatus;
+        metadata : [MetadataEntry];
+    };
+
+    public type ProbabilityScores = {
+        human_score : Float;
+        uniqueness_score : Float;
+        trust_score : Float;
+        reputation_score : Float;
+        ai_probability : Float;
+        organization_probability : Float;
+        updated_at : Timestamp;
+        model_version : Text;
+    };
+
+    public type PolicyRequirements = {
+        min_human_score : ?Float;
+        min_uniqueness_score : ?Float;
+        min_trust_score : ?Float;
+        min_reputation_score : ?Float;
+        min_wallet_age_days : ?Nat;
+    };
+
+    public type PolicyWeights = {
+        existence : Float;
+        continuity : Float;
+        human : Float;
+        social : Float;
+        economic : Float;
+        reputation : Float;
+    };
+
+    public type ContextPolicy = {
+        policy_id : PolicyId;
+        name : Text;
+        description : Text;
+        requirements : PolicyRequirements;
+        weights : PolicyWeights;
+        decay_lambda : Float;
+        active : Bool;
+        created_at : Timestamp;
+        updated_at : Timestamp;
+    };
+
+    public type FactorEventAction = { #created; #updated; #revoked; #expired; #recomputed };
+
+    public type FactorEvent = {
+        principal : IdentityPrincipal;
+        factor_id : ?FactorId;
+        action : FactorEventAction;
+        reason : ?Text;
+        actor : Text;
+        timestamp : Timestamp;
+        metadata : [MetadataEntry];
+    };
+
+    public type IdentityGraph = {
+        principal : IdentityPrincipal;
+        entity_kind : EntityKind;
+        factors : [Factor];
+        scores : ProbabilityScores;
+        history : [FactorEvent];
+        created_at : Timestamp;
+        updated_at : Timestamp;
+    };
+
+    public type NewIdentityGraph = {
+        principal : IdentityPrincipal;
+        entity_kind : EntityKind;
+    };
+
+    public type NewFactor = {
+        principal : IdentityPrincipal;
+        category : FactorCategory;
+        factor_type : Text;
+        provider : Text;
+        value : Text;
+        verified : Bool;
+        confidence : Float;
+        reliability : Float;
+        weight_hint : Float;
+        expires_at : ?Timestamp;
+        metadata : [MetadataEntry];
+    };
+
+    public type NewContextPolicy = {
+        policy_id : PolicyId;
+        name : Text;
+        description : Text;
+        requirements : PolicyRequirements;
+        weights : PolicyWeights;
+        decay_lambda : Float;
+        active : Bool;
+    };
+
+    public type PolicyEvaluationItem = {
+        key : Text;
+        passed : Bool;
+        expected : Text;
+        actual : Text;
+    };
+
+    public type PolicyEvaluation = {
+        policy_id : PolicyId;
+        principal : IdentityPrincipal;
+        passed : Bool;
+        items : [PolicyEvaluationItem];
+        evaluated_at : Timestamp;
+    };
+
 }
