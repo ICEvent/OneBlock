@@ -15,6 +15,7 @@ import  Home  from "./pages/Home";
 import  Console  from "./pages/Console";
 import  BlockPage  from "./pages/Block";
 import PolicyEval from "./pages/PolicyEval";
+import OipConsole from "./pages/OipConsole";
 
 export default () => {
 
@@ -28,6 +29,7 @@ export default () => {
           <Route path="/" element={<Home />} />
           <Route path="/console" element={<Console />} />
           <Route path="/policy" element={<PolicyEval />} />
+          <Route path="/oip" element={<OipConsole />} />
         </Routes>
       </Store>
     </BrowserRouter>
