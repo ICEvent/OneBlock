@@ -10,6 +10,7 @@ import Time "mo:base/Time";
 import Buffer "mo:base/Buffer";
 import Array "mo:base/Array";
 import Order "mo:base/Order";
+import Float "mo:base/Float";
 
 import Types "types";
 
@@ -37,6 +38,20 @@ persistent actor {
     type NewIntegrationApp = Types.NewIntegrationApp;
     type NewActivityType = Types.NewActivityType;
     type NewActivityRecord = Types.NewActivityRecord;
+    type IdentityGraph = Types.IdentityGraph;
+    type NewIdentityGraph = Types.NewIdentityGraph;
+    type Factor = Types.Factor;
+    type NewFactor = Types.NewFactor;
+    type ProbabilityScores = Types.ProbabilityScores;
+    type ContextPolicy = Types.ContextPolicy;
+    type NewContextPolicy = Types.NewContextPolicy;
+    type PolicyEvaluation = Types.PolicyEvaluation;
+    type PolicyEvaluationItem = Types.PolicyEvaluationItem;
+    type PolicyWeights = Types.PolicyWeights;
+    type TrustEdge = Types.TrustEdge;
+    type OipProvider = Types.OipProvider;
+    type NewOipProvider = Types.NewOipProvider;
+    type ProviderFactorSubmission = Types.ProviderFactorSubmission;
 
     var stableProfiles : [(Text, Profile)] = [];
     var stableFeaturedProfiles : [Profile] = [];
@@ -56,6 +71,10 @@ persistent actor {
     var stableIdempotencyKeys : [(Text, Text)] = []; // idempotency_key -> record_id
     var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]
     var stableDerivedSummaries : [(Text, DerivedSummary)] = [];
+    var stableIdentityGraphs : [(Text, IdentityGraph)] = [];
+    var stableContextPolicies : [(Text, ContextPolicy)] = [];
+    var stableTrustEdges : [(Text, TrustEdge)] = [];
+    var stableOipProviders : [(Text, OipProvider)] = [];
 
     var reserveIds : [Text] = ["oneblock", "block", "about", "admin", "status", "update"];
 
@@ -64,6 +83,7 @@ persistent actor {
     var blockIdCounter : Nat = 0;
     var traitIdCounter : Nat = 0;
     var activityRecordCounter : Nat = 0;
+    var factorIdCounter : Nat = 0;
 
     transient var profiles = TrieMap.TrieMap<Text, Profile>(Text.equal, Text.hash);
     profiles := TrieMap.fromEntries<Text, Profile>(Iter.fromArray(stableProfiles), Text.equal, Text.hash);
@@ -111,6 +131,14 @@ persistent actor {
 
     transient var derivedSummaries = TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
     derivedSummaries := TrieMap.fromEntries<Text, DerivedSummary>(Iter.fromArray(stableDerivedSummaries), Text.equal, Text.hash);
+    transient var identityGraphs = TrieMap.TrieMap<Text, IdentityGraph>(Text.equal, Text.hash);
+    identityGraphs := TrieMap.fromEntries<Text, IdentityGraph>(Iter.fromArray(stableIdentityGraphs), Text.equal, Text.hash);
+    transient var contextPolicies = TrieMap.TrieMap<Text, ContextPolicy>(Text.equal, Text.hash);
+    contextPolicies := TrieMap.fromEntries<Text, ContextPolicy>(Iter.fromArray(stableContextPolicies), Text.equal, Text.hash);
+    transient var trustEdges = TrieMap.TrieMap<Text, TrustEdge>(Text.equal, Text.hash);
+    trustEdges := TrieMap.fromEntries<Text, TrustEdge>(Iter.fromArray(stableTrustEdges), Text.equal, Text.hash);
+    transient var oipProviders = TrieMap.TrieMap<Text, OipProvider>(Text.equal, Text.hash);
+    oipProviders := TrieMap.fromEntries<Text, OipProvider>(Iter.fromArray(stableOipProviders), Text.equal, Text.hash);
 
     system func preupgrade() {
         stableProfiles := Iter.toArray(profiles.entries());
@@ -128,7 +156,11 @@ persistent actor {
         stableActivityRecords := Iter.toArray(activityRecordsMap.entries());
         stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());
         stableProfileActivityIndex := Iter.toArray(profileActivityIndex.entries());
-        stableDerivedSummaries := Iter.toArray(derivedSummaries.entries())
+        stableDerivedSummaries := Iter.toArray(derivedSummaries.entries());
+        stableIdentityGraphs := Iter.toArray(identityGraphs.entries());
+        stableContextPolicies := Iter.toArray(contextPolicies.entries());
+        stableTrustEdges := Iter.toArray(trustEdges.entries());
+        stableOipProviders := Iter.toArray(oipProviders.entries())
     };
 
     system func postupgrade() {
@@ -147,7 +179,68 @@ persistent actor {
         stableActivityRecords := [];
         stableIdempotencyKeys := [];
         stableProfileActivityIndex := [];
-        stableDerivedSummaries := []
+        stableDerivedSummaries := [];
+        stableIdentityGraphs := [];
+        stableContextPolicies := [];
+        stableTrustEdges := [];
+        stableOipProviders := []
+    };
+    private func clamp01(v : Float) : Float {
+        if (v < 0.0) { 0.0 } else if (v > 1.0) { 1.0 } else { v }
+    };
+    private func defaultPolicyWeights() : PolicyWeights {
+        { existence = 0.20; continuity = 0.15; human = 0.25; social = 0.15; economic = 0.10; reputation = 0.15 }
+    };
+    private func defaultScores(now : Int) : ProbabilityScores {
+        {
+            human_score = 0.0; uniqueness_score = 0.0; trust_score = 0.0; reputation_score = 0.0;
+            ai_probability = 0.6; organization_probability = 0.4; updated_at = now; model_version = "oip-v0.2-m2";
+        }
+    };
+    private func generateFactorId() : Text {
+        factorIdCounter += 1;
+        "factor_" # Nat.toText(factorIdCounter)
+    };
+    private func edgeKey(fromP : Text, toP : Text, context : Text) : Text { fromP # "->" # toP # ":" # context };
+    private func providerIdemKey(providerId : Text, idem : Text) : Text { "provider:" # providerId # ":" # idem };
+    private func scoreForCategory(weights : PolicyWeights, c : Types.FactorCategory) : Float {
+        switch (c) { case (#existence) weights.existence; case (#continuity) weights.continuity; case (#human) weights.human; case (#social) weights.social; case (#economic) weights.economic; case (#reputation) weights.reputation }
+    };
+    private func freshness(f : Factor, now : Int) : Float {
+        if (f.status == #revoked or f.status == #expired) { return 0.0 };
+        switch (f.expires_at) { case null { 1.0 }; case (?exp) { if (now >= exp) { 0.0 } else { 0.9 } } }
+    };
+    private func decayMultiplier(lastUpdated : Int, now : Int, lambda : Float) : Float {
+        let dt : Float = Float.fromInt(now - lastUpdated) / 1_000_000_000.0 / 86400.0;
+        if (dt <= 0.0) { 1.0 } else { Float.exp(0.0 - (lambda * dt)) }
+    };
+    private func recomputeScoresInternal(g : IdentityGraph, policyOpt : ?ContextPolicy, now : Int) : ProbabilityScores {
+        let weights = switch (policyOpt) { case (?p) p.weights; case null defaultPolicyWeights() };
+        let lambda = switch (policyOpt) { case (?p) p.decay_lambda; case null 0.08 };
+        var human : Float = 0.0;
+        var uniq : Float = 0.0;
+        var trust : Float = 0.0;
+        var rep : Float = 0.0;
+        for (f in g.factors.vals()) {
+            let base = clamp01(f.confidence) * clamp01(f.reliability) * clamp01(scoreForCategory(weights, f.category)) * freshness(f, now);
+            switch (f.category) {
+                case (#human) { human += base; trust += base };
+                case (#existence) { uniq += base; trust += base };
+                case (#continuity) { trust += base };
+                case (#social) { human += base * 0.5; trust += base };
+                case (#economic) { uniq += base * 0.3; trust += base };
+                case (#reputation) { rep += base; trust += base * 0.7 };
+            }
+        };
+        let d = decayMultiplier(g.scores.updated_at, now, lambda);
+        human := clamp01(human * d); uniq := clamp01(uniq * d); rep := clamp01(rep * d); trust := clamp01(trust * d);
+        {
+            human_score = human; uniqueness_score = uniq; trust_score = trust; reputation_score = rep;
+            ai_probability = clamp01((1.0 - human) * 0.6);
+            organization_probability = clamp01((1.0 - human) * 0.4);
+            updated_at = now;
+            model_version = "oip-v0.2-m2";
+        }
     };
 
     public shared ({ caller }) func createProfile(newProfile : Types.NewProfile) : async Result.Result<Nat, Text> {
@@ -1165,6 +1258,234 @@ persistent actor {
         switch (fa) {
             case (?fa) { true };
             case (_) (false)
+        }
+    };
+
+    // --------------------------- OIP M2 ---------------------------
+    public shared ({ caller }) func createIdentityGraph(input : NewIdentityGraph) : async Result.Result<Nat, Text> {
+        if (Principal.isAnonymous(caller)) { return #err("no authenticated") };
+        let callerText = Principal.toText(caller);
+        if (callerText != input.principal and not isAdmin(caller)) { return #err("no permission") };
+        switch (identityGraphs.get(input.principal)) {
+            case (?_) { #err("identity graph already exists") };
+            case null {
+                let now = Time.now();
+                identityGraphs.put(input.principal, {
+                    principal = input.principal; entity_kind = input.entity_kind; factors = [];
+                    scores = defaultScores(now); history = []; created_at = now; updated_at = now;
+                });
+                #ok(1)
+            }
+        }
+    };
+
+    public shared ({ caller }) func createPolicy(input : NewContextPolicy) : async Result.Result<Nat, Text> {
+        if (not isAdmin(caller)) { return #err("no permission") };
+        let now = Time.now();
+        contextPolicies.put(input.policy_id, {
+            policy_id = input.policy_id; name = input.name; description = input.description;
+            requirements = input.requirements; weights = input.weights; decay_lambda = input.decay_lambda;
+            active = input.active; created_at = now; updated_at = now;
+        });
+        #ok(1)
+    };
+
+    public shared ({ caller }) func registerOipProvider(input : NewOipProvider) : async Result.Result<Nat, Text> {
+        if (Principal.isAnonymous(caller)) { return #err("not authenticated") };
+        if (Text.size(input.provider_id) < 3) { return #err("provider_id too short") };
+        switch (oipProviders.get(input.provider_id)) {
+            case (?_) { #err("provider already exists") };
+            case null {
+                let now = Time.now();
+                oipProviders.put(input.provider_id, {
+                    provider_id = input.provider_id;
+                    owner = caller;
+                    name = input.name;
+                    capabilities = input.capabilities;
+                    verification = input.verification;
+                    reliability = clamp01(input.reliability);
+                    status = #active;
+                    created_at = now;
+                    updated_at = now;
+                });
+                #ok(1)
+            }
+        }
+    };
+
+    public shared ({ caller }) func setProviderStatus(providerId : Text, active : Bool) : async Result.Result<Nat, Text> {
+        switch (oipProviders.get(providerId)) {
+            case null { #err("provider not found") };
+            case (?p) {
+                if (p.owner != caller and not isAdmin(caller)) { return #err("no permission") };
+                oipProviders.put(providerId, {
+                    p with status = if (active) { #active } else { #suspended }; updated_at = Time.now()
+                });
+                #ok(1)
+            }
+        }
+    };
+
+    public shared ({ caller }) func addFactor(input : NewFactor) : async Result.Result<Text, Text> {
+        if (Principal.isAnonymous(caller)) { return #err("no authenticated") };
+        let callerText = Principal.toText(caller);
+        if (callerText != input.principal and not isAdmin(caller)) { return #err("no permission") };
+        switch (identityGraphs.get(input.principal)) {
+            case null { #err("identity graph not found") };
+            case (?g) {
+                let now = Time.now();
+                let factor : Factor = {
+                    id = generateFactorId(); principal = input.principal; category = input.category;
+                    factor_type = input.factor_type; provider = input.provider; value = input.value; verified = input.verified;
+                    confidence = clamp01(input.confidence); reliability = clamp01(input.reliability); weight_hint = clamp01(input.weight_hint);
+                    issued_at = now; updated_at = now; expires_at = input.expires_at; revoked_at = null; status = #active; metadata = input.metadata;
+                };
+                let updatedFactors = Array.append(g.factors, [factor]);
+                let updatedScores = recomputeScoresInternal({ g with factors = updatedFactors }, null, now);
+                let event : Types.FactorEvent = { principal = input.principal; factor_id = ?factor.id; action = #created; reason = null; actor = callerText; timestamp = now; metadata = [] };
+                identityGraphs.put(input.principal, { g with factors = updatedFactors; scores = updatedScores; history = Array.append(g.history, [event]); updated_at = now });
+                #ok(factor.id)
+            }
+        }
+    };
+
+    public shared ({ caller }) func submitProviderFactor(input : ProviderFactorSubmission) : async Result.Result<Text, Text> {
+        if (Principal.isAnonymous(caller)) { return #err("not authenticated") };
+        let provider = switch (oipProviders.get(input.provider_id)) {
+            case null { return #err("provider not found") };
+            case (?p) { p }
+        };
+        if (provider.owner != caller and not isAdmin(caller)) { return #err("not authorized provider") };
+        if (provider.status != #active) { return #err("provider suspended") };
+        let idemKey = providerIdemKey(input.provider_id, input.idempotency_key);
+        switch (idempotencyKeys.get(idemKey)) {
+            case (?rid) { return #err("duplicate submission: " # rid) };
+            case null {}
+        };
+        if (provider.verification == #signed_payload and input.signed_payload == null) {
+            return #err("signed_payload required")
+        };
+        switch (identityGraphs.get(input.principal)) {
+            case null { return #err("identity graph not found") };
+            case (?g) {
+                let now = Time.now();
+                let factor : Factor = {
+                    id = generateFactorId();
+                    principal = input.principal;
+                    category = input.category;
+                    factor_type = input.factor_type;
+                    provider = input.provider_id;
+                    value = input.value;
+                    verified = true;
+                    confidence = clamp01(input.confidence);
+                    reliability = clamp01(
+                        switch (input.reliability) {
+                            case (?r) { r * provider.reliability };
+                            case null { provider.reliability };
+                        }
+                    );
+                    weight_hint = clamp01(input.weight_hint);
+                    issued_at = now;
+                    updated_at = now;
+                    expires_at = input.expires_at;
+                    revoked_at = null;
+                    status = #active;
+                    metadata = [
+                        { key = "provider_id"; value = input.provider_id },
+                        { key = "idempotency_key"; value = input.idempotency_key }
+                    ];
+                };
+                let updatedFactors = Array.append(g.factors, [factor]);
+                let updatedScores = recomputeScoresInternal({ g with factors = updatedFactors }, null, now);
+                let event : Types.FactorEvent = {
+                    principal = input.principal; factor_id = ?factor.id; action = #created;
+                    reason = ?"provider_submission"; actor = Principal.toText(caller); timestamp = now; metadata = factor.metadata;
+                };
+                identityGraphs.put(input.principal, {
+                    g with factors = updatedFactors; scores = updatedScores; history = Array.append(g.history, [event]); updated_at = now
+                });
+                idempotencyKeys.put(idemKey, factor.id);
+                #ok(factor.id)
+            }
+        }
+    };
+
+    public query func getOipProvider(providerId : Text) : async ?OipProvider {
+        oipProviders.get(providerId)
+    };
+
+    public query func listOipProviders() : async [OipProvider] {
+        Iter.toArray(oipProviders.vals())
+    };
+
+    public shared ({ caller }) func addTrustEdge(to_principal : Text, context : Text, trust : Float, confidence : Float) : async Result.Result<Nat, Text> {
+        if (Principal.isAnonymous(caller)) { return #err("no authenticated") };
+        let fromP = Principal.toText(caller);
+        let key = edgeKey(fromP, to_principal, context);
+        let now = Time.now();
+        trustEdges.put(key, { id = key; from_principal = fromP; to_principal = to_principal; context = context; trust = clamp01(trust); confidence = clamp01(confidence); created_at = now; updated_at = now });
+        #ok(1)
+    };
+
+    public query func getInboundTrust(principal : Text) : async [TrustEdge] {
+        let b = Buffer.Buffer<TrustEdge>(0);
+        for ((_, e) in trustEdges.entries()) { if (e.to_principal == principal) { b.add(e) } };
+        Buffer.toArray(b)
+    };
+
+    public shared ({ caller }) func recomputeScores(principal : Text, policyId : ?Text) : async Result.Result<ProbabilityScores, Text> {
+        if (Principal.isAnonymous(caller)) { return #err("no authenticated") };
+        let callerText = Principal.toText(caller);
+        if (callerText != principal and not isAdmin(caller)) { return #err("no permission") };
+        switch (identityGraphs.get(principal)) {
+            case null { #err("identity graph not found") };
+            case (?g) {
+                let policy = switch (policyId) { case null null; case (?id) contextPolicies.get(id) };
+                let now = Time.now();
+                let s = recomputeScoresInternal(g, policy, now);
+                let event : Types.FactorEvent = { principal = principal; factor_id = null; action = #recomputed; reason = policyId; actor = callerText; timestamp = now; metadata = [] };
+                identityGraphs.put(principal, { g with scores = s; history = Array.append(g.history, [event]); updated_at = now });
+                #ok(s)
+            }
+        }
+    };
+
+    public shared ({ caller }) func runDecaySweep() : async Nat {
+        if (not isAdmin(caller)) { return 0 };
+        let now = Time.now();
+        var count : Nat = 0;
+        for ((pid, g) in identityGraphs.entries()) {
+            let s = recomputeScoresInternal(g, null, now);
+            identityGraphs.put(pid, { g with scores = s; updated_at = now });
+            count += 1;
+        };
+        count
+    };
+
+    public query func getScores(principal : Text) : async ?ProbabilityScores {
+        switch (identityGraphs.get(principal)) { case null null; case (?g) ?g.scores }
+    };
+
+    public query func evaluatePolicy(principal : Text, policyId : Text) : async Result.Result<PolicyEvaluation, Text> {
+        switch (identityGraphs.get(principal)) {
+            case null { #err("identity graph not found") };
+            case (?g) {
+                switch (contextPolicies.get(policyId)) {
+                    case null { #err("policy not found") };
+                    case (?p) {
+                        let b = Buffer.Buffer<PolicyEvaluationItem>(0);
+                        let s = g.scores;
+                        switch (p.requirements.min_human_score) { case (?v) b.add({ key = "min_human_score"; passed = s.human_score >= v; expected = Float.toText(v); actual = Float.toText(s.human_score) }); case null {} };
+                        switch (p.requirements.min_uniqueness_score) { case (?v) b.add({ key = "min_uniqueness_score"; passed = s.uniqueness_score >= v; expected = Float.toText(v); actual = Float.toText(s.uniqueness_score) }); case null {} };
+                        switch (p.requirements.min_trust_score) { case (?v) b.add({ key = "min_trust_score"; passed = s.trust_score >= v; expected = Float.toText(v); actual = Float.toText(s.trust_score) }); case null {} };
+                        switch (p.requirements.min_reputation_score) { case (?v) b.add({ key = "min_reputation_score"; passed = s.reputation_score >= v; expected = Float.toText(v); actual = Float.toText(s.reputation_score) }); case null {} };
+                        let items = Buffer.toArray(b);
+                        var allPass = true;
+                        for (it in items.vals()) { if (not it.passed) { allPass := false } };
+                        #ok({ policy_id = policyId; principal = principal; passed = allPass; items = items; evaluated_at = Time.now() })
+                    }
+                }
+            }
         }
     }
 }
