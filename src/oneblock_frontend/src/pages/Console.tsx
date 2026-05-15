@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Profile, Link, Canister } from "../api/profile/service.did.d";
+import { Profile, Link } from "../api/profile/service.did.d";
+import { Canister } from "../types/canister";
 import { useNavigate } from 'react-router-dom';
 
 import '../styles/Console.css';

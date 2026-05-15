@@ -402,7 +402,7 @@ module {
         factor_id : ?FactorId;
         action : FactorEventAction;
         reason : ?Text;
-        actor : Text;
+        triggered_by : Text;
         timestamp : Timestamp;
         metadata : [MetadataEntry];
     };
