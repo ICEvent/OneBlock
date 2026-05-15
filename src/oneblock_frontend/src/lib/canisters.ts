@@ -8,3 +8,7 @@ export const defaultAgent = new HttpAgent({
   host: HOST,
 });
 
+defaultAgent.fetchRootKey().catch((err) => {
+  console.warn("Unable to fetch root key:", err);
+});
+

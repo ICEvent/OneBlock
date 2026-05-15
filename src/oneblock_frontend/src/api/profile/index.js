@@ -34,4 +34,9 @@ export const createActor = (agent,actorOptions) => {
   });
 };
 
-export const profile = createActor(canisterId);
+const _agent = new HttpAgent({ host: "https://ic0.app" });
+_agent.fetchRootKey().catch((err) => {
+  console.warn("Unable to fetch root key:", err);
+});
+
+export const profile = createActor(_agent);
