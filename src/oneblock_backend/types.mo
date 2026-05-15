@@ -446,6 +446,17 @@ module {
         active : Bool;
     };
 
+    public type TrustEdge = {
+        id : Text;
+        from_principal : IdentityPrincipal;
+        to_principal : IdentityPrincipal;
+        context : Text;
+        trust : Float;
+        confidence : Float;
+        created_at : Timestamp;
+        updated_at : Timestamp;
+    };
+
     public type PolicyEvaluationItem = {
         key : Text;
         passed : Bool;

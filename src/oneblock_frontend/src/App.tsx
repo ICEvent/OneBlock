@@ -14,6 +14,7 @@ import { ProfilePage } from "./pages/Profile"
 import  Home  from "./pages/Home";
 import  Console  from "./pages/Console";
 import  BlockPage  from "./pages/Block";
+import PolicyEval from "./pages/PolicyEval";
 
 export default () => {
 
@@ -26,6 +27,7 @@ export default () => {
           <Route path="/profile/:id" element={<ProfilePage />} />
           <Route path="/" element={<Home />} />
           <Route path="/console" element={<Console />} />
+          <Route path="/policy" element={<PolicyEval />} />
         </Routes>
       </Store>
     </BrowserRouter>
@@ -33,4 +35,3 @@ export default () => {
 
   )
 }
-
