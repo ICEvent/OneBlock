@@ -49,6 +49,9 @@ persistent actor {
     type PolicyEvaluationItem = Types.PolicyEvaluationItem;
     type PolicyWeights = Types.PolicyWeights;
     type TrustEdge = Types.TrustEdge;
+    type OipProvider = Types.OipProvider;
+    type NewOipProvider = Types.NewOipProvider;
+    type ProviderFactorSubmission = Types.ProviderFactorSubmission;
 
     var stableProfiles : [(Text, Profile)] = [];
     var stableFeaturedProfiles : [Profile] = [];
@@ -71,6 +74,7 @@ persistent actor {
     var stableIdentityGraphs : [(Text, IdentityGraph)] = [];
     var stableContextPolicies : [(Text, ContextPolicy)] = [];
     var stableTrustEdges : [(Text, TrustEdge)] = [];
+    var stableOipProviders : [(Text, OipProvider)] = [];
 
     var reserveIds : [Text] = ["oneblock", "block", "about", "admin", "status", "update"];
 
@@ -133,6 +137,8 @@ persistent actor {
     contextPolicies := TrieMap.fromEntries<Text, ContextPolicy>(Iter.fromArray(stableContextPolicies), Text.equal, Text.hash);
     transient var trustEdges = TrieMap.TrieMap<Text, TrustEdge>(Text.equal, Text.hash);
     trustEdges := TrieMap.fromEntries<Text, TrustEdge>(Iter.fromArray(stableTrustEdges), Text.equal, Text.hash);
+    transient var oipProviders = TrieMap.TrieMap<Text, OipProvider>(Text.equal, Text.hash);
+    oipProviders := TrieMap.fromEntries<Text, OipProvider>(Iter.fromArray(stableOipProviders), Text.equal, Text.hash);
 
     system func preupgrade() {
         stableProfiles := Iter.toArray(profiles.entries());
@@ -153,7 +159,8 @@ persistent actor {
         stableDerivedSummaries := Iter.toArray(derivedSummaries.entries());
         stableIdentityGraphs := Iter.toArray(identityGraphs.entries());
         stableContextPolicies := Iter.toArray(contextPolicies.entries());
-        stableTrustEdges := Iter.toArray(trustEdges.entries())
+        stableTrustEdges := Iter.toArray(trustEdges.entries());
+        stableOipProviders := Iter.toArray(oipProviders.entries())
     };
 
     system func postupgrade() {
@@ -175,7 +182,8 @@ persistent actor {
         stableDerivedSummaries := [];
         stableIdentityGraphs := [];
         stableContextPolicies := [];
-        stableTrustEdges := []
+        stableTrustEdges := [];
+        stableOipProviders := []
     };
     private func clamp01(v : Float) : Float {
         if (v < 0.0) { 0.0 } else if (v > 1.0) { 1.0 } else { v }
@@ -194,6 +202,7 @@ persistent actor {
         "factor_" # Nat.toText(factorIdCounter)
     };
     private func edgeKey(fromP : Text, toP : Text, context : Text) : Text { fromP # "->" # toP # ":" # context };
+    private func providerIdemKey(providerId : Text, idem : Text) : Text { "provider:" # providerId # ":" # idem };
     private func scoreForCategory(weights : PolicyWeights, c : Types.FactorCategory) : Float {
         switch (c) { case (#existence) weights.existence; case (#continuity) weights.continuity; case (#human) weights.human; case (#social) weights.social; case (#economic) weights.economic; case (#reputation) weights.reputation }
     };
@@ -1281,6 +1290,42 @@ persistent actor {
         #ok(1)
     };
 
+    public shared ({ caller }) func registerOipProvider(input : NewOipProvider) : async Result.Result<Nat, Text> {
+        if (Principal.isAnonymous(caller)) { return #err("not authenticated") };
+        if (Text.size(input.provider_id) < 3) { return #err("provider_id too short") };
+        switch (oipProviders.get(input.provider_id)) {
+            case (?_) { #err("provider already exists") };
+            case null {
+                let now = Time.now();
+                oipProviders.put(input.provider_id, {
+                    provider_id = input.provider_id;
+                    owner = caller;
+                    name = input.name;
+                    capabilities = input.capabilities;
+                    verification = input.verification;
+                    reliability = clamp01(input.reliability);
+                    status = #active;
+                    created_at = now;
+                    updated_at = now;
+                });
+                #ok(1)
+            }
+        }
+    };
+
+    public shared ({ caller }) func setProviderStatus(providerId : Text, active : Bool) : async Result.Result<Nat, Text> {
+        switch (oipProviders.get(providerId)) {
+            case null { #err("provider not found") };
+            case (?p) {
+                if (p.owner != caller and not isAdmin(caller)) { return #err("no permission") };
+                oipProviders.put(providerId, {
+                    p with status = if (active) { #active } else { #suspended }; updated_at = Time.now()
+                });
+                #ok(1)
+            }
+        }
+    };
+
     public shared ({ caller }) func addFactor(input : NewFactor) : async Result.Result<Text, Text> {
         if (Principal.isAnonymous(caller)) { return #err("no authenticated") };
         let callerText = Principal.toText(caller);
@@ -1302,6 +1347,75 @@ persistent actor {
                 #ok(factor.id)
             }
         }
+    };
+
+    public shared ({ caller }) func submitProviderFactor(input : ProviderFactorSubmission) : async Result.Result<Text, Text> {
+        if (Principal.isAnonymous(caller)) { return #err("not authenticated") };
+        let provider = switch (oipProviders.get(input.provider_id)) {
+            case null { return #err("provider not found") };
+            case (?p) { p }
+        };
+        if (provider.owner != caller and not isAdmin(caller)) { return #err("not authorized provider") };
+        if (provider.status != #active) { return #err("provider suspended") };
+        let idemKey = providerIdemKey(input.provider_id, input.idempotency_key);
+        switch (idempotencyKeys.get(idemKey)) {
+            case (?rid) { return #err("duplicate submission: " # rid) };
+            case null {}
+        };
+        if (provider.verification == #signed_payload and input.signed_payload == null) {
+            return #err("signed_payload required")
+        };
+        switch (identityGraphs.get(input.principal)) {
+            case null { return #err("identity graph not found") };
+            case (?g) {
+                let now = Time.now();
+                let factor : Factor = {
+                    id = generateFactorId();
+                    principal = input.principal;
+                    category = input.category;
+                    factor_type = input.factor_type;
+                    provider = input.provider_id;
+                    value = input.value;
+                    verified = true;
+                    confidence = clamp01(input.confidence);
+                    reliability = clamp01(
+                        switch (input.reliability) {
+                            case (?r) { r * provider.reliability };
+                            case null { provider.reliability };
+                        }
+                    );
+                    weight_hint = clamp01(input.weight_hint);
+                    issued_at = now;
+                    updated_at = now;
+                    expires_at = input.expires_at;
+                    revoked_at = null;
+                    status = #active;
+                    metadata = [
+                        { key = "provider_id"; value = input.provider_id },
+                        { key = "idempotency_key"; value = input.idempotency_key }
+                    ];
+                };
+                let updatedFactors = Array.append(g.factors, [factor]);
+                let updatedScores = recomputeScoresInternal({ g with factors = updatedFactors }, null, now);
+                let event : Types.FactorEvent = {
+                    principal = input.principal; factor_id = ?factor.id; action = #created;
+                    reason = ?"provider_submission"; actor = Principal.toText(caller); timestamp = now; metadata = factor.metadata;
+                };
+                identityGraphs.put(input.principal, {
+                    g with factors = updatedFactors; scores = updatedScores; history = Array.append(g.history, [event]); updated_at = now
+                });
+                idempotencyKeys.put(idemKey, factor.id);
+                #ok(factor.id)
+            }
+        }
+    };
+
+    public query func getOipProvider(providerId : Text) : async ?OipProvider {
+        oipProviders.get(providerId)
+    };
+
+    public query func listOipProviders() : async [OipProvider] {
+        Iter.toArray(oipProviders.vals())
     };
 
     public shared ({ caller }) func addTrustEdge(to_principal : Text, context : Text, trust : Float, confidence : Float) : async Result.Result<Nat, Text> {

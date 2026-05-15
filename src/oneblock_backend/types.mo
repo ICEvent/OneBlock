@@ -472,4 +472,43 @@ module {
         evaluated_at : Timestamp;
     };
 
+    // ========== OIP v0.3 (M3 Provider Ecosystem) ==========
+    public type ProviderStatus = { #active; #suspended };
+    public type ProviderCapability = { #factor; #reputation; #risk };
+    public type ProviderVerification = { #none; #idempotency_only; #signed_payload };
+
+    public type OipProvider = {
+        provider_id : Text;
+        owner : Principal;
+        name : Text;
+        capabilities : [ProviderCapability];
+        verification : ProviderVerification;
+        reliability : Float;
+        status : ProviderStatus;
+        created_at : Timestamp;
+        updated_at : Timestamp;
+    };
+
+    public type NewOipProvider = {
+        provider_id : Text;
+        name : Text;
+        capabilities : [ProviderCapability];
+        verification : ProviderVerification;
+        reliability : Float;
+    };
+
+    public type ProviderFactorSubmission = {
+        provider_id : Text;
+        idempotency_key : Text;
+        principal : IdentityPrincipal;
+        category : FactorCategory;
+        factor_type : Text;
+        value : Text;
+        confidence : Float;
+        reliability : ?Float;
+        weight_hint : Float;
+        expires_at : ?Timestamp;
+        signed_payload : ?Text;
+    };
+
 }
