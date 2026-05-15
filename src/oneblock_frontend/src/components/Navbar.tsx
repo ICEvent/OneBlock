@@ -88,6 +88,7 @@ const Navbar = () => {
         {isAuthed ? (
           <>
              <Link to="/console" className={location.pathname === '/console' ? 'active' : ''}>Console</Link>
+             <Link to="/policy" className={location.pathname === '/policy' ? 'active' : ''}>Policy</Link>
              <button onClick={logout} className="logout-btn"> Logout</button>
           </>
         ) : (
