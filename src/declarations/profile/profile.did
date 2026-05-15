@@ -93,6 +93,37 @@ type Result =
    ok: nat;
  };
 type RecordId = text;
+type ProviderVerification = 
+ variant {
+   idempotency_only;
+   none;
+   signed_payload;
+ };
+type ProviderStatus = 
+ variant {
+   active;
+   suspended;
+ };
+type ProviderFactorSubmission = 
+ record {
+   category: FactorCategory;
+   confidence: float64;
+   expires_at: opt Timestamp;
+   factor_type: text;
+   idempotency_key: text;
+   "principal": IdentityPrincipal;
+   provider_id: text;
+   reliability: opt float64;
+   signed_payload: opt text;
+   value: text;
+   weight_hint: float64;
+ };
+type ProviderCapability = 
+ variant {
+   factor;
+   reputation;
+   risk;
+ };
 type ProfileId = text;
 type Profile = 
  record {
@@ -152,6 +183,18 @@ type PolicyEvaluation =
    policy_id: PolicyId;
    "principal": IdentityPrincipal;
  };
+type OipProvider = 
+ record {
+   capabilities: vec ProviderCapability;
+   created_at: Timestamp;
+   name: text;
+   owner: principal;
+   provider_id: text;
+   reliability: float64;
+   status: ProviderStatus;
+   updated_at: Timestamp;
+   verification: ProviderVerification;
+ };
 type NewTrait = 
  record {
    confidence: float64;
@@ -167,6 +210,14 @@ type NewProfile =
    id: text;
    name: text;
    pfp: text;
+ };
+type NewOipProvider = 
+ record {
+   capabilities: vec ProviderCapability;
+   name: text;
+   provider_id: text;
+   reliability: float64;
+   verification: ProviderVerification;
  };
 type NewIntegrationApp = 
  record {
@@ -420,6 +471,7 @@ service : {
   getInboundTrust: ("principal": text) -> (vec TrustEdge) query;
   getMyFavorites: () -> (vec Favorite) query;
   getMyProfile: () -> (opt Profile) query;
+  getOipProvider: (providerId: text) -> (opt OipProvider) query;
   getProfile: (id: text) -> (opt Profile) query;
   getProfileByPrincipal: ("principal": text) -> (opt Profile) query;
   getProfileCount: () -> (nat) query;
@@ -432,14 +484,18 @@ service : {
   listBlocks: (profileId: text) -> (vec Block) query;
   listConnections: (profileId: ProfileId) ->
    (vec IntegrationConnection) query;
+  listOipProviders: () -> (vec OipProvider) query;
   recomputeScores: ("principal": text, policyId: opt text) -> (Result_2);
   registerActivityType: (newType: NewActivityType) -> (Result_1);
   registerApp: (newApp: NewIntegrationApp) -> (Result_1);
+  registerOipProvider: (input: NewOipProvider) -> (Result);
   removeFeaturedProfile: (id: text) -> (Result);
   reserveid: (id: text) -> (Result);
   revokeConnection: (appId: AppId) -> (Result);
   runDecaySweep: () -> (nat);
   searchProfilesByName: (q: text) -> (vec Profile) query;
+  setProviderStatus: (providerId: text, active: bool) -> (Result);
   submitActivityRecord: (newRecord: NewActivityRecord) -> (Result_1);
+  submitProviderFactor: (input: ProviderFactorSubmission) -> (Result_1);
   updateProfile: (id: text, updateProfile: UpdateProfile) -> (Result);
 }

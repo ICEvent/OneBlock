@@ -1399,7 +1399,7 @@ persistent actor {
                 let updatedScores = recomputeScoresInternal({ g with factors = updatedFactors }, null, now);
                 let event : Types.FactorEvent = {
                     principal = input.principal; factor_id = ?factor.id; action = #created;
-                    reason = ?"provider_submission"; actor = Principal.toText(caller); timestamp = now; metadata = factor.metadata;
+                    reason = ?"provider_submission"; triggered_by = Principal.toText(caller); timestamp = now; metadata = factor.metadata;
                 };
                 identityGraphs.put(input.principal, {
                     g with factors = updatedFactors; scores = updatedScores; history = Array.append(g.history, [event]); updated_at = now

@@ -176,6 +176,13 @@ export interface NewIntegrationApp {
   'verification_policy' : VerificationPolicy,
   'category' : AppCategory,
 }
+export interface NewOipProvider {
+  'capabilities' : Array<ProviderCapability>,
+  'name' : string,
+  'provider_id' : string,
+  'reliability' : number,
+  'verification' : ProviderVerification,
+}
 export interface NewProfile {
   'id' : string,
   'bio' : string,
@@ -189,6 +196,17 @@ export interface NewTrait {
   'confidence' : number,
   'tlabel' : string,
   'visibility' : Visibility,
+}
+export interface OipProvider {
+  'status' : ProviderStatus,
+  'updated_at' : Timestamp,
+  'capabilities' : Array<ProviderCapability>,
+  'owner' : Principal,
+  'name' : string,
+  'provider_id' : string,
+  'reliability' : number,
+  'created_at' : Timestamp,
+  'verification' : ProviderVerification,
 }
 export interface PolicyEvaluation {
   'principal' : IdentityPrincipal,
@@ -243,6 +261,27 @@ export interface Profile {
   'visibility' : Visibility,
 }
 export type ProfileId = string;
+export type ProviderCapability = { 'risk' : null } |
+  { 'reputation' : null } |
+  { 'factor' : null };
+export interface ProviderFactorSubmission {
+  'principal' : IdentityPrincipal,
+  'value' : string,
+  'signed_payload' : [] | [string],
+  'factor_type' : string,
+  'provider_id' : string,
+  'reliability' : [] | [number],
+  'weight_hint' : number,
+  'category' : FactorCategory,
+  'confidence' : number,
+  'expires_at' : [] | [Timestamp],
+  'idempotency_key' : string,
+}
+export type ProviderStatus = { 'active' : null } |
+  { 'suspended' : null };
+export type ProviderVerification = { 'none' : null } |
+  { 'signed_payload' : null } |
+  { 'idempotency_only' : null };
 export type RecordId = string;
 export type Result = { 'ok' : bigint } |
   { 'err' : string };
@@ -346,6 +385,7 @@ export interface _SERVICE {
   'getInboundTrust' : ActorMethod<[string], Array<TrustEdge>>,
   'getMyFavorites' : ActorMethod<[], Array<Favorite>>,
   'getMyProfile' : ActorMethod<[], [] | [Profile]>,
+  'getOipProvider' : ActorMethod<[string], [] | [OipProvider]>,
   'getProfile' : ActorMethod<[string], [] | [Profile]>,
   'getProfileByPrincipal' : ActorMethod<[string], [] | [Profile]>,
   'getProfileCount' : ActorMethod<[], bigint>,
@@ -357,15 +397,19 @@ export interface _SERVICE {
   'listApps' : ActorMethod<[], Array<IntegrationApp>>,
   'listBlocks' : ActorMethod<[string], Array<Block>>,
   'listConnections' : ActorMethod<[ProfileId], Array<IntegrationConnection>>,
+  'listOipProviders' : ActorMethod<[], Array<OipProvider>>,
   'recomputeScores' : ActorMethod<[string, [] | [string]], Result_2>,
   'registerActivityType' : ActorMethod<[NewActivityType], Result_1>,
   'registerApp' : ActorMethod<[NewIntegrationApp], Result_1>,
+  'registerOipProvider' : ActorMethod<[NewOipProvider], Result>,
   'removeFeaturedProfile' : ActorMethod<[string], Result>,
   'reserveid' : ActorMethod<[string], Result>,
   'revokeConnection' : ActorMethod<[AppId], Result>,
   'runDecaySweep' : ActorMethod<[], bigint>,
   'searchProfilesByName' : ActorMethod<[string], Array<Profile>>,
+  'setProviderStatus' : ActorMethod<[string, boolean], Result>,
   'submitActivityRecord' : ActorMethod<[NewActivityRecord], Result_1>,
+  'submitProviderFactor' : ActorMethod<[ProviderFactorSubmission], Result_1>,
   'updateProfile' : ActorMethod<[string, UpdateProfile], Result>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;

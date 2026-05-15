@@ -262,6 +262,31 @@ export const idlFactory = ({ IDL }) => {
     'from_principal' : IdentityPrincipal,
     'confidence' : IDL.Float64,
   });
+  const ProviderStatus = IDL.Variant({
+    'active' : IDL.Null,
+    'suspended' : IDL.Null,
+  });
+  const ProviderCapability = IDL.Variant({
+    'risk' : IDL.Null,
+    'reputation' : IDL.Null,
+    'factor' : IDL.Null,
+  });
+  const ProviderVerification = IDL.Variant({
+    'none' : IDL.Null,
+    'signed_payload' : IDL.Null,
+    'idempotency_only' : IDL.Null,
+  });
+  const OipProvider = IDL.Record({
+    'status' : ProviderStatus,
+    'updated_at' : Timestamp,
+    'capabilities' : IDL.Vec(ProviderCapability),
+    'owner' : IDL.Principal,
+    'name' : IDL.Text,
+    'provider_id' : IDL.Text,
+    'reliability' : IDL.Float64,
+    'created_at' : Timestamp,
+    'verification' : ProviderVerification,
+  });
   const ProbabilityScores = IDL.Record({
     'human_score' : IDL.Float64,
     'updated_at' : Timestamp,
@@ -297,6 +322,13 @@ export const idlFactory = ({ IDL }) => {
     'verification_policy' : VerificationPolicy,
     'category' : AppCategory,
   });
+  const NewOipProvider = IDL.Record({
+    'capabilities' : IDL.Vec(ProviderCapability),
+    'name' : IDL.Text,
+    'provider_id' : IDL.Text,
+    'reliability' : IDL.Float64,
+    'verification' : ProviderVerification,
+  });
   const NewActivityRecord = IDL.Record({
     'activity_type' : ActivityTypeKey,
     'attestation' : IDL.Opt(Attestation),
@@ -308,6 +340,19 @@ export const idlFactory = ({ IDL }) => {
     'amount' : IDL.Opt(IDL.Float64),
     'profile_id' : ProfileId,
     'payload' : IDL.Vec(MetadataEntry),
+    'idempotency_key' : IDL.Text,
+  });
+  const ProviderFactorSubmission = IDL.Record({
+    'principal' : IdentityPrincipal,
+    'value' : IDL.Text,
+    'signed_payload' : IDL.Opt(IDL.Text),
+    'factor_type' : IDL.Text,
+    'provider_id' : IDL.Text,
+    'reliability' : IDL.Opt(IDL.Float64),
+    'weight_hint' : IDL.Float64,
+    'category' : FactorCategory,
+    'confidence' : IDL.Float64,
+    'expires_at' : IDL.Opt(Timestamp),
     'idempotency_key' : IDL.Text,
   });
   const UpdateProfile = IDL.Record({
@@ -373,6 +418,7 @@ export const idlFactory = ({ IDL }) => {
     'getInboundTrust' : IDL.Func([IDL.Text], [IDL.Vec(TrustEdge)], ['query']),
     'getMyFavorites' : IDL.Func([], [IDL.Vec(Favorite)], ['query']),
     'getMyProfile' : IDL.Func([], [IDL.Opt(Profile)], ['query']),
+    'getOipProvider' : IDL.Func([IDL.Text], [IDL.Opt(OipProvider)], ['query']),
     'getProfile' : IDL.Func([IDL.Text], [IDL.Opt(Profile)], ['query']),
     'getProfileByPrincipal' : IDL.Func(
         [IDL.Text],
@@ -392,9 +438,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IntegrationConnection)],
         ['query'],
       ),
+    'listOipProviders' : IDL.Func([], [IDL.Vec(OipProvider)], ['query']),
     'recomputeScores' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [Result_2], []),
     'registerActivityType' : IDL.Func([NewActivityType], [Result_1], []),
     'registerApp' : IDL.Func([NewIntegrationApp], [Result_1], []),
+    'registerOipProvider' : IDL.Func([NewOipProvider], [Result], []),
     'removeFeaturedProfile' : IDL.Func([IDL.Text], [Result], []),
     'reserveid' : IDL.Func([IDL.Text], [Result], []),
     'revokeConnection' : IDL.Func([AppId], [Result], []),
@@ -404,7 +452,13 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(Profile)],
         ['query'],
       ),
+    'setProviderStatus' : IDL.Func([IDL.Text, IDL.Bool], [Result], []),
     'submitActivityRecord' : IDL.Func([NewActivityRecord], [Result_1], []),
+    'submitProviderFactor' : IDL.Func(
+        [ProviderFactorSubmission],
+        [Result_1],
+        [],
+      ),
     'updateProfile' : IDL.Func([IDL.Text, UpdateProfile], [Result], []),
   });
 };
