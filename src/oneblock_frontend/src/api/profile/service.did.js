@@ -1,12 +1,36 @@
 export const idlFactory = ({ IDL }) => {
   const Result = IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text });
-  const Result_2 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
+  const IdentityPrincipal = IDL.Text;
+  const MetadataEntry = IDL.Record({ 'key' : IDL.Text, 'value' : IDL.Text });
+  const FactorCategory = IDL.Variant({
+    'existence' : IDL.Null,
+    'social' : IDL.Null,
+    'human' : IDL.Null,
+    'reputation' : IDL.Null,
+    'economic' : IDL.Null,
+    'continuity' : IDL.Null,
+  });
+  const Timestamp = IDL.Int;
+  const NewFactor = IDL.Record({
+    'principal' : IdentityPrincipal,
+    'verified' : IDL.Bool,
+    'provider' : IDL.Text,
+    'value' : IDL.Text,
+    'metadata' : IDL.Vec(MetadataEntry),
+    'factor_type' : IDL.Text,
+    'reliability' : IDL.Float64,
+    'weight_hint' : IDL.Float64,
+    'category' : FactorCategory,
+    'confidence' : IDL.Float64,
+    'expires_at' : IDL.Opt(Timestamp),
+  });
+  const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
   const Favorite = IDL.Record({
     'owner' : IDL.Principal,
     'name' : IDL.Text,
     'address' : IDL.Text,
   });
-  const Result_1 = IDL.Variant({ 'ok' : Favorite, 'err' : IDL.Text });
+  const Result_4 = IDL.Variant({ 'ok' : Favorite, 'err' : IDL.Text });
   const Link = IDL.Record({ 'url' : IDL.Text, 'name' : IDL.Text });
   const Network = IDL.Variant({
     'ic' : IDL.Null,
@@ -19,117 +43,178 @@ export const idlFactory = ({ IDL }) => {
       IDL.Record({ 'network' : Network, 'address' : IDL.Text })
     ),
   });
+  const AppId = IDL.Text;
+  const Visibility = IDL.Variant({
+    'personal' : IDL.Null,
+    'global' : IDL.Null,
+    'unlisted' : IDL.Null,
+  });
+  const ProfileId = IDL.Text;
+  const NewBlock = IDL.Record({
+    'evidence_refs' : IDL.Vec(IDL.Text),
+    'end_time' : IDL.Opt(Timestamp),
+    'start_time' : Timestamp,
+    'narrative' : IDL.Opt(IDL.Text),
+    'visibility' : Visibility,
+    'profile_id' : ProfileId,
+  });
+  const EntityKind = IDL.Variant({
+    'human' : IDL.Null,
+    'hybrid' : IDL.Null,
+    'organization' : IDL.Null,
+    'ai_agent' : IDL.Null,
+  });
+  const NewIdentityGraph = IDL.Record({
+    'principal' : IdentityPrincipal,
+    'entity_kind' : EntityKind,
+  });
+  const PolicyWeights = IDL.Record({
+    'existence' : IDL.Float64,
+    'social' : IDL.Float64,
+    'human' : IDL.Float64,
+    'reputation' : IDL.Float64,
+    'economic' : IDL.Float64,
+    'continuity' : IDL.Float64,
+  });
+  const PolicyRequirements = IDL.Record({
+    'min_wallet_age_days' : IDL.Opt(IDL.Nat),
+    'min_trust_score' : IDL.Opt(IDL.Float64),
+    'min_reputation_score' : IDL.Opt(IDL.Float64),
+    'min_uniqueness_score' : IDL.Opt(IDL.Float64),
+    'min_human_score' : IDL.Opt(IDL.Float64),
+  });
+  const PolicyId = IDL.Text;
+  const NewContextPolicy = IDL.Record({
+    'active' : IDL.Bool,
+    'name' : IDL.Text,
+    'description' : IDL.Text,
+    'weights' : PolicyWeights,
+    'decay_lambda' : IDL.Float64,
+    'requirements' : PolicyRequirements,
+    'policy_id' : PolicyId,
+  });
   const NewProfile = IDL.Record({
     'id' : IDL.Text,
     'bio' : IDL.Text,
     'pfp' : IDL.Text,
     'name' : IDL.Text,
   });
-  const Canister = IDL.Record({
-    'desc' : IDL.Text,
-    'name' : IDL.Text,
-    'posts' : IDL.Text,
-    'canisterid' : IDL.Principal,
-    'gallery' : IDL.Text,
-  });
-  const Visibility = IDL.Variant({
-    'global' : IDL.Null,
-    'unlisted' : IDL.Null,
-    'personal' : IDL.Null,
-  });
-  const Profile = IDL.Record({
-    'id' : IDL.Text,
-    'bio' : IDL.Text,
-    'pfp' : IDL.Text,
-    'owner' : IDL.Principal,
-    'name' : IDL.Text,
-    'createtime' : IDL.Int,
-    'links' : IDL.Vec(Link),
-    'blocks' : IDL.Vec(IDL.Text),
-    'traits' : IDL.Vec(IDL.Text),
-    'visibility' : Visibility,
-    'last_updated' : IDL.Int,
-  });
-  const Inbox = IDL.Record({ 'owner' : IDL.Principal, 'inboxid' : IDL.Text });
-  const UpdateProfile = IDL.Record({
-    'bio' : IDL.Text,
-    'pfp' : IDL.Text,
-    'name' : IDL.Text,
-  });
+  const BlockId = IDL.Text;
   const Strength = IDL.Variant({
     'low' : IDL.Null,
-    'medium' : IDL.Null,
     'high' : IDL.Null,
-  });
-  const NewBlock = IDL.Record({
-    'profile_id' : IDL.Text,
-    'start_time' : IDL.Int,
-    'end_time' : IDL.Opt(IDL.Int),
-    'evidence_refs' : IDL.Vec(IDL.Text),
-    'narrative' : IDL.Opt(IDL.Text),
-    'visibility' : Visibility,
-  });
-  const Block = IDL.Record({
-    'id' : IDL.Text,
-    'profile_id' : IDL.Text,
-    'start_time' : IDL.Int,
-    'end_time' : IDL.Opt(IDL.Int),
-    'evidence_refs' : IDL.Vec(IDL.Text),
-    'derived_traits' : IDL.Vec(IDL.Text),
-    'narrative' : IDL.Opt(IDL.Text),
-    'visibility' : Visibility,
-    'hash' : IDL.Text,
-    'created_at' : IDL.Int,
+    'medium' : IDL.Null,
   });
   const NewTrait = IDL.Record({
-    'tlabel' : IDL.Text,
+    'explanation' : IDL.Text,
+    'derived_from' : IDL.Vec(BlockId),
     'strength' : Strength,
     'confidence' : IDL.Float64,
-    'explanation' : IDL.Text,
-    'derived_from' : IDL.Vec(IDL.Text),
-    'visibility' : Visibility,
-  });
-  const Trait = IDL.Record({
-    'id' : IDL.Text,
     'tlabel' : IDL.Text,
-    'strength' : Strength,
-    'confidence' : IDL.Float64,
-    'explanation' : IDL.Text,
-    'derived_from' : IDL.Vec(IDL.Text),
     'visibility' : Visibility,
-    'updated_at' : IDL.Int,
   });
-  // Integration system types
-  const AppCategory = IDL.Variant({
-    'donation' : IDL.Null,
-    'fitness' : IDL.Null,
-    'education' : IDL.Null,
-    'finance' : IDL.Null,
-    'social' : IDL.Null,
-    'other' : IDL.Null,
+  const PolicyEvaluationItem = IDL.Record({
+    'key' : IDL.Text,
+    'actual' : IDL.Text,
+    'expected' : IDL.Text,
+    'passed' : IDL.Bool,
+  });
+  const PolicyEvaluation = IDL.Record({
+    'principal' : IdentityPrincipal,
+    'items' : IDL.Vec(PolicyEvaluationItem),
+    'evaluated_at' : Timestamp,
+    'policy_id' : PolicyId,
+    'passed' : IDL.Bool,
+  });
+  const Result_3 = IDL.Variant({ 'ok' : PolicyEvaluation, 'err' : IDL.Text });
+  const RecordId = IDL.Text;
+  const ActivityTypeKey = IDL.Text;
+  const VerificationLevel = IDL.Variant({
+    'self' : IDL.Null,
+    'platform' : IDL.Null,
+    'third_party' : IDL.Null,
+    'verifiable' : IDL.Null,
+  });
+  const SignatureStatus = IDL.Variant({
+    'verified' : IDL.Null,
+    'invalid' : IDL.Null,
+    'unverified' : IDL.Null,
+  });
+  const Attestation = IDL.Record({
+    'signature_status' : SignatureStatus,
+    'receipt_url' : IDL.Opt(IDL.Text),
+    'signed_payload' : IDL.Opt(IDL.Text),
+    'issuer' : IDL.Opt(IDL.Text),
+    'tx_hash' : IDL.Opt(IDL.Text),
+  });
+  const ActivityRecord = IDL.Record({
+    'id' : RecordId,
+    'activity_type' : ActivityTypeKey,
+    'verification_level' : VerificationLevel,
+    'hash' : IDL.Text,
+    'attestation' : IDL.Opt(Attestation),
+    'schema_version' : IDL.Nat,
+    'ingest_timestamp' : Timestamp,
+    'app_id' : AppId,
+    'currency' : IDL.Opt(IDL.Text),
+    'event_timestamp' : Timestamp,
+    'visibility' : Visibility,
+    'amount' : IDL.Opt(IDL.Float64),
+    'profile_id' : ProfileId,
+    'payload' : IDL.Vec(MetadataEntry),
+    'idempotency_key' : IDL.Text,
+  });
+  const FieldDef = IDL.Record({
+    'field_type' : IDL.Text,
+    'name' : IDL.Text,
+    'description' : IDL.Text,
+    'required' : IDL.Bool,
+  });
+  const ActivityType = IDL.Record({
+    'description' : IDL.Text,
+    'created_at' : Timestamp,
+    'version' : IDL.Nat,
+    'fields' : IDL.Vec(FieldDef),
+    'app_id' : AppId,
+    'type_label' : IDL.Text,
+    'type_key' : ActivityTypeKey,
   });
   const VerificationPolicy = IDL.Variant({
     'none' : IDL.Null,
-    'idempotency_only' : IDL.Null,
     'signed_payload' : IDL.Null,
+    'idempotency_only' : IDL.Null,
+  });
+  const AppCategory = IDL.Variant({
+    'finance' : IDL.Null,
+    'social' : IDL.Null,
+    'other' : IDL.Null,
+    'education' : IDL.Null,
+    'donation' : IDL.Null,
+    'fitness' : IDL.Null,
   });
   const IntegrationApp = IDL.Record({
-    'id' : IDL.Text,
-    'name' : IDL.Text,
-    'description' : IDL.Text,
-    'category' : AppCategory,
-    'owner' : IDL.Principal,
-    'verification_policy' : VerificationPolicy,
-    'schema_version' : IDL.Nat,
+    'id' : AppId,
     'active' : IDL.Bool,
-    'created_at' : IDL.Int,
-  });
-  const NewIntegrationApp = IDL.Record({
-    'id' : IDL.Text,
+    'owner' : IDL.Principal,
     'name' : IDL.Text,
     'description' : IDL.Text,
-    'category' : AppCategory,
     'verification_policy' : VerificationPolicy,
+    'created_at' : Timestamp,
+    'schema_version' : IDL.Nat,
+    'category' : AppCategory,
+  });
+  const TraitId = IDL.Text;
+  const Block = IDL.Record({
+    'id' : BlockId,
+    'evidence_refs' : IDL.Vec(IDL.Text),
+    'hash' : IDL.Text,
+    'created_at' : Timestamp,
+    'end_time' : IDL.Opt(Timestamp),
+    'start_time' : Timestamp,
+    'narrative' : IDL.Opt(IDL.Text),
+    'derived_traits' : IDL.Vec(TraitId),
+    'visibility' : Visibility,
+    'profile_id' : ProfileId,
   });
   const ConnectionStatus = IDL.Variant({
     'active' : IDL.Null,
@@ -137,141 +222,156 @@ export const idlFactory = ({ IDL }) => {
     'pending' : IDL.Null,
   });
   const IntegrationConnection = IDL.Record({
-    'profile_id' : IDL.Text,
-    'app_id' : IDL.Text,
-    'external_user_id' : IDL.Text,
-    'scopes' : IDL.Vec(IDL.Text),
     'status' : ConnectionStatus,
-    'created_at' : IDL.Int,
-    'revoked_at' : IDL.Opt(IDL.Int),
+    'scopes' : IDL.Vec(IDL.Text),
+    'external_user_id' : IDL.Text,
+    'created_at' : Timestamp,
+    'revoked_at' : IDL.Opt(Timestamp),
+    'app_id' : AppId,
+    'profile_id' : ProfileId,
   });
-  const FieldDef = IDL.Record({
+  const Profile = IDL.Record({
+    'id' : ProfileId,
+    'bio' : IDL.Text,
+    'pfp' : IDL.Text,
+    'owner' : IDL.Principal,
+    'traits' : IDL.Vec(TraitId),
     'name' : IDL.Text,
-    'field_type' : IDL.Text,
-    'required' : IDL.Bool,
-    'description' : IDL.Text,
-  });
-  const ActivityType = IDL.Record({
-    'app_id' : IDL.Text,
-    'type_key' : IDL.Text,
-    'type_label' : IDL.Text,
-    'description' : IDL.Text,
-    'fields' : IDL.Vec(FieldDef),
-    'version' : IDL.Nat,
-    'created_at' : IDL.Int,
-  });
-  const NewActivityType = IDL.Record({
-    'app_id' : IDL.Text,
-    'type_key' : IDL.Text,
-    'type_label' : IDL.Text,
-    'description' : IDL.Text,
-    'fields' : IDL.Vec(FieldDef),
-  });
-  const SignatureStatus = IDL.Variant({
-    'unverified' : IDL.Null,
-    'verified' : IDL.Null,
-    'invalid' : IDL.Null,
-  });
-  const Attestation = IDL.Record({
-    'tx_hash' : IDL.Opt(IDL.Text),
-    'receipt_url' : IDL.Opt(IDL.Text),
-    'signed_payload' : IDL.Opt(IDL.Text),
-    'issuer' : IDL.Opt(IDL.Text),
-    'signature_status' : SignatureStatus,
-  });
-  const MetadataEntry = IDL.Record({
-    'key' : IDL.Text,
-    'value' : IDL.Text,
-  });
-  const VerificationLevel = IDL.Variant({
-    'self' : IDL.Null,
-    'platform' : IDL.Null,
-    'verifiable' : IDL.Null,
-    'third_party' : IDL.Null,
-  });
-  const ActivityRecord = IDL.Record({
-    'id' : IDL.Text,
-    'profile_id' : IDL.Text,
-    'app_id' : IDL.Text,
-    'activity_type' : IDL.Text,
-    'amount' : IDL.Opt(IDL.Float64),
-    'currency' : IDL.Opt(IDL.Text),
-    'event_timestamp' : IDL.Int,
-    'ingest_timestamp' : IDL.Int,
-    'payload' : IDL.Vec(MetadataEntry),
-    'schema_version' : IDL.Nat,
-    'idempotency_key' : IDL.Text,
-    'attestation' : IDL.Opt(Attestation),
-    'verification_level' : VerificationLevel,
-    'visibility' : Visibility,
-    'hash' : IDL.Text,
-  });
-  const NewActivityRecord = IDL.Record({
-    'profile_id' : IDL.Text,
-    'app_id' : IDL.Text,
-    'activity_type' : IDL.Text,
-    'amount' : IDL.Opt(IDL.Float64),
-    'currency' : IDL.Opt(IDL.Text),
-    'event_timestamp' : IDL.Int,
-    'payload' : IDL.Vec(MetadataEntry),
-    'schema_version' : IDL.Nat,
-    'idempotency_key' : IDL.Text,
-    'attestation' : IDL.Opt(Attestation),
+    'last_updated' : Timestamp,
+    'createtime' : IDL.Int,
+    'links' : IDL.Vec(Link),
+    'blocks' : IDL.Vec(BlockId),
     'visibility' : Visibility,
   });
   const DerivedSummary = IDL.Record({
-    'profile_id' : IDL.Text,
-    'app_id' : IDL.Text,
-    'activity_type' : IDL.Text,
-    'record_count' : IDL.Nat,
+    'activity_type' : ActivityTypeKey,
     'total_amount' : IDL.Opt(IDL.Float64),
+    'last_updated' : Timestamp,
+    'app_id' : AppId,
     'currency' : IDL.Opt(IDL.Text),
-    'last_updated' : IDL.Int,
+    'profile_id' : ProfileId,
+    'record_count' : IDL.Nat,
+  });
+  const TrustEdge = IDL.Record({
+    'id' : IDL.Text,
+    'updated_at' : Timestamp,
+    'trust' : IDL.Float64,
+    'to_principal' : IdentityPrincipal,
+    'context' : IDL.Text,
+    'created_at' : Timestamp,
+    'from_principal' : IdentityPrincipal,
+    'confidence' : IDL.Float64,
+  });
+  const ProbabilityScores = IDL.Record({
+    'human_score' : IDL.Float64,
+    'updated_at' : Timestamp,
+    'model_version' : IDL.Text,
+    'uniqueness_score' : IDL.Float64,
+    'trust_score' : IDL.Float64,
+    'organization_probability' : IDL.Float64,
+    'ai_probability' : IDL.Float64,
+    'reputation_score' : IDL.Float64,
+  });
+  const Trait = IDL.Record({
+    'id' : TraitId,
+    'updated_at' : Timestamp,
+    'explanation' : IDL.Text,
+    'derived_from' : IDL.Vec(BlockId),
+    'strength' : Strength,
+    'confidence' : IDL.Float64,
+    'tlabel' : IDL.Text,
+    'visibility' : Visibility,
+  });
+  const Result_2 = IDL.Variant({ 'ok' : ProbabilityScores, 'err' : IDL.Text });
+  const NewActivityType = IDL.Record({
+    'description' : IDL.Text,
+    'fields' : IDL.Vec(FieldDef),
+    'app_id' : AppId,
+    'type_label' : IDL.Text,
+    'type_key' : ActivityTypeKey,
+  });
+  const NewIntegrationApp = IDL.Record({
+    'id' : AppId,
+    'name' : IDL.Text,
+    'description' : IDL.Text,
+    'verification_policy' : VerificationPolicy,
+    'category' : AppCategory,
+  });
+  const NewActivityRecord = IDL.Record({
+    'activity_type' : ActivityTypeKey,
+    'attestation' : IDL.Opt(Attestation),
+    'schema_version' : IDL.Nat,
+    'app_id' : AppId,
+    'currency' : IDL.Opt(IDL.Text),
+    'event_timestamp' : Timestamp,
+    'visibility' : Visibility,
+    'amount' : IDL.Opt(IDL.Float64),
+    'profile_id' : ProfileId,
+    'payload' : IDL.Vec(MetadataEntry),
+    'idempotency_key' : IDL.Text,
+  });
+  const UpdateProfile = IDL.Record({
+    'bio' : IDL.Text,
+    'pfp' : IDL.Text,
+    'name' : IDL.Text,
   });
   return IDL.Service({
     'addAdmin' : IDL.Func([IDL.Text], [Result], []),
+    'addFactor' : IDL.Func([NewFactor], [Result_1], []),
     'addFavorite' : IDL.Func(
         [IDL.Record({ 'name' : IDL.Text, 'address' : IDL.Text })],
-        [Result_1],
+        [Result_4],
         [],
       ),
     'addFeaturedProfile' : IDL.Func([IDL.Text], [Result], []),
-    'addInbox' : IDL.Func([IDL.Text], [Result], []),
     'addLink' : IDL.Func([IDL.Text, Link], [Result], []),
+    'addTrustEdge' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Float64, IDL.Float64],
+        [Result],
+        [],
+      ),
     'addWallet' : IDL.Func([IDL.Text, Wallet], [Result], []),
     'availableCycles' : IDL.Func([], [IDL.Nat], ['query']),
     'changeId' : IDL.Func([IDL.Text, IDL.Text], [Result], []),
-    'connectApp' : IDL.Func([IDL.Text, IDL.Text, IDL.Vec(IDL.Text)], [Result], []),
-    'createBlock' : IDL.Func([NewBlock], [Result_2], []),
+    'connectApp' : IDL.Func([AppId, IDL.Text, IDL.Vec(IDL.Text)], [Result], []),
+    'createBlock' : IDL.Func([NewBlock], [Result_1], []),
+    'createIdentityGraph' : IDL.Func([NewIdentityGraph], [Result], []),
+    'createPolicy' : IDL.Func([NewContextPolicy], [Result], []),
     'createProfile' : IDL.Func([NewProfile], [Result], []),
-    'createTrait' : IDL.Func([IDL.Text, NewTrait], [Result_2], []),
+    'createTrait' : IDL.Func([IDL.Text, NewTrait], [Result_1], []),
     'deleteLink' : IDL.Func([IDL.Text, IDL.Text], [Result], []),
-    'editCanister' : IDL.Func([Canister], [Result], []),
-    'getActivityType' : IDL.Func([IDL.Text, IDL.Text], [IDL.Opt(ActivityType)], ['query']),
-    'getActivityRecord' : IDL.Func([IDL.Text], [IDL.Opt(ActivityRecord)], ['query']),
+    'evaluatePolicy' : IDL.Func([IDL.Text, IDL.Text], [Result_3], ['query']),
+    'getActivityRecord' : IDL.Func(
+        [RecordId],
+        [IDL.Opt(ActivityRecord)],
+        ['query'],
+      ),
     'getActivityRecords' : IDL.Func(
-        [IDL.Text, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
+        [ProfileId, IDL.Opt(AppId), IDL.Opt(ActivityTypeKey)],
         [IDL.Vec(ActivityRecord)],
         ['query'],
       ),
-    'getApp' : IDL.Func([IDL.Text], [IDL.Opt(IntegrationApp)], ['query']),
+    'getActivityType' : IDL.Func(
+        [AppId, ActivityTypeKey],
+        [IDL.Opt(ActivityType)],
+        ['query'],
+      ),
+    'getApp' : IDL.Func([AppId], [IDL.Opt(IntegrationApp)], ['query']),
     'getBlock' : IDL.Func([IDL.Text], [IDL.Opt(Block)], ['query']),
     'getChain' : IDL.Func([IDL.Text], [IDL.Vec(Block)], ['query']),
     'getConnection' : IDL.Func(
-        [IDL.Text, IDL.Text],
+        [ProfileId, AppId],
         [IDL.Opt(IntegrationConnection)],
         ['query'],
       ),
     'getDefaultProfiles' : IDL.Func([IDL.Nat], [IDL.Vec(Profile)], ['query']),
     'getDerivedSummary' : IDL.Func(
-        [IDL.Text, IDL.Text, IDL.Text],
+        [ProfileId, AppId, ActivityTypeKey],
         [IDL.Opt(DerivedSummary)],
         ['query'],
       ),
-    'getInbox' : IDL.Func([IDL.Text], [IDL.Opt(Inbox)], ['query']),
-    'getMyCanister' : IDL.Func([], [IDL.Opt(Canister)], ['query']),
+    'getInboundTrust' : IDL.Func([IDL.Text], [IDL.Vec(TrustEdge)], ['query']),
     'getMyFavorites' : IDL.Func([], [IDL.Vec(Favorite)], ['query']),
-    'getMyInbox' : IDL.Func([], [IDL.Opt(Inbox)], ['query']),
     'getMyProfile' : IDL.Func([], [IDL.Opt(Profile)], ['query']),
     'getProfile' : IDL.Func([IDL.Text], [IDL.Opt(Profile)], ['query']),
     'getProfileByPrincipal' : IDL.Func(
@@ -279,30 +379,32 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(Profile)],
         ['query'],
       ),
-    'getProfileCanister' : IDL.Func(
-        [IDL.Principal],
-        [IDL.Opt(Canister)],
-        ['query'],
-      ),
     'getProfileCount' : IDL.Func([], [IDL.Nat], ['query']),
     'getProfiles' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Vec(Profile)], ['query']),
+    'getScores' : IDL.Func([IDL.Text], [IDL.Opt(ProbabilityScores)], ['query']),
     'getTrait' : IDL.Func([IDL.Text], [IDL.Opt(Trait)], ['query']),
     'getTraits' : IDL.Func([IDL.Text], [IDL.Vec(Trait)], ['query']),
-    'listActivityTypes' : IDL.Func([IDL.Text], [IDL.Vec(ActivityType)], ['query']),
+    'listActivityTypes' : IDL.Func([AppId], [IDL.Vec(ActivityType)], ['query']),
     'listApps' : IDL.Func([], [IDL.Vec(IntegrationApp)], ['query']),
     'listBlocks' : IDL.Func([IDL.Text], [IDL.Vec(Block)], ['query']),
-    'listConnections' : IDL.Func([IDL.Text], [IDL.Vec(IntegrationConnection)], ['query']),
-    'registerActivityType' : IDL.Func([NewActivityType], [Result_2], []),
-    'registerApp' : IDL.Func([NewIntegrationApp], [Result_2], []),
+    'listConnections' : IDL.Func(
+        [ProfileId],
+        [IDL.Vec(IntegrationConnection)],
+        ['query'],
+      ),
+    'recomputeScores' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [Result_2], []),
+    'registerActivityType' : IDL.Func([NewActivityType], [Result_1], []),
+    'registerApp' : IDL.Func([NewIntegrationApp], [Result_1], []),
     'removeFeaturedProfile' : IDL.Func([IDL.Text], [Result], []),
     'reserveid' : IDL.Func([IDL.Text], [Result], []),
-    'revokeConnection' : IDL.Func([IDL.Text], [Result], []),
+    'revokeConnection' : IDL.Func([AppId], [Result], []),
+    'runDecaySweep' : IDL.Func([], [IDL.Nat], []),
     'searchProfilesByName' : IDL.Func(
         [IDL.Text],
         [IDL.Vec(Profile)],
         ['query'],
       ),
-    'submitActivityRecord' : IDL.Func([NewActivityRecord], [Result_2], []),
+    'submitActivityRecord' : IDL.Func([NewActivityRecord], [Result_1], []),
     'updateProfile' : IDL.Func([IDL.Text, UpdateProfile], [Result], []),
   });
 };

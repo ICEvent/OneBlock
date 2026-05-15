@@ -1,11 +1,36 @@
 export const idlFactory = ({ IDL }) => {
   const Result = IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text });
+  const IdentityPrincipal = IDL.Text;
+  const MetadataEntry = IDL.Record({ 'key' : IDL.Text, 'value' : IDL.Text });
+  const FactorCategory = IDL.Variant({
+    'existence' : IDL.Null,
+    'social' : IDL.Null,
+    'human' : IDL.Null,
+    'reputation' : IDL.Null,
+    'economic' : IDL.Null,
+    'continuity' : IDL.Null,
+  });
+  const Timestamp = IDL.Int;
+  const NewFactor = IDL.Record({
+    'principal' : IdentityPrincipal,
+    'verified' : IDL.Bool,
+    'provider' : IDL.Text,
+    'value' : IDL.Text,
+    'metadata' : IDL.Vec(MetadataEntry),
+    'factor_type' : IDL.Text,
+    'reliability' : IDL.Float64,
+    'weight_hint' : IDL.Float64,
+    'category' : FactorCategory,
+    'confidence' : IDL.Float64,
+    'expires_at' : IDL.Opt(Timestamp),
+  });
+  const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
   const Favorite = IDL.Record({
     'owner' : IDL.Principal,
     'name' : IDL.Text,
     'address' : IDL.Text,
   });
-  const Result_2 = IDL.Variant({ 'ok' : Favorite, 'err' : IDL.Text });
+  const Result_4 = IDL.Variant({ 'ok' : Favorite, 'err' : IDL.Text });
   const Link = IDL.Record({ 'url' : IDL.Text, 'name' : IDL.Text });
   const Network = IDL.Variant({
     'ic' : IDL.Null,
@@ -19,7 +44,6 @@ export const idlFactory = ({ IDL }) => {
     ),
   });
   const AppId = IDL.Text;
-  const Timestamp = IDL.Int;
   const Visibility = IDL.Variant({
     'personal' : IDL.Null,
     'global' : IDL.Null,
@@ -34,7 +58,41 @@ export const idlFactory = ({ IDL }) => {
     'visibility' : Visibility,
     'profile_id' : ProfileId,
   });
-  const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
+  const EntityKind = IDL.Variant({
+    'human' : IDL.Null,
+    'hybrid' : IDL.Null,
+    'organization' : IDL.Null,
+    'ai_agent' : IDL.Null,
+  });
+  const NewIdentityGraph = IDL.Record({
+    'principal' : IdentityPrincipal,
+    'entity_kind' : EntityKind,
+  });
+  const PolicyWeights = IDL.Record({
+    'existence' : IDL.Float64,
+    'social' : IDL.Float64,
+    'human' : IDL.Float64,
+    'reputation' : IDL.Float64,
+    'economic' : IDL.Float64,
+    'continuity' : IDL.Float64,
+  });
+  const PolicyRequirements = IDL.Record({
+    'min_wallet_age_days' : IDL.Opt(IDL.Nat),
+    'min_trust_score' : IDL.Opt(IDL.Float64),
+    'min_reputation_score' : IDL.Opt(IDL.Float64),
+    'min_uniqueness_score' : IDL.Opt(IDL.Float64),
+    'min_human_score' : IDL.Opt(IDL.Float64),
+  });
+  const PolicyId = IDL.Text;
+  const NewContextPolicy = IDL.Record({
+    'active' : IDL.Bool,
+    'name' : IDL.Text,
+    'description' : IDL.Text,
+    'weights' : PolicyWeights,
+    'decay_lambda' : IDL.Float64,
+    'requirements' : PolicyRequirements,
+    'policy_id' : PolicyId,
+  });
   const NewProfile = IDL.Record({
     'id' : IDL.Text,
     'bio' : IDL.Text,
@@ -55,6 +113,20 @@ export const idlFactory = ({ IDL }) => {
     'tlabel' : IDL.Text,
     'visibility' : Visibility,
   });
+  const PolicyEvaluationItem = IDL.Record({
+    'key' : IDL.Text,
+    'actual' : IDL.Text,
+    'expected' : IDL.Text,
+    'passed' : IDL.Bool,
+  });
+  const PolicyEvaluation = IDL.Record({
+    'principal' : IdentityPrincipal,
+    'items' : IDL.Vec(PolicyEvaluationItem),
+    'evaluated_at' : Timestamp,
+    'policy_id' : PolicyId,
+    'passed' : IDL.Bool,
+  });
+  const Result_3 = IDL.Variant({ 'ok' : PolicyEvaluation, 'err' : IDL.Text });
   const RecordId = IDL.Text;
   const ActivityTypeKey = IDL.Text;
   const VerificationLevel = IDL.Variant({
@@ -75,7 +147,6 @@ export const idlFactory = ({ IDL }) => {
     'issuer' : IDL.Opt(IDL.Text),
     'tx_hash' : IDL.Opt(IDL.Text),
   });
-  const MetadataEntry = IDL.Record({ 'key' : IDL.Text, 'value' : IDL.Text });
   const ActivityRecord = IDL.Record({
     'id' : RecordId,
     'activity_type' : ActivityTypeKey,
@@ -181,6 +252,26 @@ export const idlFactory = ({ IDL }) => {
     'profile_id' : ProfileId,
     'record_count' : IDL.Nat,
   });
+  const TrustEdge = IDL.Record({
+    'id' : IDL.Text,
+    'updated_at' : Timestamp,
+    'trust' : IDL.Float64,
+    'to_principal' : IdentityPrincipal,
+    'context' : IDL.Text,
+    'created_at' : Timestamp,
+    'from_principal' : IdentityPrincipal,
+    'confidence' : IDL.Float64,
+  });
+  const ProbabilityScores = IDL.Record({
+    'human_score' : IDL.Float64,
+    'updated_at' : Timestamp,
+    'model_version' : IDL.Text,
+    'uniqueness_score' : IDL.Float64,
+    'trust_score' : IDL.Float64,
+    'organization_probability' : IDL.Float64,
+    'ai_probability' : IDL.Float64,
+    'reputation_score' : IDL.Float64,
+  });
   const Trait = IDL.Record({
     'id' : TraitId,
     'updated_at' : Timestamp,
@@ -191,6 +282,7 @@ export const idlFactory = ({ IDL }) => {
     'tlabel' : IDL.Text,
     'visibility' : Visibility,
   });
+  const Result_2 = IDL.Variant({ 'ok' : ProbabilityScores, 'err' : IDL.Text });
   const NewActivityType = IDL.Record({
     'description' : IDL.Text,
     'fields' : IDL.Vec(FieldDef),
@@ -225,21 +317,30 @@ export const idlFactory = ({ IDL }) => {
   });
   return IDL.Service({
     'addAdmin' : IDL.Func([IDL.Text], [Result], []),
+    'addFactor' : IDL.Func([NewFactor], [Result_1], []),
     'addFavorite' : IDL.Func(
         [IDL.Record({ 'name' : IDL.Text, 'address' : IDL.Text })],
-        [Result_2],
+        [Result_4],
         [],
       ),
     'addFeaturedProfile' : IDL.Func([IDL.Text], [Result], []),
     'addLink' : IDL.Func([IDL.Text, Link], [Result], []),
+    'addTrustEdge' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Float64, IDL.Float64],
+        [Result],
+        [],
+      ),
     'addWallet' : IDL.Func([IDL.Text, Wallet], [Result], []),
     'availableCycles' : IDL.Func([], [IDL.Nat], ['query']),
     'changeId' : IDL.Func([IDL.Text, IDL.Text], [Result], []),
     'connectApp' : IDL.Func([AppId, IDL.Text, IDL.Vec(IDL.Text)], [Result], []),
     'createBlock' : IDL.Func([NewBlock], [Result_1], []),
+    'createIdentityGraph' : IDL.Func([NewIdentityGraph], [Result], []),
+    'createPolicy' : IDL.Func([NewContextPolicy], [Result], []),
     'createProfile' : IDL.Func([NewProfile], [Result], []),
     'createTrait' : IDL.Func([IDL.Text, NewTrait], [Result_1], []),
     'deleteLink' : IDL.Func([IDL.Text, IDL.Text], [Result], []),
+    'evaluatePolicy' : IDL.Func([IDL.Text, IDL.Text], [Result_3], ['query']),
     'getActivityRecord' : IDL.Func(
         [RecordId],
         [IDL.Opt(ActivityRecord)],
@@ -269,6 +370,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(DerivedSummary)],
         ['query'],
       ),
+    'getInboundTrust' : IDL.Func([IDL.Text], [IDL.Vec(TrustEdge)], ['query']),
     'getMyFavorites' : IDL.Func([], [IDL.Vec(Favorite)], ['query']),
     'getMyProfile' : IDL.Func([], [IDL.Opt(Profile)], ['query']),
     'getProfile' : IDL.Func([IDL.Text], [IDL.Opt(Profile)], ['query']),
@@ -279,6 +381,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getProfileCount' : IDL.Func([], [IDL.Nat], ['query']),
     'getProfiles' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Vec(Profile)], ['query']),
+    'getScores' : IDL.Func([IDL.Text], [IDL.Opt(ProbabilityScores)], ['query']),
     'getTrait' : IDL.Func([IDL.Text], [IDL.Opt(Trait)], ['query']),
     'getTraits' : IDL.Func([IDL.Text], [IDL.Vec(Trait)], ['query']),
     'listActivityTypes' : IDL.Func([AppId], [IDL.Vec(ActivityType)], ['query']),
@@ -289,11 +392,13 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IntegrationConnection)],
         ['query'],
       ),
+    'recomputeScores' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [Result_2], []),
     'registerActivityType' : IDL.Func([NewActivityType], [Result_1], []),
     'registerApp' : IDL.Func([NewIntegrationApp], [Result_1], []),
     'removeFeaturedProfile' : IDL.Func([IDL.Text], [Result], []),
     'reserveid' : IDL.Func([IDL.Text], [Result], []),
     'revokeConnection' : IDL.Func([AppId], [Result], []),
+    'runDecaySweep' : IDL.Func([], [IDL.Nat], []),
     'searchProfilesByName' : IDL.Func(
         [IDL.Text],
         [IDL.Vec(Profile)],
