@@ -9,6 +9,7 @@ import { CANISTER_ALLTRACKS } from "../lib/constants"
 import ProfileLayout from "../layouts/ProfileLayout";
 import ProfileSidebar from "../components/ProfileSidebar"
 import ProfileMain from "../components/ProfileStats";
+import ScoresOIP from "../components/ScoresOIP";
 
 
 const ProfilePage = () => {
@@ -19,6 +20,7 @@ const ProfilePage = () => {
   const { id } = useParams<{ id: string }>()
   const [loading, setLoading] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [scores, setScores] = useState<any | null>(null);
 
   const [stats, setStats] = useState<StatsCollection>({
     UserStats: {
@@ -44,6 +46,7 @@ const ProfilePage = () => {
   useEffect(() => {
     if (profile) {
       loadCanister()
+      loadScores()
     }
 
   }, [profile]);
@@ -58,6 +61,16 @@ const ProfilePage = () => {
   };
 
 
+
+  const loadScores = async () => {
+    const ownerText = typeof profile.owner === 'object' && profile.owner.toText
+      ? profile.owner.toText()
+      : String(profile.owner);
+    const [scoreData] = await oneblock.getScores(ownerText);
+    if (scoreData) {
+      setScores(scoreData);
+    }
+  };
 
   const loadProfile = async () => {
     const [profileData] = await oneblock.getProfile(id);
@@ -165,7 +178,15 @@ const ProfilePage = () => {
       ) : (
         <ProfileLayout
           sidebar={<ProfileSidebar profile={profile} tags={[]} />}
-          main={<ProfileMain stats={stats} />} />
+          main={
+            <>
+              <ProfileMain stats={stats} />
+              <section style={{ marginTop: '24px' }}>
+                <h3 style={{ marginBottom: '12px' }}>OIP Identity Scores</h3>
+                <ScoresOIP scores={scores} />
+              </section>
+            </>
+          } />
 
       )}
     </>

@@ -6,6 +6,7 @@ import { Link as ProfileLink } from '../api/profile/service.did.d';
 import BlockChain from '../components/BlockChain';
 import { Block } from '../types/block';
 import Navbar from '../components/Navbar';
+import ScoresOIP from '../components/ScoresOIP';
 import '../styles/Block.css';
 
 const BlockPage = () => {
@@ -14,6 +15,7 @@ const BlockPage = () => {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
+  const [scores, setScores] = useState<any | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -89,6 +91,15 @@ const BlockPage = () => {
         ];
         
         setBlocks(sampleBlocks);
+
+        // Load OIP scores for this profile
+        const ownerText = typeof profileData.owner === 'object' && profileData.owner.toText
+          ? profileData.owner.toText()
+          : String(profileData.owner);
+        const [scoreData] = await oneblock.getScores(ownerText);
+        if (scoreData) {
+          setScores(scoreData);
+        }
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -188,6 +199,11 @@ const BlockPage = () => {
                 Each block represents a period of activity and growth. Blocks are 
                 connected chronologically to form your unique chain of experiences.
               </p>
+            </div>
+
+            <div className="sidebar-section">
+              <h3>OIP Identity Scores</h3>
+              <ScoresOIP scores={scores} />
             </div>
           </div>
         </div>

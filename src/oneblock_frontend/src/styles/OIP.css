@@ -1,0 +1,343 @@
+/* ── OIP shared layout ──────────────────────────────── */
+.oip-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.oip-hero {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+  border-radius: 12px;
+  padding: 24px 28px;
+  margin-bottom: 28px;
+  color: #e0e6f0;
+}
+.oip-hero h2 {
+  margin: 0 0 6px;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #7ecfff;
+}
+.oip-hero p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #a8b8cc;
+  line-height: 1.5;
+}
+
+/* ── Steps (PolicyEval) ─────────────────────────────── */
+.oip-steps {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.oip-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #1e2533;
+  border: 1px solid #2e3a50;
+  border-radius: 8px;
+  flex: 1;
+  min-width: 160px;
+}
+.oip-step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #0f3460;
+  color: #7ecfff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.oip-step span {
+  font-size: 0.82rem;
+  color: #a8b8cc;
+}
+
+/* ── Form card ──────────────────────────────────────── */
+.oip-card {
+  background: #1a1f2e;
+  border: 1px solid #2a3448;
+  border-radius: 10px;
+  padding: 22px 24px;
+  margin-bottom: 20px;
+}
+
+.oip-field {
+  margin-bottom: 16px;
+}
+.oip-field label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #7ecfff;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.oip-field .oip-hint {
+  font-size: 0.75rem;
+  color: #667788;
+  margin-bottom: 5px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.oip-field input,
+.oip-field select {
+  width: 100%;
+  padding: 9px 12px;
+  background: #111827;
+  border: 1px solid #2e3a50;
+  border-radius: 6px;
+  color: #e0e6f0;
+  font-size: 0.9rem;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+.oip-field input:focus,
+.oip-field select:focus {
+  border-color: #7ecfff;
+}
+
+.oip-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* ── Buttons ─────────────────────────────────────────── */
+.oip-btn {
+  padding: 10px 22px;
+  background: #0f3460;
+  color: #7ecfff;
+  border: 1px solid #1a5ba0;
+  border-radius: 7px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+.oip-btn:hover:not(:disabled) {
+  background: #1a5ba0;
+  color: #fff;
+}
+.oip-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.oip-btn-primary {
+  background: #1a5ba0;
+  color: #fff;
+  border-color: #2a7fd4;
+}
+.oip-btn-primary:hover:not(:disabled) {
+  background: #2a7fd4;
+}
+.oip-btn-sm {
+  padding: 6px 14px;
+  font-size: 0.8rem;
+}
+
+.oip-btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* ── Tabs ────────────────────────────────────────────── */
+.oip-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #2a3448;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.oip-tab {
+  padding: 8px 18px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 7px 7px 0 0;
+  color: #667788;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+.oip-tab:hover {
+  color: #a8b8cc;
+  background: #1a1f2e;
+}
+.oip-tab.active {
+  background: #1a1f2e;
+  border-color: #2a3448;
+  color: #7ecfff;
+  font-weight: 700;
+}
+
+/* ── Tab guide banner ────────────────────────────────── */
+.oip-guide {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #131c2b;
+  border: 1px solid #1e3a5a;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 0.82rem;
+  color: #8aabb8;
+  line-height: 1.5;
+}
+.oip-guide-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ── Output terminal ─────────────────────────────────── */
+.oip-output {
+  background: #0d1117;
+  border: 1px solid #2a3448;
+  border-radius: 8px;
+  padding: 16px;
+  min-height: 200px;
+  max-height: 400px;
+  overflow-y: auto;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 0.8rem;
+  color: #9effd0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.oip-output-label {
+  font-size: 0.75rem;
+  color: #445566;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.oip-output.is-error {
+  color: #ff7070;
+}
+
+/* ── Result card (PolicyEval) ───────────────────────── */
+.oip-result {
+  border-radius: 10px;
+  border: 1px solid #2a3448;
+  overflow: hidden;
+}
+.oip-result-banner {
+  padding: 14px 20px;
+  font-size: 1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.oip-result-banner.pass {
+  background: #0d2a1a;
+  color: #4ade80;
+  border-bottom: 1px solid #14532d;
+}
+.oip-result-banner.fail {
+  background: #2a0d0d;
+  color: #f87171;
+  border-bottom: 1px solid #7f1d1d;
+}
+.oip-result-body {
+  background: #1a1f2e;
+  padding: 16px 20px;
+}
+
+/* ── Score bars (ScoresOIP) ──────────────────────────── */
+.oip-scores {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.oip-score-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.oip-score-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.oip-score-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #a8b8cc;
+}
+.oip-score-pct {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #e0e6f0;
+}
+.oip-score-desc {
+  font-size: 0.73rem;
+  color: #556677;
+  margin-bottom: 2px;
+}
+.oip-bar-track {
+  height: 7px;
+  background: #1e2533;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.oip-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+}
+.oip-bar-fill.green  { background: linear-gradient(90deg, #16a34a, #4ade80); }
+.oip-bar-fill.yellow { background: linear-gradient(90deg, #ca8a04, #fde047); }
+.oip-bar-fill.red    { background: linear-gradient(90deg, #b91c1c, #f87171); }
+.oip-bar-fill.blue   { background: linear-gradient(90deg, #1d4ed8, #60a5fa); }
+.oip-bar-fill.purple { background: linear-gradient(90deg, #7c3aed, #c084fc); }
+
+.oip-scores-empty {
+  text-align: center;
+  padding: 32px 0;
+  color: #445566;
+}
+.oip-scores-empty .oip-empty-icon { font-size: 2rem; }
+.oip-scores-empty p { margin: 8px 0 0; font-size: 0.85rem; }
+
+.oip-model-tag {
+  font-size: 0.72rem;
+  color: #445566;
+  margin-top: 10px;
+  text-align: right;
+}
+
+/* ── Error / notice ──────────────────────────────────── */
+.oip-error {
+  padding: 10px 14px;
+  background: #2a0d0d;
+  border: 1px solid #7f1d1d;
+  border-radius: 7px;
+  color: #f87171;
+  font-size: 0.84rem;
+  margin-top: 12px;
+}
+
+/* ── Responsive ──────────────────────────────────────── */
+@media (max-width: 600px) {
+  .oip-field-row { grid-template-columns: 1fr; }
+  .oip-tabs { gap: 2px; }
+  .oip-tab { padding: 7px 12px; font-size: 0.8rem; }
+}
