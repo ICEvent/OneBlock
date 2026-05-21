@@ -230,6 +230,13 @@ export const idlFactory = ({ IDL }) => {
     'app_id' : AppId,
     'profile_id' : ProfileId,
   });
+  const Canister = IDL.Record({
+    'canisterid' : IDL.Principal,
+    'name' : IDL.Text,
+    'desc' : IDL.Text,
+    'posts' : IDL.Text,
+    'gallery' : IDL.Text,
+  });
   const Profile = IDL.Record({
     'id' : ProfileId,
     'bio' : IDL.Text,
@@ -420,6 +427,7 @@ export const idlFactory = ({ IDL }) => {
     'getMyProfile' : IDL.Func([], [IDL.Opt(Profile)], ['query']),
     'getOipProvider' : IDL.Func([IDL.Text], [IDL.Opt(OipProvider)], ['query']),
     'getProfile' : IDL.Func([IDL.Text], [IDL.Opt(Profile)], ['query']),
+    'getProfileCanister' : IDL.Func([IDL.Principal], [IDL.Opt(Canister)], ['query']),
     'getProfileByPrincipal' : IDL.Func(
         [IDL.Text],
         [IDL.Opt(Profile)],
@@ -459,6 +467,7 @@ export const idlFactory = ({ IDL }) => {
         [Result_1],
         [],
       ),
+    'updateLatestPost' : IDL.Func([IDL.Text], [Result], []),
     'updateProfile' : IDL.Func([IDL.Text, UpdateProfile], [Result], []),
   });
 };

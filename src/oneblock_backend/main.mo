@@ -614,6 +614,50 @@ persistent actor {
 
     };
 
+    public shared ({ caller }) func updateLatestPost(post : Text) : async Result.Result<Nat, Text> {
+        if (Principal.isAnonymous(caller)) {
+            return #err("not authenticated")
+        };
+
+        if (Text.size(post) == 0) {
+            return #err("post cannot be empty")
+        };
+
+        let existingCanister = myCanisters.get(caller);
+        switch (existingCanister) {
+            case (?c) {
+                myCanisters.put(
+                    caller,
+                    {
+                        canisterid = c.canisterid;
+                        name = c.name;
+                        desc = c.desc;
+                        posts = post;
+                        gallery = c.gallery;
+                    }
+                );
+            };
+            case null {
+                myCanisters.put(
+                    caller,
+                    {
+                        canisterid = Principal.fromActor(this);
+                        name = "";
+                        desc = "";
+                        posts = post;
+                        gallery = "";
+                    }
+                );
+            };
+        };
+
+        #ok(1)
+    };
+
+    public query func getProfileCanister(owner : Principal) : async ?Canister {
+        myCanisters.get(owner)
+    };
+
     //----------------------------- Block Management ------------------------------------
     
     private func generateBlockId() : Text {

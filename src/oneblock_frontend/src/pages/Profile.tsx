@@ -181,6 +181,14 @@ const ProfilePage = () => {
           main={
             <>
               <ProfileMain stats={stats} />
+              <section className="stats-section" style={{ marginTop: '24px' }}>
+                <h3>Latest Post</h3>
+                <p className="stats-description">
+                  {canister?.posts?.trim()
+                    ? canister.posts
+                    : 'No latest post shared yet.'}
+                </p>
+              </section>
               <section style={{ marginTop: '24px' }}>
                 <h3 style={{ marginBottom: '12px' }}>OIP Identity Scores</h3>
                 <ScoresOIP scores={scores} />
@@ -195,4 +203,3 @@ const ProfilePage = () => {
 
 
 export { ProfilePage }
-
