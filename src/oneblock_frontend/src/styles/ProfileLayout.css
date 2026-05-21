@@ -71,7 +71,7 @@
 .tag {
   background: rgba(99, 102, 241, 0.08);
   border: 1px solid rgba(99, 102, 241, 0.2);
-  color: #a5b4fc;
+  color: #4338ca;
   padding: 3px 10px;
   border-radius: 100px;
   font-size: 0.8rem;
@@ -184,7 +184,7 @@
   border-radius: 50%;
   overflow: hidden;
   border: 2px solid var(--border-accent);
-  box-shadow: 0 0 20px var(--accent-glow);
+  box-shadow: none;
 }
 
 .profile-avatar img {
