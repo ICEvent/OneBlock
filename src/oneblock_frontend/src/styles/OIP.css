@@ -6,22 +6,23 @@
 }
 
 .oip-hero {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+  background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 100%);
+  border: 1px solid #c7d2fe;
   border-radius: 12px;
   padding: 24px 28px;
   margin-bottom: 28px;
-  color: #e0e6f0;
+  color: var(--text-primary);
 }
 .oip-hero h2 {
   margin: 0 0 6px;
   font-size: 1.4rem;
   font-weight: 700;
-  color: #7ecfff;
+  color: var(--accent);
 }
 .oip-hero p {
   margin: 0;
   font-size: 0.9rem;
-  color: #a8b8cc;
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
@@ -37,8 +38,8 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: #1e2533;
-  border: 1px solid #2e3a50;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   flex: 1;
   min-width: 160px;
@@ -47,8 +48,8 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #0f3460;
-  color: #7ecfff;
+  background: rgba(79, 70, 229, 0.1);
+  color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -58,13 +59,13 @@
 }
 .oip-step span {
   font-size: 0.82rem;
-  color: #a8b8cc;
+  color: var(--text-secondary);
 }
 
 /* ── Form card ──────────────────────────────────────── */
 .oip-card {
-  background: #1a1f2e;
-  border: 1px solid #2a3448;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 22px 24px;
   margin-bottom: 20px;
@@ -77,14 +78,14 @@
   display: block;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #7ecfff;
+  color: var(--text-secondary);
   margin-bottom: 5px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 .oip-field .oip-hint {
   font-size: 0.75rem;
-  color: #667788;
+  color: var(--text-muted);
   margin-bottom: 5px;
   font-weight: 400;
   text-transform: none;
@@ -94,10 +95,10 @@
 .oip-field select {
   width: 100%;
   padding: 9px 12px;
-  background: #111827;
-  border: 1px solid #2e3a50;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: #e0e6f0;
+  color: var(--text-primary);
   font-size: 0.9rem;
   outline: none;
   box-sizing: border-box;
@@ -105,7 +106,7 @@
 }
 .oip-field input:focus,
 .oip-field select:focus {
-  border-color: #7ecfff;
+  border-color: var(--border-accent);
 }
 
 .oip-field-row {
@@ -117,9 +118,9 @@
 /* ── Buttons ─────────────────────────────────────────── */
 .oip-btn {
   padding: 10px 22px;
-  background: #0f3460;
-  color: #7ecfff;
-  border: 1px solid #1a5ba0;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid rgba(79, 70, 229, 0.35);
   border-radius: 7px;
   font-size: 0.88rem;
   font-weight: 600;
@@ -128,20 +129,21 @@
   white-space: nowrap;
 }
 .oip-btn:hover:not(:disabled) {
-  background: #1a5ba0;
-  color: #fff;
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--accent);
 }
 .oip-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 .oip-btn-primary {
-  background: #1a5ba0;
+  background: var(--accent-gradient);
   color: #fff;
-  border-color: #2a7fd4;
+  border-color: transparent;
 }
 .oip-btn-primary:hover:not(:disabled) {
-  background: #2a7fd4;
+  opacity: 0.92;
+  color: #fff;
 }
 .oip-btn-sm {
   padding: 6px 14px;
@@ -159,7 +161,7 @@
 .oip-tabs {
   display: flex;
   gap: 4px;
-  border-bottom: 1px solid #2a3448;
+  border-bottom: 1px solid var(--border);
   margin-bottom: 20px;
   flex-wrap: wrap;
 }
@@ -169,20 +171,20 @@
   border: 1px solid transparent;
   border-bottom: none;
   border-radius: 7px 7px 0 0;
-  color: #667788;
+  color: var(--text-muted);
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
   transition: color 0.2s, background 0.2s;
 }
 .oip-tab:hover {
-  color: #a8b8cc;
-  background: #1a1f2e;
+  color: var(--text-secondary);
+  background: var(--bg-card-hover);
 }
 .oip-tab.active {
-  background: #1a1f2e;
-  border-color: #2a3448;
-  color: #7ecfff;
+  background: var(--bg-card);
+  border-color: var(--border);
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -191,13 +193,13 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: #131c2b;
-  border: 1px solid #1e3a5a;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
   border-radius: 8px;
   padding: 12px 16px;
   margin-bottom: 16px;
   font-size: 0.82rem;
-  color: #8aabb8;
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 .oip-guide-icon {
@@ -208,8 +210,8 @@
 
 /* ── Output terminal ─────────────────────────────────── */
 .oip-output {
-  background: #0d1117;
-  border: 1px solid #2a3448;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px;
   min-height: 200px;
@@ -217,13 +219,13 @@
   overflow-y: auto;
   font-family: 'Fira Code', 'Courier New', monospace;
   font-size: 0.8rem;
-  color: #9effd0;
+  color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
 }
 .oip-output-label {
   font-size: 0.75rem;
-  color: #445566;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-bottom: 6px;
@@ -235,7 +237,7 @@
 /* ── Result card (PolicyEval) ───────────────────────── */
 .oip-result {
   border-radius: 10px;
-  border: 1px solid #2a3448;
+  border: 1px solid var(--border);
   overflow: hidden;
 }
 .oip-result-banner {
@@ -247,17 +249,17 @@
   gap: 10px;
 }
 .oip-result-banner.pass {
-  background: #0d2a1a;
-  color: #4ade80;
-  border-bottom: 1px solid #14532d;
+  background: #ecfdf5;
+  color: #047857;
+  border-bottom: 1px solid #a7f3d0;
 }
 .oip-result-banner.fail {
-  background: #2a0d0d;
-  color: #f87171;
-  border-bottom: 1px solid #7f1d1d;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-bottom: 1px solid #fecaca;
 }
 .oip-result-body {
-  background: #1a1f2e;
+  background: var(--bg-card);
   padding: 16px 20px;
 }
 
@@ -280,21 +282,21 @@
 .oip-score-label {
   font-size: 0.82rem;
   font-weight: 600;
-  color: #a8b8cc;
+  color: var(--text-secondary);
 }
 .oip-score-pct {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #e0e6f0;
+  color: var(--text-primary);
 }
 .oip-score-desc {
   font-size: 0.73rem;
-  color: #556677;
+  color: var(--text-muted);
   margin-bottom: 2px;
 }
 .oip-bar-track {
   height: 7px;
-  background: #1e2533;
+  background: #e2e8f0;
   border-radius: 4px;
   overflow: hidden;
 }
@@ -312,14 +314,14 @@
 .oip-scores-empty {
   text-align: center;
   padding: 32px 0;
-  color: #445566;
+  color: var(--text-muted);
 }
 .oip-scores-empty .oip-empty-icon { font-size: 2rem; }
 .oip-scores-empty p { margin: 8px 0 0; font-size: 0.85rem; }
 
 .oip-model-tag {
   font-size: 0.72rem;
-  color: #445566;
+  color: var(--text-muted);
   margin-top: 10px;
   text-align: right;
 }
@@ -327,10 +329,10 @@
 /* ── Error / notice ──────────────────────────────────── */
 .oip-error {
   padding: 10px 14px;
-  background: #2a0d0d;
-  border: 1px solid #7f1d1d;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
   border-radius: 7px;
-  color: #f87171;
+  color: #b91c1c;
   font-size: 0.84rem;
   margin-top: 12px;
 }

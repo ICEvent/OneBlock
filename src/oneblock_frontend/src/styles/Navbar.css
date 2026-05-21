@@ -13,7 +13,7 @@
   align-items: center;
   padding: 0 32px;
   height: var(--navbar-height);
-  background: rgba(8, 11, 20, 0.85);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
@@ -84,12 +84,12 @@
   font-weight: 600;
   font-size: 14px;
   transition: all 0.2s;
-  box-shadow: 0 0 20px var(--accent-glow);
+  box-shadow: none;
 }
 
 .login-btn:hover {
   opacity: 0.9;
-  box-shadow: 0 0 28px rgba(99, 102, 241, 0.4);
+  box-shadow: none;
   transform: translateY(-1px);
 }
 
@@ -150,7 +150,7 @@
     align-items: stretch;
     padding: 12px 0;
     gap: 4px;
-    background: rgba(8, 11, 20, 0.95);
+    background: rgba(255, 255, 255, 0.97);
     border-top: 1px solid var(--border);
   }
 

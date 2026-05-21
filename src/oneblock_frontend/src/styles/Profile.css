@@ -18,7 +18,7 @@
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid var(--border-accent);
-  box-shadow: 0 0 24px var(--accent-glow);
+  box-shadow: none;
 }
 
 .profile-info {
@@ -58,7 +58,7 @@
   padding: 6px 14px;
   border-radius: 100px;
   text-decoration: none;
-  color: #a5b4fc;
+  color: #4338ca;
   font-size: 13px;
   font-weight: 500;
   transition: all 0.2s ease;

@@ -39,7 +39,7 @@
 
 .trait-badge.strength-low {
   background: rgba(99, 102, 241, 0.1);
-  color: #a5b4fc;
+  color: #4338ca;
   border: 1px solid rgba(99, 102, 241, 0.3);
 }
 
@@ -95,7 +95,7 @@
 .trait-confidence {
   padding: 3px 10px;
   background: rgba(99, 102, 241, 0.1);
-  color: #a5b4fc;
+  color: #4338ca;
   border-radius: 100px;
   font-size: 0.75rem;
   font-weight: 600;

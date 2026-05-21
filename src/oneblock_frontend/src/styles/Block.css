@@ -111,7 +111,7 @@
   padding: 3px 10px;
   background: rgba(99, 102, 241, 0.1);
   border: 1px solid rgba(99, 102, 241, 0.25);
-  color: #a5b4fc;
+  color: #4338ca;
   border-radius: 100px;
   font-size: 0.78rem;
   font-weight: 600;
@@ -186,7 +186,7 @@
 
 .block-chain .block-card:first-child::before {
   border-color: var(--accent-emerald);
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+  box-shadow: none;
 }
 
 .block-chain .block-card:last-child::before {
@@ -283,13 +283,13 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 0 20px var(--accent-glow);
+  box-shadow: none;
 }
 
 .block-form button[type="submit"]:hover:not(:disabled) {
   opacity: 0.9;
   transform: translateY(-1px);
-  box-shadow: 0 0 28px rgba(99, 102, 241, 0.4);
+  box-shadow: none;
 }
 
 .block-form button[type="submit"]:disabled {
@@ -378,7 +378,7 @@
   font-weight: 600;
   font-size: 14px;
   transition: all 0.2s ease;
-  box-shadow: 0 0 20px var(--accent-glow);
+  box-shadow: none;
 }
 
 .home-link:hover {
@@ -417,7 +417,7 @@
   border-radius: 50%;
   border: 2px solid var(--border-accent);
   object-fit: cover;
-  box-shadow: 0 0 20px var(--accent-glow);
+  box-shadow: none;
 }
 
 .profile-text h1 {
