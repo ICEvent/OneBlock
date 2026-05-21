@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Profile, Link } from "../api/profile/service.did.d";
+import { Profile } from "../api/profile/service.did.d";
 import { useNavigate } from 'react-router-dom';
 
 import '../styles/Console.css';

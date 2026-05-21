@@ -622,6 +622,9 @@ persistent actor {
         if (Text.size(post) == 0) {
             return #err("post cannot be empty")
         };
+        if (Text.size(post) > 500) {
+            return #err("post is too long")
+        };
 
         let existingCanister = myCanisters.get(caller);
         switch (existingCanister) {

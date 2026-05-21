@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { CircularProgress } from '@mui/material';
 import { toast } from 'react-toastify';
 import { useOneblock } from '../Store';
@@ -9,7 +9,7 @@ export const PostsPanel: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const loadLatestPost = async () => {
+  const loadLatestPost = useCallback(async () => {
     setLoading(true);
     try {
       const [profile] = await oneblock.getMyProfile();
@@ -26,16 +26,16 @@ export const PostsPanel: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [oneblock]);
 
   useEffect(() => {
     loadLatestPost();
-  }, []);
+  }, [loadLatestPost]);
 
   const saveLatestPost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!post.trim()) {
-      toast.error('Post cannot be empty');
+      toast.error('post cannot be empty');
       return;
     }
 
