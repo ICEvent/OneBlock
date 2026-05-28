@@ -5,7 +5,6 @@ import { Profile } from '../types/profile';
 import { Link as ProfileLink } from '../api/profile/service.did.d';
 import BlockChain from '../components/BlockChain';
 import { Block } from '../types/block';
-import Navbar from '../components/Navbar';
 import ScoresOIP from '../components/ScoresOIP';
 import '../styles/Block.css';
 
@@ -49,48 +48,9 @@ const BlockPage = () => {
             : profileData.last_updated as number | undefined,
         });
 
-        // Load blocks for this profile
-        // For now, create sample blocks to demonstrate the UI
-        const sampleBlocks: Block[] = [
-          {
-            id: '1',
-            profile_id: profileData.id,
-            start_time: BigInt(Date.now() - 365 * 24 * 60 * 60 * 1000),
-            end_time: [BigInt(Date.now() - 180 * 24 * 60 * 60 * 1000)],
-            evidence_refs: ['https://icevent.app', 'https://alltracks.icevent.app'],
-            derived_traits: ['builder', 'consistent'],
-            narrative: ['Started building on the Internet Computer. Launched multiple projects and contributed to the IC ecosystem.'],
-            visibility: { global: null },
-            hash: 'a1b2c3d4e5f6',
-            created_at: BigInt(Date.now() - 365 * 24 * 60 * 60 * 1000),
-          },
-          {
-            id: '2',
-            profile_id: profileData.id,
-            start_time: BigInt(Date.now() - 180 * 24 * 60 * 60 * 1000),
-            end_time: [BigInt(Date.now() - 90 * 24 * 60 * 60 * 1000)],
-            evidence_refs: ['https://vansday.net'],
-            derived_traits: ['community', 'active'],
-            narrative: ['Engaged with the community through events and collaborations. Built tools to help others in the ecosystem.'],
-            visibility: { global: null },
-            hash: 'b2c3d4e5f6a1',
-            created_at: BigInt(Date.now() - 180 * 24 * 60 * 60 * 1000),
-          },
-          {
-            id: '3',
-            profile_id: profileData.id,
-            start_time: BigInt(Date.now() - 90 * 24 * 60 * 60 * 1000),
-            end_time: [],
-            evidence_refs: ['https://dashboard.internetcomputer.org/'],
-            derived_traits: ['persistent', 'innovative'],
-            narrative: ['Continuing to build and expand. Focusing on creating value for the entire ecosystem.'],
-            visibility: { global: null },
-            hash: 'c3d4e5f6a1b2',
-            created_at: BigInt(Date.now() - 90 * 24 * 60 * 60 * 1000),
-          },
-        ];
-        
-        setBlocks(sampleBlocks);
+        // Load real blocks for this profile
+        const blocksData = await oneblock.listBlocks(profileData.id);
+        setBlocks(blocksData as Block[]);
 
         // Load OIP scores for this profile
         const ownerText = typeof profileData.owner === 'object' && profileData.owner.toText
@@ -111,7 +71,6 @@ const BlockPage = () => {
   if (loading) {
     return (
       <>
-        <Navbar />
         <div className="block-page loading">
           <div className="loading-spinner">
             <span className="material-icons">hourglass_empty</span>
@@ -125,7 +84,6 @@ const BlockPage = () => {
   if (!profile) {
     return (
       <>
-        <Navbar />
         <div className="block-page not-found">
           <span className="material-icons">person_off</span>
           <h2>Profile Not Found</h2>
@@ -138,7 +96,6 @@ const BlockPage = () => {
 
   return (
     <>
-      <Navbar />
       <div className="block-page">
         <div className="block-page-header">
           <div className="header-content">

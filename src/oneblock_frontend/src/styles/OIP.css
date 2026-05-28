@@ -2,6 +2,7 @@
 .oip-page {
   max-width: 860px;
   margin: 0 auto;
+  margin-top: var(--navbar-height);
   padding: 24px 16px 48px;
 }
 
