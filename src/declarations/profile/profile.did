@@ -370,6 +370,14 @@ type ConnectionStatus =
    active;
    pending;
    revoked;
+  };
+type Canister = 
+ record {
+   canisterid: principal;
+   desc: text;
+   gallery: text;
+   name: text;
+   posts: text;
  };
 type BlockId = text;
 type Block = 
@@ -473,6 +481,7 @@ service : {
   getMyProfile: () -> (opt Profile) query;
   getOipProvider: (providerId: text) -> (opt OipProvider) query;
   getProfile: (id: text) -> (opt Profile) query;
+  getProfileCanister: (owner: principal) -> (opt Canister) query;
   getProfileByPrincipal: ("principal": text) -> (opt Profile) query;
   getProfileCount: () -> (nat) query;
   getProfiles: (pageSize: nat, pageNumber: nat) -> (vec Profile) query;
@@ -497,5 +506,6 @@ service : {
   setProviderStatus: (providerId: text, active: bool) -> (Result);
   submitActivityRecord: (newRecord: NewActivityRecord) -> (Result_1);
   submitProviderFactor: (input: ProviderFactorSubmission) -> (Result_1);
+  updateLatestPost: (post: text) -> (Result);
   updateProfile: (id: text, updateProfile: UpdateProfile) -> (Result);
 }

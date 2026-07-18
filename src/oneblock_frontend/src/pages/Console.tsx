@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Profile, Link } from "../api/profile/service.did.d";
-import { Canister } from "../types/canister";
+import { Profile } from "../api/profile/service.did.d";
 import { useNavigate } from 'react-router-dom';
 
 import '../styles/Console.css';
 import { ProfilePanel } from "../components/console/ProfilePanel";
 import { LinksPanel } from "../components/console/LinksPanel";
 import { BlocksPanel } from "../components/console/BlocksPanel";
+import { PostsPanel } from "../components/console/PostsPanel";
 
 import { ProfileForm } from "../components/ProfileForm";
 
@@ -45,6 +45,8 @@ const Console = () => {
         return <LinksPanel profile={profile} onLinkChange={loadProfile}  />;
       case 'blocks':
         return <BlocksPanel />;
+      case 'posts':
+        return <PostsPanel />;
       
       default:
         return <ProfilePanel />;
@@ -75,6 +77,13 @@ const Console = () => {
           >
             <span className="material-icons">view_timeline</span>
             Blocks
+          </div>
+          <div
+            className={`menu-item ${activePanel === 'posts' ? 'active' : ''}`}
+            onClick={() => setActivePanel('posts')}
+          >
+            <span className="material-icons">edit_note</span>
+            Latest Post
           </div>
           
         </nav>

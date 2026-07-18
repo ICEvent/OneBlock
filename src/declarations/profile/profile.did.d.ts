@@ -59,6 +59,13 @@ export type BlockId = string;
 export type ConnectionStatus = { 'active' : null } |
   { 'revoked' : null } |
   { 'pending' : null };
+export interface Canister {
+  'canisterid' : Principal,
+  'name' : string,
+  'desc' : string,
+  'posts' : string,
+  'gallery' : string,
+}
 export interface DerivedSummary {
   'activity_type' : ActivityTypeKey,
   'total_amount' : [] | [number],
@@ -387,6 +394,7 @@ export interface _SERVICE {
   'getMyProfile' : ActorMethod<[], [] | [Profile]>,
   'getOipProvider' : ActorMethod<[string], [] | [OipProvider]>,
   'getProfile' : ActorMethod<[string], [] | [Profile]>,
+  'getProfileCanister' : ActorMethod<[Principal], [] | [Canister]>,
   'getProfileByPrincipal' : ActorMethod<[string], [] | [Profile]>,
   'getProfileCount' : ActorMethod<[], bigint>,
   'getProfiles' : ActorMethod<[bigint, bigint], Array<Profile>>,
@@ -410,6 +418,7 @@ export interface _SERVICE {
   'setProviderStatus' : ActorMethod<[string, boolean], Result>,
   'submitActivityRecord' : ActorMethod<[NewActivityRecord], Result_1>,
   'submitProviderFactor' : ActorMethod<[ProviderFactorSubmission], Result_1>,
+  'updateLatestPost' : ActorMethod<[string], Result>,
   'updateProfile' : ActorMethod<[string, UpdateProfile], Result>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
