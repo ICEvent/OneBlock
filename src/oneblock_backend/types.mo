@@ -1,4 +1,3 @@
-
 module {
     // ========== Core Type Aliases ==========
     public type BlockId = Text;
@@ -6,169 +5,74 @@ module {
     public type TraitId = Text;
     public type Timestamp = Int;
 
-    // ========== Enums ==========
-    public type Visibility = {
-        #global;
-        #unlisted;
-        #personal;
+    // ========== Oneblock Protocol v0.1 ==========
+    // Apps submit facts. The ledger creates chain metadata.
+    public type AppId = Text;
+    public type SchemaId = Text;
+    public type JourneyId = Text;
+
+    public type MetadataEntry = {
+        key : Text;
+        value : Text;
     };
 
-    public type VerificationLevel = {
-        #self;
-        #platform;
-        #verifiable;
-        #third_party;
-    };
-
-    public type Strength = {
-        #low;
-        #medium;
-        #high;
-    };
-
-    // ========== Block System Types ==========
     public type Block = {
-        id : BlockId;
+        block_id : BlockId;
+        prev_block_id : ?BlockId;
+        prev_hash : ?Text;
+        timestamp : Timestamp;
+
         profile_id : ProfileId;
-        
-        start_time : Timestamp;
-        end_time : ?Timestamp;
-        
-        evidence_refs : [Text]; // e.g. alltrack://route/123, icevent://event/456
-        derived_traits : [TraitId];
-        
-        narrative : ?Text;
-        
-        visibility : Visibility;
-        
-        hash : Text; // content hash for audit
-        created_at : Timestamp;
+        journey_id : ?JourneyId;
+
+        app_id : AppId;
+        producer : Principal;
+        schema_id : SchemaId;
+        external_id : Text;
+        payload : [MetadataEntry];
+        evidence_hash : ?Text;
+        app_signature : ?Text;
+
+        hash : Text;
     };
 
-    public type Trait = {
-        id : TraitId;
-        tlabel : Text;
-        
-        strength : Strength;
-        confidence : Float; // 0.0 to 1.0
-        
-        explanation : Text;
-        derived_from : [BlockId];
-        
-        visibility : Visibility;
+    // This is the only shape an application submits. Chain-owned fields are absent by design.
+    public type SubmitEvent = {
+        profile_id : ProfileId;
+        journey_id : ?JourneyId;
+        app_id : AppId;
+        schema_id : SchemaId;
+        external_id : Text;
+        payload : [MetadataEntry];
+        evidence_hash : ?Text;
+        app_signature : ?Text;
+    };
+
+    public type Journey = {
+        id : JourneyId;
+        profile_id : ProfileId;
+        title : Text;
+        created_at : Timestamp;
         updated_at : Timestamp;
     };
 
-    // ========== Legacy Profile Types (Extended) ==========
-    public type Profile = {
-        id : ProfileId;
-        
-        // Display info
-        name : Text;
-        bio : Text;
-        pfp : Text;
-        
-        // Legacy links
-        links : [Link];
-        
-        // Block-chain system
-        blocks : [BlockId];
-        traits : [TraitId];
-        
-        // System fields
-        owner : Principal;
-        createtime : Int;
-        visibility : Visibility;
-        last_updated : Timestamp;
-    };
-
-    public type NewProfile = {
-        id : Text;
-        name : Text;
-        bio : Text;
-        pfp : Text
-    };
-    
-    public type UpdateProfile = {
-        name : Text;
-        bio : Text;
-        pfp : Text
-    };
-    
-    public type Link = {
-        name : Text;
-        url : Text
-    };
-
-    public type Wallet = {
-        name : Text;
-        addresses : [{
-            address : Text;
-            network : Network
-        }]
-    };
-
-    public type Network = {
-        #ic;
-        #ethereum;
-        #bitcoin
-    };
-
-    public type Favorite = {
-        owner: Principal;
-        name: Text;
-        address: Text;
-    };
-
-    public type Inbox = {
-        inboxid: Text;
-        owner: Principal;
-    };
-
-    public type Canister = {
-        canisterid: Principal;
-        name: Text;
-        desc: Text;
-        posts: Text;
-        gallery: Text;
-    };
-
-    // ========== Input/Output Types ==========
-    public type NewBlock = {
+    public type NewJourney = {
         profile_id : ProfileId;
-        start_time : Timestamp;
-        end_time : ?Timestamp;
-        evidence_refs : [Text];
-        narrative : ?Text;
-        visibility : Visibility;
+        title : Text;
     };
-
-    public type NewTrait = {
-        tlabel : Text;
-        strength : Strength;
-        confidence : Float;
-        explanation : Text;
-        derived_from : [BlockId];
-        visibility : Visibility;
-    };
-
-    // ========== Integration System ==========
-
-    public type AppId = Text;
-    public type ActivityTypeKey = Text; // e.g. "donation.made"
-    public type RecordId = Text;
 
     public type AppCategory = {
-        #donation;
-        #fitness;
-        #education;
+        #event;
+        #activity;
+        #creation;
+        #contribution;
         #finance;
+        #education;
         #social;
         #other;
     };
 
     public type VerificationPolicy = {
-        #none;
         #idempotency_only;
         #signed_payload;
     };
@@ -178,110 +82,11 @@ module {
         name : Text;
         description : Text;
         category : AppCategory;
-        owner : Principal; // principal of the app that is authorized to submit records
+        owner : Principal;
         verification_policy : VerificationPolicy;
-        schema_version : Nat;
         active : Bool;
         created_at : Timestamp;
     };
-
-    public type ConnectionStatus = {
-        #active;
-        #revoked;
-        #pending;
-    };
-
-    // Links a OneBlock profile to a 3rd-party app user identity
-    public type IntegrationConnection = {
-        profile_id : ProfileId;
-        app_id : AppId;
-        external_user_id : Text; // the user's id inside the 3rd-party app
-        scopes : [Text];         // permissions granted, e.g. ["donation.read"]
-        status : ConnectionStatus;
-        created_at : Timestamp;
-        revoked_at : ?Timestamp;
-    };
-
-    // Describes the shape of a single event type emitted by an app
-    public type FieldDef = {
-        name : Text;
-        field_type : Text;  // "text" | "nat" | "float" | "bool"
-        required : Bool;
-        description : Text;
-    };
-
-    public type ActivityType = {
-        app_id : AppId;
-        type_key : ActivityTypeKey; // e.g. "donation.made"
-        type_label : Text;
-        description : Text;
-        fields : [FieldDef]; // schema for the payload entries
-        version : Nat;
-        created_at : Timestamp;
-    };
-
-    // Evidence / attestation attached to an activity record
-    public type SignatureStatus = {
-        #unverified;
-        #verified;
-        #invalid;
-    };
-
-    public type Attestation = {
-        tx_hash : ?Text;
-        receipt_url : ?Text;
-        signed_payload : ?Text; // base64 or hex signed blob
-        issuer : ?Text;         // who signed (principal text or app id)
-        signature_status : SignatureStatus;
-    };
-
-    // Generic key-value entry for the extensible payload map
-    public type MetadataEntry = {
-        key : Text;
-        value : Text;
-    };
-
-    // A single public activity event linked to a profile
-    public type ActivityRecord = {
-        id : RecordId;
-        profile_id : ProfileId;
-        app_id : AppId;
-        activity_type : ActivityTypeKey;
-
-        // Normalized queryable fields (null when not applicable)
-        amount : ?Float;
-        currency : ?Text;
-
-        // When the event happened in the external app
-        event_timestamp : Timestamp;
-        // When it was ingested into OneBlock
-        ingest_timestamp : Timestamp;
-
-        // App-specific data as key-value pairs
-        payload : [MetadataEntry];
-        schema_version : Nat;
-
-        // Idempotency key supplied by the app (app_id + external event id)
-        idempotency_key : Text;
-
-        attestation : ?Attestation;
-        verification_level : VerificationLevel;
-        visibility : Visibility;
-        hash : Text;
-    };
-
-    // Per-(profile, app, activity_type) rollup recomputed on every submission
-    public type DerivedSummary = {
-        profile_id : ProfileId;
-        app_id : AppId;
-        activity_type : ActivityTypeKey;
-        record_count : Nat;
-        total_amount : ?Float;
-        currency : ?Text;
-        last_updated : Timestamp;
-    };
-
-    // ========== Integration Input Types ==========
 
     public type NewIntegrationApp = {
         id : AppId;
@@ -291,224 +96,178 @@ module {
         verification_policy : VerificationPolicy;
     };
 
-    public type NewActivityType = {
-        app_id : AppId;
-        type_key : ActivityTypeKey;
-        type_label : Text;
-        description : Text;
-        fields : [FieldDef];
-    };
+    public type ConnectionStatus = { #active; #revoked; #pending };
 
-    public type NewActivityRecord = {
+    public type IntegrationConnection = {
         profile_id : ProfileId;
         app_id : AppId;
-        activity_type : ActivityTypeKey;
-        amount : ?Float;
-        currency : ?Text;
-        event_timestamp : Timestamp;
-        payload : [MetadataEntry];
-        schema_version : Nat;
-        idempotency_key : Text; // must be unique per app; duplicate calls are rejected
-        attestation : ?Attestation;
-        visibility : Visibility;
+        external_user_id : Text;
+        scopes : [SchemaId];
+        status : ConnectionStatus;
+        created_at : Timestamp;
+        revoked_at : ?Timestamp;
     };
 
-    // ========== OIP v0.1 (M1) ==========
+    public type FieldDef = {
+        name : Text;
+        field_type : Text;
+        required : Bool;
+        description : Text;
+    };
+
+    public type EventSchema = {
+        id : SchemaId;
+        app_id : AppId;
+        name : Text;
+        description : Text;
+        fields : [FieldDef];
+        version : Nat;
+        active : Bool;
+        created_at : Timestamp;
+    };
+
+    public type NewEventSchema = {
+        id : SchemaId;
+        app_id : AppId;
+        name : Text;
+        description : Text;
+        fields : [FieldDef];
+        version : Nat;
+    };
+
+    public type SubmitError = {
+        #unauthorized_app;
+        #app_inactive;
+        #connection_not_active;
+        #schema_not_found;
+        #schema_not_allowed;
+        #invalid_payload : Text;
+        #duplicate_external_id;
+        #journey_not_found;
+        #journey_profile_mismatch;
+        #signature_required;
+    };
+
+    public type SubmitResult = {
+        #ok : Block;
+        #err : SubmitError;
+    };
+
+    // ========== Legacy profile shell ==========
+    // Kept temporarily so the existing frontend/API can migrate incrementally.
+    public type Visibility = { #global; #unlisted; #personal };
+    public type VerificationLevel = { #self; #platform; #verifiable; #third_party };
+    public type Strength = { #low; #medium; #high };
+
+    public type Trait = {
+        id : TraitId;
+        tlabel : Text;
+        strength : Strength;
+        confidence : Float;
+        explanation : Text;
+        derived_from : [BlockId];
+        visibility : Visibility;
+        updated_at : Timestamp;
+    };
+
+    public type Profile = {
+        id : ProfileId;
+        name : Text;
+        bio : Text;
+        pfp : Text;
+        links : [Link];
+        blocks : [BlockId];
+        traits : [TraitId];
+        owner : Principal;
+        createtime : Int;
+        visibility : Visibility;
+        last_updated : Timestamp;
+    };
+
+    public type NewProfile = { id : Text; name : Text; bio : Text; pfp : Text };
+    public type UpdateProfile = { name : Text; bio : Text; pfp : Text };
+    public type Link = { name : Text; url : Text };
+    public type Wallet = { name : Text; addresses : [{ address : Text; network : Network }] };
+    public type Network = { #ic; #ethereum; #bitcoin };
+    public type Favorite = { owner : Principal; name : Text; address : Text };
+    public type Inbox = { inboxid : Text; owner : Principal };
+    public type Canister = { canisterid : Principal; name : Text; desc : Text; posts : Text; gallery : Text };
+
+    // ========== OIP identity types ==========
     public type IdentityPrincipal = Text;
     public type FactorId = Text;
     public type PolicyId = Text;
-
-    public type EntityKind = {
-        #human;
-        #ai_agent;
-        #hybrid;
-        #organization;
-    };
-
-    public type FactorCategory = {
-        #existence;
-        #continuity;
-        #human;
-        #social;
-        #economic;
-        #reputation;
-    };
-
+    public type EntityKind = { #human; #ai_agent; #hybrid; #organization };
+    public type FactorCategory = { #existence; #continuity; #human; #social; #economic; #reputation };
     public type FactorStatus = { #active; #revoked; #expired };
 
     public type Factor = {
-        id : FactorId;
-        principal : IdentityPrincipal;
-        category : FactorCategory;
-        factor_type : Text;
-        provider : Text;
-        value : Text;
-        verified : Bool;
-        confidence : Float;
-        reliability : Float;
-        weight_hint : Float;
-        issued_at : Timestamp;
-        updated_at : Timestamp;
-        expires_at : ?Timestamp;
-        revoked_at : ?Timestamp;
-        status : FactorStatus;
-        metadata : [MetadataEntry];
+        id : FactorId; principal : IdentityPrincipal; category : FactorCategory;
+        factor_type : Text; provider : Text; value : Text; verified : Bool;
+        confidence : Float; reliability : Float; weight_hint : Float;
+        issued_at : Timestamp; updated_at : Timestamp; expires_at : ?Timestamp;
+        revoked_at : ?Timestamp; status : FactorStatus; metadata : [MetadataEntry];
     };
 
     public type ProbabilityScores = {
-        human_score : Float;
-        uniqueness_score : Float;
-        trust_score : Float;
-        reputation_score : Float;
-        ai_probability : Float;
-        organization_probability : Float;
-        updated_at : Timestamp;
-        model_version : Text;
+        human_score : Float; uniqueness_score : Float; trust_score : Float;
+        reputation_score : Float; ai_probability : Float; organization_probability : Float;
+        updated_at : Timestamp; model_version : Text;
     };
 
     public type PolicyRequirements = {
-        min_human_score : ?Float;
-        min_uniqueness_score : ?Float;
-        min_trust_score : ?Float;
-        min_reputation_score : ?Float;
-        min_wallet_age_days : ?Nat;
+        min_human_score : ?Float; min_uniqueness_score : ?Float; min_trust_score : ?Float;
+        min_reputation_score : ?Float; min_wallet_age_days : ?Nat;
     };
-
-    public type PolicyWeights = {
-        existence : Float;
-        continuity : Float;
-        human : Float;
-        social : Float;
-        economic : Float;
-        reputation : Float;
-    };
-
+    public type PolicyWeights = { existence : Float; continuity : Float; human : Float; social : Float; economic : Float; reputation : Float };
     public type ContextPolicy = {
-        policy_id : PolicyId;
-        name : Text;
-        description : Text;
-        requirements : PolicyRequirements;
-        weights : PolicyWeights;
-        decay_lambda : Float;
-        active : Bool;
-        created_at : Timestamp;
-        updated_at : Timestamp;
+        policy_id : PolicyId; name : Text; description : Text; requirements : PolicyRequirements;
+        weights : PolicyWeights; decay_lambda : Float; active : Bool; created_at : Timestamp; updated_at : Timestamp;
     };
-
     public type FactorEventAction = { #created; #updated; #revoked; #expired; #recomputed };
-
     public type FactorEvent = {
-        principal : IdentityPrincipal;
-        factor_id : ?FactorId;
-        action : FactorEventAction;
-        reason : ?Text;
-        triggered_by : Text;
-        timestamp : Timestamp;
-        metadata : [MetadataEntry];
+        principal : IdentityPrincipal; factor_id : ?FactorId; action : FactorEventAction;
+        reason : ?Text; triggered_by : Text; timestamp : Timestamp; metadata : [MetadataEntry];
     };
-
     public type IdentityGraph = {
-        principal : IdentityPrincipal;
-        entity_kind : EntityKind;
-        factors : [Factor];
-        scores : ProbabilityScores;
-        history : [FactorEvent];
-        created_at : Timestamp;
-        updated_at : Timestamp;
+        principal : IdentityPrincipal; entity_kind : EntityKind; factors : [Factor];
+        scores : ProbabilityScores; history : [FactorEvent]; created_at : Timestamp; updated_at : Timestamp;
     };
-
-    public type NewIdentityGraph = {
-        principal : IdentityPrincipal;
-        entity_kind : EntityKind;
-    };
-
+    public type NewIdentityGraph = { principal : IdentityPrincipal; entity_kind : EntityKind };
     public type NewFactor = {
-        principal : IdentityPrincipal;
-        category : FactorCategory;
-        factor_type : Text;
-        provider : Text;
-        value : Text;
-        verified : Bool;
-        confidence : Float;
-        reliability : Float;
-        weight_hint : Float;
-        expires_at : ?Timestamp;
-        metadata : [MetadataEntry];
+        principal : IdentityPrincipal; category : FactorCategory; factor_type : Text; provider : Text;
+        value : Text; verified : Bool; confidence : Float; reliability : Float; weight_hint : Float;
+        expires_at : ?Timestamp; metadata : [MetadataEntry];
     };
-
     public type NewContextPolicy = {
-        policy_id : PolicyId;
-        name : Text;
-        description : Text;
-        requirements : PolicyRequirements;
-        weights : PolicyWeights;
-        decay_lambda : Float;
-        active : Bool;
+        policy_id : PolicyId; name : Text; description : Text; requirements : PolicyRequirements;
+        weights : PolicyWeights; decay_lambda : Float; active : Bool;
     };
-
     public type TrustEdge = {
-        id : Text;
-        from_principal : IdentityPrincipal;
-        to_principal : IdentityPrincipal;
-        context : Text;
-        trust : Float;
-        confidence : Float;
-        created_at : Timestamp;
-        updated_at : Timestamp;
+        id : Text; from_principal : IdentityPrincipal; to_principal : IdentityPrincipal;
+        context : Text; trust : Float; confidence : Float; created_at : Timestamp; updated_at : Timestamp;
     };
-
-    public type PolicyEvaluationItem = {
-        key : Text;
-        passed : Bool;
-        expected : Text;
-        actual : Text;
-    };
-
+    public type PolicyEvaluationItem = { key : Text; passed : Bool; expected : Text; actual : Text };
     public type PolicyEvaluation = {
-        policy_id : PolicyId;
-        principal : IdentityPrincipal;
-        passed : Bool;
-        items : [PolicyEvaluationItem];
-        evaluated_at : Timestamp;
+        policy_id : PolicyId; principal : IdentityPrincipal; passed : Bool;
+        items : [PolicyEvaluationItem]; evaluated_at : Timestamp;
     };
 
-    // ========== OIP v0.3 (M3 Provider Ecosystem) ==========
     public type ProviderStatus = { #active; #suspended };
     public type ProviderCapability = { #factor; #reputation; #risk };
     public type ProviderVerification = { #none; #idempotency_only; #signed_payload };
-
     public type OipProvider = {
-        provider_id : Text;
-        owner : Principal;
-        name : Text;
-        capabilities : [ProviderCapability];
-        verification : ProviderVerification;
-        reliability : Float;
-        status : ProviderStatus;
-        created_at : Timestamp;
-        updated_at : Timestamp;
+        provider_id : Text; owner : Principal; name : Text; capabilities : [ProviderCapability];
+        verification : ProviderVerification; reliability : Float; status : ProviderStatus;
+        created_at : Timestamp; updated_at : Timestamp;
     };
-
     public type NewOipProvider = {
-        provider_id : Text;
-        name : Text;
-        capabilities : [ProviderCapability];
-        verification : ProviderVerification;
-        reliability : Float;
+        provider_id : Text; name : Text; capabilities : [ProviderCapability];
+        verification : ProviderVerification; reliability : Float;
     };
-
     public type ProviderFactorSubmission = {
-        provider_id : Text;
-        idempotency_key : Text;
-        principal : IdentityPrincipal;
-        category : FactorCategory;
-        factor_type : Text;
-        value : Text;
-        confidence : Float;
-        reliability : ?Float;
-        weight_hint : Float;
-        expires_at : ?Timestamp;
-        signed_payload : ?Text;
+        provider_id : Text; idempotency_key : Text; principal : IdentityPrincipal;
+        category : FactorCategory; factor_type : Text; value : Text; confidence : Float;
+        reliability : ?Float; weight_hint : Float; expires_at : ?Timestamp; signed_payload : ?Text;
     };
-
 }
