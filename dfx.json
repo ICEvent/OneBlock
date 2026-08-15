@@ -4,6 +4,10 @@
       "main": "src/oneblock_backend/main.mo",
       "type": "motoko"
     },
+    "personal_chain": {
+      "main": "src/personal_chain/main.mo",
+      "type": "motoko"
+    },
     "profile_assets": {
       "dependencies": [
         "profile"
