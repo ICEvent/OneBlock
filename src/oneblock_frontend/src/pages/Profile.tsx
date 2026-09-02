@@ -59,23 +59,21 @@ const ProfilePage = () => {
   }, [id, oneblock]);
 
   const ProfilePlaceholder = () => (
-    <div className="profile-container">
-      <header className="profile-header">
-        <div className="profile-avatar"><div className="placeholder-avatar animate-pulse" /></div>
-        <div className="profile-info">
-          <div className="placeholder-text animate-pulse" />
-          <div className="placeholder-bio animate-pulse" />
-        </div>
-      </header>
+    <div className="profile-loading ecosystem-panel" aria-busy="true">
+      <div className="profile-avatar"><div className="placeholder-avatar animate-pulse" /></div>
+      <div className="profile-info">
+        <div className="placeholder-text animate-pulse" />
+        <div className="placeholder-bio animate-pulse" />
+      </div>
     </div>
   );
 
   const ProfileNotFound = () => (
-    <div style={{ textAlign: 'center', padding: '48px 24px', margin: '40px auto', maxWidth: '520px' }}>
-      <span className="material-icons" style={{ fontSize: '48px', color: '#64748b' }}>person_off</span>
+    <div className="profile-not-found ecosystem-panel">
+      <span className="material-icons" aria-hidden="true">person_off</span>
       <h2>Profile not found</h2>
       <p>This profile does not exist or is no longer available.</p>
-      <NavLink to="/" style={{ display: 'inline-block', marginTop: '16px' }}>Return home</NavLink>
+      <NavLink to="/">Return home</NavLink>
     </div>
   );
 
@@ -87,7 +85,7 @@ const ProfilePage = () => {
   return (
     <>
       <Navbar />
-      <div className="page-with-navbar">
+      <div className="page-with-navbar profile-page-shell">
         {loading ? (
           <ProfilePlaceholder />
         ) : !profile ? (
@@ -96,7 +94,18 @@ const ProfilePage = () => {
           <ProfileLayout
             sidebar={<ProfileSidebar profile={profile} tags={[]} />}
             main={
-              <div style={{ display: 'grid', gap: '20px' }}>
+              <div className="profile-main-stack">
+                <section className="profile-context-banner ecosystem-hero">
+                  <div>
+                    <span className="section-eyebrow">Sovereign identity</span>
+                    <h2>Evidence before score</h2>
+                    <p>
+                      This profile separates verified interaction history from probabilistic identity signals, so reputation stays portable and contextual.
+                    </p>
+                  </div>
+                  <div className="profile-context-badge">OneBlock public record</div>
+                </section>
+
                 {profile.owner && (
                   <TrustReputation
                     subject={profile.owner}
@@ -105,11 +114,11 @@ const ProfilePage = () => {
                   />
                 )}
 
-                <section style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '20px' }}>
-                  <div style={{ marginBottom: '14px' }}>
-                    <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Derived identity model</span>
-                    <h3 style={{ margin: '4px 0 6px', color: '#0f172a' }}>Identity confidence</h3>
-                    <p style={{ margin: 0, color: '#64748b', fontSize: '0.86rem', lineHeight: 1.5 }}>
+                <section className="profile-model-card ecosystem-panel">
+                  <div className="profile-section-heading">
+                    <span className="section-eyebrow">Derived identity model</span>
+                    <h3>Identity confidence</h3>
+                    <p>
                       OIP signals are probabilistic interpretations built above the evidence layer. They are not the same as verified Trust Protocol reputation.
                     </p>
                   </div>
