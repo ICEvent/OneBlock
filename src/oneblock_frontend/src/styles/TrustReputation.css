@@ -106,6 +106,51 @@
   font-size: 1.05rem;
 }
 
+.trust-context-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.trust-context {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 13px 14px;
+}
+
+.trust-context-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.trust-context-heading strong {
+  color: #0f172a;
+  font-size: 0.82rem;
+}
+
+.trust-context-heading span {
+  color: #94a3b8;
+  font-size: 0.7rem;
+}
+
+.trust-context-dimensions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.trust-context-dimensions > span {
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  padding: 5px 8px;
+  font-size: 0.72rem;
+}
+
 .trust-review-list {
   display: grid;
   gap: 10px;
