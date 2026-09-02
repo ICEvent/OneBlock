@@ -96,7 +96,11 @@ export default function TrustReputation({ subject, agent, compact = false, showP
           showPrivateStats ? service.getActorTrustStats(subject).catch(() => undefined) : Promise.resolve(undefined),
         ]);
         if (!active) return;
-        setReviews(reviewViews.filter((view) => view.revealed).map((view) => view.review));
+        const revealedReviews = reviewViews
+          .filter((view) => view.revealed)
+          .map((view) => view.review)
+          .sort((a, b) => a.createdAt === b.createdAt ? 0 : a.createdAt > b.createdAt ? -1 : 1);
+        setReviews(revealedReviews);
         setPrivateStats(stats);
       } catch (error) {
         console.warn('Unable to load Trust Protocol reputation', error);
@@ -207,6 +211,7 @@ export default function TrustReputation({ subject, agent, compact = false, showP
 
       {!compact && <div className="trust-footnote">
         Reputation stays contextual. OneBlock exposes provenance and verified evidence instead of collapsing different roles and interactions into one universal score.
+        {reviews.length > 6 && <span> Showing the 6 most recent of {reviews.length} revealed reviews.</span>}
       </div>}
     </section>
   );
