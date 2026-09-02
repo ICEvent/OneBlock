@@ -46,12 +46,12 @@ const BlockPage = () => {
           last_updated: typeof profileData.last_updated === 'bigint' ? Number(profileData.last_updated) : profileData.last_updated as number | undefined,
         });
 
-        const ownerText = typeof profileData.owner === 'object' && profileData.owner.toText
+        const ownerText = typeof profileData.owner === 'object' && profileData.owner?.toText
           ? profileData.owner.toText()
-          : String(profileData.owner);
+          : profileData.owner ? String(profileData.owner) : '';
         const [blocksData, scoreResult] = await Promise.all([
           oneblock.listBlocks(profileData.id),
-          oneblock.getScores(ownerText).catch(() => []),
+          ownerText ? oneblock.getScores(ownerText).catch(() => []) : Promise.resolve([]),
         ]);
         if (!active) return;
         setBlocks(blocksData as Block[]);
@@ -127,7 +127,7 @@ const BlockPage = () => {
           </div>
 
           <div className="block-sidebar">
-            <TrustReputation subject={profile.owner} agent={agent} compact />
+            {profile.owner && <TrustReputation subject={profile.owner} agent={agent} compact />}
 
             <div className="sidebar-section">
               <h3>Connected sources</h3>
