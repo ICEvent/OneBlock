@@ -1,113 +1,123 @@
-/* ── OIP shared layout ──────────────────────────────── */
+/* OIP shared layout */
 .oip-page {
-  max-width: 860px;
+  max-width: 900px;
   margin: 0 auto;
-  margin-top: var(--navbar-height);
-  padding: 24px 16px 48px;
+  padding: 28px 16px 52px;
 }
 
 .oip-hero {
-  background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 100%);
-  border: 1px solid #c7d2fe;
-  border-radius: 12px;
-  padding: 24px 28px;
-  margin-bottom: 28px;
+  background: radial-gradient(circle at top right, rgba(34, 211, 238, 0.18), transparent 38%), linear-gradient(135deg, #f8fbff, #f5f3ff);
+  border: 1px solid #dbeafe;
+  border-radius: 20px;
+  padding: 24px 26px;
+  margin-bottom: 20px;
   color: var(--text-primary);
 }
+
 .oip-hero h2 {
   margin: 0 0 6px;
-  font-size: 1.4rem;
+  font-size: 1.35rem;
   font-weight: 700;
-  color: var(--accent);
-}
-.oip-hero p {
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
+  color: var(--text-primary);
+  letter-spacing: -0.025em;
 }
 
-/* ── Steps (PolicyEval) ─────────────────────────────── */
+.oip-hero p {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
 .oip-steps {
   display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 8px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
 }
+
 .oip-step {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
-  background: var(--bg-card);
+  padding: 10px 12px;
+  background: #fff;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   flex: 1;
   min-width: 160px;
 }
+
 .oip-step-num {
   width: 26px;
   height: 26px;
-  border-radius: 50%;
-  background: rgba(79, 70, 229, 0.1);
-  color: var(--accent);
+  border-radius: 999px;
+  background: #ecfeff;
+  color: var(--accent-strong);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  font-weight: 800;
   flex-shrink: 0;
 }
+
 .oip-step span {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
 }
 
-/* ── Form card ──────────────────────────────────────── */
 .oip-card {
-  background: var(--bg-card);
+  background: rgba(255, 255, 255, 0.97);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 18px;
   padding: 22px 24px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-card);
 }
 
 .oip-field {
   margin-bottom: 16px;
 }
+
 .oip-field label {
   display: block;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 5px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.oip-field .oip-hint {
   font-size: 0.75rem;
+  font-weight: 750;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.oip-field .oip-hint {
+  font-size: 0.72rem;
   color: var(--text-muted);
   margin-bottom: 5px;
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
 }
+
 .oip-field input,
 .oip-field select {
   width: 100%;
+  min-height: 42px;
   padding: 9px 12px;
   background: var(--bg-input);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: 1px solid #dbe4f0;
+  border-radius: 10px;
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   outline: none;
   box-sizing: border-box;
-  transition: border-color 0.2s;
+  transition: border-color 0.16s, box-shadow 0.16s;
 }
+
 .oip-field input:focus,
 .oip-field select:focus {
-  border-color: var(--border-accent);
+  border-color: #67e8f9;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.11);
 }
 
 .oip-field-row {
@@ -116,39 +126,45 @@
   gap: 14px;
 }
 
-/* ── Buttons ─────────────────────────────────────────── */
 .oip-btn {
-  padding: 10px 22px;
-  background: transparent;
-  color: var(--accent);
-  border: 1px solid rgba(79, 70, 229, 0.35);
-  border-radius: 7px;
-  font-size: 0.88rem;
-  font-weight: 600;
+  padding: 9px 16px;
+  background: #fff;
+  color: var(--accent-strong);
+  border: 1px solid #a5f3fc;
+  border-radius: 9px;
+  font-size: 0.82rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.16s, border-color 0.16s, color 0.16s;
   white-space: nowrap;
 }
+
 .oip-btn:hover:not(:disabled) {
-  background: rgba(79, 70, 229, 0.08);
-  color: var(--accent);
+  background: #ecfeff;
+  border-color: #67e8f9;
+  color: #164e63;
 }
+
 .oip-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
 .oip-btn-primary {
-  background: var(--accent-gradient);
+  background: var(--accent);
   color: #fff;
-  border-color: transparent;
+  border-color: var(--accent);
 }
+
 .oip-btn-primary:hover:not(:disabled) {
-  opacity: 0.92;
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
   color: #fff;
 }
+
 .oip-btn-sm {
-  padding: 6px 14px;
-  font-size: 0.8rem;
+  padding: 6px 12px;
+  font-size: 0.76rem;
 }
 
 .oip-btn-group {
@@ -158,189 +174,211 @@
   margin-top: 4px;
 }
 
-/* ── Tabs ────────────────────────────────────────────── */
 .oip-tabs {
   display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 20px;
+  gap: 6px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
 }
+
 .oip-tab {
-  padding: 8px 18px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: 7px 7px 0 0;
+  padding: 7px 13px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 999px;
   color: var(--text-muted);
-  font-size: 0.85rem;
-  font-weight: 500;
+  font-size: 0.8rem;
+  font-weight: 650;
   cursor: pointer;
-  transition: color 0.2s, background 0.2s;
+  transition: color 0.16s, background 0.16s, border-color 0.16s;
 }
+
 .oip-tab:hover {
-  color: var(--text-secondary);
-  background: var(--bg-card-hover);
+  color: var(--accent-strong);
+  background: #ecfeff;
+  border-color: #a5f3fc;
 }
+
 .oip-tab.active {
-  background: var(--bg-card);
-  border-color: var(--border);
-  color: var(--accent);
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #fff;
   font-weight: 700;
 }
 
-/* ── Tab guide banner ────────────────────────────────── */
 .oip-guide {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  font-size: 0.82rem;
-  color: var(--text-secondary);
+  background: #ecfeff;
+  border: 1px solid #a5f3fc;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 0.78rem;
+  color: #155e75;
   line-height: 1.5;
 }
+
 .oip-guide-icon {
-  font-size: 1.1rem;
+  font-size: 1rem;
   flex-shrink: 0;
   margin-top: 1px;
 }
 
-/* ── Output terminal ─────────────────────────────────── */
 .oip-output {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
   padding: 16px;
   min-height: 200px;
   max-height: 400px;
   overflow-y: auto;
   font-family: 'Fira Code', 'Courier New', monospace;
-  font-size: 0.8rem;
-  color: var(--text-primary);
+  font-size: 0.78rem;
+  color: #e2e8f0;
   white-space: pre-wrap;
   word-break: break-word;
 }
+
 .oip-output-label {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   margin-bottom: 6px;
 }
+
 .oip-output.is-error {
-  color: #ff7070;
+  color: #fca5a5;
 }
 
-/* ── Result card (PolicyEval) ───────────────────────── */
 .oip-result {
-  border-radius: 10px;
+  border-radius: 14px;
   border: 1px solid var(--border);
   overflow: hidden;
 }
+
 .oip-result-banner {
-  padding: 14px 20px;
-  font-size: 1rem;
+  padding: 13px 18px;
+  font-size: 0.92rem;
   font-weight: 700;
   display: flex;
   align-items: center;
   gap: 10px;
 }
+
 .oip-result-banner.pass {
   background: #ecfdf5;
   color: #047857;
   border-bottom: 1px solid #a7f3d0;
 }
+
 .oip-result-banner.fail {
   background: #fef2f2;
   color: #b91c1c;
   border-bottom: 1px solid #fecaca;
 }
+
 .oip-result-body {
   background: var(--bg-card);
-  padding: 16px 20px;
+  padding: 16px 18px;
 }
 
-/* ── Score bars (ScoresOIP) ──────────────────────────── */
 .oip-scores {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 13px;
 }
+
 .oip-score-row {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
+
 .oip-score-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
 }
+
 .oip-score-label {
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 700;
   color: var(--text-secondary);
 }
+
 .oip-score-pct {
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 0.78rem;
+  font-weight: 750;
   color: var(--text-primary);
 }
+
 .oip-score-desc {
-  font-size: 0.73rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
   margin-bottom: 2px;
 }
+
 .oip-bar-track {
-  height: 7px;
+  height: 6px;
   background: #e2e8f0;
-  border-radius: 4px;
+  border-radius: 999px;
   overflow: hidden;
 }
+
 .oip-bar-fill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: 999px;
   transition: width 0.6s ease;
 }
-.oip-bar-fill.green  { background: linear-gradient(90deg, #16a34a, #4ade80); }
-.oip-bar-fill.yellow { background: linear-gradient(90deg, #ca8a04, #fde047); }
-.oip-bar-fill.red    { background: linear-gradient(90deg, #b91c1c, #f87171); }
-.oip-bar-fill.blue   { background: linear-gradient(90deg, #1d4ed8, #60a5fa); }
-.oip-bar-fill.purple { background: linear-gradient(90deg, #7c3aed, #c084fc); }
+
+.oip-bar-fill.green  { background: #10b981; }
+.oip-bar-fill.yellow { background: #f59e0b; }
+.oip-bar-fill.red    { background: #ef4444; }
+.oip-bar-fill.blue   { background: #0ea5e9; }
+.oip-bar-fill.purple { background: #0891b2; }
 
 .oip-scores-empty {
   text-align: center;
-  padding: 32px 0;
+  padding: 28px 0;
   color: var(--text-muted);
 }
-.oip-scores-empty .oip-empty-icon { font-size: 2rem; }
-.oip-scores-empty p { margin: 8px 0 0; font-size: 0.85rem; }
+
+.oip-scores-empty .oip-empty-icon {
+  font-size: 1.7rem;
+  filter: grayscale(0.2);
+}
+
+.oip-scores-empty p {
+  margin: 7px 0 0;
+  font-size: 0.8rem;
+}
 
 .oip-model-tag {
-  font-size: 0.72rem;
-  color: var(--text-muted);
+  font-size: 0.68rem;
+  color: var(--text-subtle);
   margin-top: 10px;
   text-align: right;
 }
 
-/* ── Error / notice ──────────────────────────────────── */
 .oip-error {
-  padding: 10px 14px;
+  padding: 10px 13px;
   background: #fef2f2;
   border: 1px solid #fecaca;
-  border-radius: 7px;
+  border-radius: 10px;
   color: #b91c1c;
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   margin-top: 12px;
 }
 
-/* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 600px) {
+  .oip-page { padding-top: 16px; }
+  .oip-hero { padding: 18px; }
+  .oip-card { padding: 18px; }
   .oip-field-row { grid-template-columns: 1fr; }
-  .oip-tabs { gap: 2px; }
-  .oip-tab { padding: 7px 12px; font-size: 0.8rem; }
+  .oip-tabs { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
+  .oip-tab { flex: 0 0 auto; }
 }
