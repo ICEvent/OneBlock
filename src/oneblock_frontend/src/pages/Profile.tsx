@@ -9,6 +9,7 @@ import ProfileSidebar from "../components/ProfileSidebar";
 import ScoresOIP from "../components/ScoresOIP";
 import TrustReputation from "../components/TrustReputation";
 import "../styles/Profile.css";
+import "../styles/PageShell.css";
 
 const ProfilePage = () => {
   const oneblock = useOneblock();
@@ -86,37 +87,39 @@ const ProfilePage = () => {
   return (
     <>
       <Navbar />
-      {loading ? (
-        <ProfilePlaceholder />
-      ) : !profile ? (
-        <ProfileNotFound />
-      ) : (
-        <ProfileLayout
-          sidebar={<ProfileSidebar profile={profile} tags={[]} />}
-          main={
-            <div style={{ display: 'grid', gap: '20px' }}>
-              {profile.owner && (
-                <TrustReputation
-                  subject={profile.owner}
-                  agent={agent}
-                  showPrivateStats={isOwnProfile}
-                />
-              )}
+      <div className="page-with-navbar">
+        {loading ? (
+          <ProfilePlaceholder />
+        ) : !profile ? (
+          <ProfileNotFound />
+        ) : (
+          <ProfileLayout
+            sidebar={<ProfileSidebar profile={profile} tags={[]} />}
+            main={
+              <div style={{ display: 'grid', gap: '20px' }}>
+                {profile.owner && (
+                  <TrustReputation
+                    subject={profile.owner}
+                    agent={agent}
+                    showPrivateStats={isOwnProfile}
+                  />
+                )}
 
-              <section style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '20px' }}>
-                <div style={{ marginBottom: '14px' }}>
-                  <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Derived identity model</span>
-                  <h3 style={{ margin: '4px 0 6px', color: '#0f172a' }}>Identity confidence</h3>
-                  <p style={{ margin: 0, color: '#64748b', fontSize: '0.86rem', lineHeight: 1.5 }}>
-                    OIP signals are probabilistic interpretations built above the evidence layer. They are not the same as verified Trust Protocol reputation.
-                  </p>
-                </div>
-                <ScoresOIP scores={scores} />
-              </section>
-            </div>
-          }
-        />
-      )}
+                <section style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '20px' }}>
+                  <div style={{ marginBottom: '14px' }}>
+                    <span style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Derived identity model</span>
+                    <h3 style={{ margin: '4px 0 6px', color: '#0f172a' }}>Identity confidence</h3>
+                    <p style={{ margin: 0, color: '#64748b', fontSize: '0.86rem', lineHeight: 1.5 }}>
+                      OIP signals are probabilistic interpretations built above the evidence layer. They are not the same as verified Trust Protocol reputation.
+                    </p>
+                  </div>
+                  <ScoresOIP scores={scores} />
+                </section>
+              </div>
+            }
+          />
+        )}
+      </div>
     </>
   );
 };
