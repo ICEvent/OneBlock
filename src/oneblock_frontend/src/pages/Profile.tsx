@@ -44,7 +44,7 @@ const ProfilePage = () => {
         const ownerText = typeof profileData.owner === 'object' && profileData.owner.toText
           ? profileData.owner.toText()
           : String(profileData.owner);
-        const [scoreData] = await oneblock.getScores(ownerText);
+        const [scoreData] = await oneblock.getScores(ownerText).catch(() => []);
         if (active && scoreData) setScores(scoreData);
       } catch (error) {
         console.error('Error loading profile', error);
