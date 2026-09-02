@@ -1,39 +1,39 @@
 .home {
-  margin-top: var(--navbar-height);
-  background: var(--bg-primary);
+  background: transparent;
 }
 
 .home-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-  max-width: 1200px;
-  margin: 2rem auto;
-  padding: 0 1.5rem;
+  gap: 18px;
+  width: min(var(--content-max), calc(100% - 32px));
+  margin: 28px auto 48px;
 }
 
 .profile-column,
 .stats-column {
-  background: var(--bg-card);
+  background: rgba(255, 255, 255, 0.97);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 2rem;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: var(--shadow-card);
 }
 
 .profile-card h2 {
-  margin-bottom: 1rem;
-  font-size: 1.75rem;
+  margin-bottom: 12px;
+  font-size: 1.55rem;
   color: var(--text-primary);
+  letter-spacing: -0.03em;
 }
 
 .intro {
-  color: var(--text-secondary);
-  margin-bottom: 2rem;
+  color: var(--text-muted);
+  margin-bottom: 20px;
 }
 
 .links-section,
 .tags-section {
-  margin-top: 2rem;
+  margin-top: 20px;
 }
 
 .links-section ul {
@@ -42,7 +42,7 @@
 }
 
 .links-section li {
-  margin: 0.5rem 0;
+  margin: 4px 0;
 }
 
 .links-section a {
@@ -51,50 +51,52 @@
 }
 
 .links-section a:hover {
+  color: var(--accent-strong);
   text-decoration: underline;
 }
 
 .tags-container {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 6px;
 }
 
 .tag {
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.2);
-  color: #4338ca;
-  padding: 0.3rem 0.8rem;
-  border-radius: 100px;
-  font-size: 0.85rem;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 650;
 }
 
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
-  margin-top: 1rem;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .stat-item {
   text-align: center;
-  padding: 1.25rem;
-  background: var(--bg-secondary);
+  padding: 14px;
+  background: #f8fafc;
   border: 1px solid var(--border);
   border-radius: 12px;
 }
 
 .stat-item h4 {
   color: var(--text-muted);
-  margin-bottom: 0.5rem;
-  font-size: 0.8rem;
+  margin: 0 0 4px;
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.75px;
+  letter-spacing: 0.08em;
 }
 
 .stat-item p {
-  font-size: 1.75rem;
-  font-weight: 700;
+  font-size: 1.45rem;
+  font-weight: 750;
   color: var(--text-primary);
   margin: 0;
 }
@@ -102,5 +104,7 @@
 @media (max-width: 768px) {
   .home-container {
     grid-template-columns: 1fr;
+    width: min(100% - 24px, var(--content-max));
+    margin-top: 16px;
   }
 }
