@@ -8,6 +8,7 @@ import TrustReputation from '../components/TrustReputation';
 import { Block } from '../types/block';
 import ScoresOIP from '../components/ScoresOIP';
 import '../styles/Block.css';
+import '../styles/PageShell.css';
 
 const BlockPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -72,7 +73,7 @@ const BlockPage = () => {
     return (
       <>
         <Navbar />
-        <div className="block-page loading">
+        <div className="block-page page-with-navbar loading">
           <div className="loading-spinner">
             <span className="material-icons">hourglass_empty</span>
             <p>Loading profile chain…</p>
@@ -86,7 +87,7 @@ const BlockPage = () => {
     return (
       <>
         <Navbar />
-        <div className="block-page not-found">
+        <div className="block-page page-with-navbar not-found">
           <span className="material-icons">person_off</span>
           <h2>Profile not found</h2>
           <p>This profile does not exist or is no longer available.</p>
@@ -99,7 +100,7 @@ const BlockPage = () => {
   return (
     <>
       <Navbar />
-      <div className="block-page">
+      <div className="block-page page-with-navbar">
         <div className="block-page-header">
           <div className="header-content">
             <div className="profile-info-compact">
