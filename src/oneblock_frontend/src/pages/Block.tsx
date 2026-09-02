@@ -51,7 +51,7 @@ const BlockPage = () => {
           : String(profileData.owner);
         const [blocksData, scoreResult] = await Promise.all([
           oneblock.listBlocks(profileData.id),
-          oneblock.getScores(ownerText),
+          oneblock.getScores(ownerText).catch(() => []),
         ]);
         if (!active) return;
         setBlocks(blocksData as Block[]);
