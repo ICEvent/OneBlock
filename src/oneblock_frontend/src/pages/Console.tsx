@@ -1,87 +1,100 @@
 import React, { useEffect, useState } from "react";
-import { Profile, Link } from "../api/profile/service.did.d";
-import { Canister } from "../types/canister";
+import { Profile } from "../api/profile/service.did.d";
 import { useNavigate } from 'react-router-dom';
 
 import '../styles/Console.css';
-import { ProfilePanel } from "../components/console/ProfilePanel";
 import { LinksPanel } from "../components/console/LinksPanel";
 import { BlocksPanel } from "../components/console/BlocksPanel";
-
 import { ProfileForm } from "../components/ProfileForm";
-
 import Navbar from "../components/Navbar";
 import { useOneblock, useGlobalContext } from "../components/Store";
 
+type PanelKey = 'profile' | 'links' | 'blocks';
+
+const panels: Array<{ key: PanelKey; label: string; icon: string; note: string }> = [
+  { key: 'profile', label: 'Profile', icon: 'person', note: 'Public identity' },
+  { key: 'links', label: 'Sources', icon: 'link', note: 'Connected presence' },
+  { key: 'blocks', label: 'Blocks', icon: 'view_timeline', note: 'Evidence & narrative' },
+];
 
 const Console = () => {
   const oneblock = useOneblock();
-  const [activePanel, setActivePanel] = useState('profile');
+  const [activePanel, setActivePanel] = useState<PanelKey>('profile');
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const { state: { isAuthed } } = useGlobalContext();
 
   useEffect(() => {
-    if (isAuthed) {
-      loadProfile();
-    }else{
+    if (!isAuthed) {
       navigate('/');
+      return;
     }
-  }, [isAuthed])
+    void loadProfile();
+  }, [isAuthed]);
 
   const loadProfile = async () => {
     const [profileData] = await oneblock.getMyProfile();
-    if (profileData) {
-      setProfile(profileData);
-    }
-  }
-
+    setProfile(profileData || null);
+  };
 
   const renderPanel = () => {
     switch (activePanel) {
       case 'profile':
         return <ProfileForm profile={profile} />;
       case 'links':
-        return <LinksPanel profile={profile} onLinkChange={loadProfile}  />;
+        return <LinksPanel profile={profile} onLinkChange={loadProfile} />;
       case 'blocks':
         return <BlocksPanel />;
-      
       default:
-        return <ProfilePanel />;
+        return null;
     }
   };
 
   return (
-    <div>
+    <div className="console-page">
       <Navbar />
-      <div className="console-layout">
-        <nav className="console-menu">
-          <div
-            className={`menu-item ${activePanel === 'profile' ? 'active' : ''}`}
-            onClick={() => setActivePanel('profile')}
-          >
-            <span className="material-icons">person</span>
-            Profile
+      <div className="console-shell">
+        <header className="console-hero ecosystem-hero">
+          <div className="console-hero-copy">
+            <span className="section-eyebrow">OneBlock workspace</span>
+            <h1>Identity workspace</h1>
+            <p>
+              Curate your public identity, connect source profiles, and add provenance-bearing life blocks from one operating context.
+            </p>
           </div>
-          <div
-            className={`menu-item ${activePanel === 'links' ? 'active' : ''}`}
-            onClick={() => setActivePanel('links')}
-          > <span className="material-icons">link</span>
-            Links
+          <div className="console-context" aria-label="Current profile">
+            <span>Current profile</span>
+            <strong>{profile?.name || profile?.id || 'Not created yet'}</strong>
+            <small>{profile ? 'Owner-controlled public record' : 'Create a profile to start your chain'}</small>
           </div>
-          <div
-            className={`menu-item ${activePanel === 'blocks' ? 'active' : ''}`}
-            onClick={() => setActivePanel('blocks')}
-          >
-            <span className="material-icons">view_timeline</span>
-            Blocks
-          </div>
-          
-        </nav>
+        </header>
 
-        <main className="console-panel">
-          {renderPanel()}
-        </main>
+        <div className="console-layout">
+          <nav className="console-menu ecosystem-panel" aria-label="Identity workspace sections">
+            {panels.map((panel) => {
+              const active = activePanel === panel.key;
+              return (
+                <button
+                  key={panel.key}
+                  type="button"
+                  className={`menu-item ${active ? 'active' : ''}`}
+                  aria-pressed={active}
+                  onClick={() => setActivePanel(panel.key)}
+                >
+                  <span className="material-icons" aria-hidden="true">{panel.icon}</span>
+                  <span className="menu-item-copy">
+                    <strong>{panel.label}</strong>
+                    <small>{panel.note}</small>
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <main className="console-panel ecosystem-panel">
+            {renderPanel()}
+          </main>
+        </div>
       </div>
     </div>
   );
