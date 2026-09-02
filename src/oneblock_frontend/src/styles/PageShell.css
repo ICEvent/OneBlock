@@ -1,10 +1,3 @@
 .page-with-navbar {
-  padding-top: var(--navbar-height);
   box-sizing: border-box;
-}
-
-@media (max-width: 768px) {
-  .page-with-navbar {
-    padding-top: 0;
-  }
 }
