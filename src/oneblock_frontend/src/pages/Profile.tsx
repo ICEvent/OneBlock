@@ -41,10 +41,10 @@ const ProfilePage = () => {
         } as Profile;
         setProfile(nextProfile);
 
-        const ownerText = typeof profileData.owner === 'object' && profileData.owner.toText
+        const ownerText = profileData.owner && typeof profileData.owner === 'object' && profileData.owner.toText
           ? profileData.owner.toText()
-          : String(profileData.owner);
-        const [scoreData] = await oneblock.getScores(ownerText).catch(() => []);
+          : profileData.owner ? String(profileData.owner) : '';
+        const [scoreData] = ownerText ? await oneblock.getScores(ownerText).catch(() => []) : [];
         if (active && scoreData) setScores(scoreData);
       } catch (error) {
         console.error('Error loading profile', error);
@@ -95,11 +95,13 @@ const ProfilePage = () => {
           sidebar={<ProfileSidebar profile={profile} tags={[]} />}
           main={
             <div style={{ display: 'grid', gap: '20px' }}>
-              <TrustReputation
-                subject={profile.owner}
-                agent={agent}
-                showPrivateStats={isOwnProfile}
-              />
+              {profile.owner && (
+                <TrustReputation
+                  subject={profile.owner}
+                  agent={agent}
+                  showPrivateStats={isOwnProfile}
+                />
+              )}
 
               <section style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '18px', padding: '20px' }}>
                 <div style={{ marginBottom: '14px' }}>
