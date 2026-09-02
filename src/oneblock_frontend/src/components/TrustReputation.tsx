@@ -32,11 +32,20 @@ const shortPrincipal = (value: Principal) => {
   return text.length <= 16 ? text : `${text.slice(0, 7)}…${text.slice(-5)}`;
 };
 
-const reviewDate = (seconds: bigint) => {
-  const millis = Number(seconds) * 1000;
-  return Number.isFinite(millis)
-    ? new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(millis))
-    : '';
+const toEpochMillis = (value: bigint) => {
+  const magnitude = value < 0n ? -value : value;
+  if (magnitude >= 100_000_000_000_000_000n) return Number(value / 1_000_000n); // nanoseconds
+  if (magnitude >= 100_000_000_000_000n) return Number(value / 1_000n); // microseconds
+  if (magnitude >= 100_000_000_000n) return Number(value); // milliseconds
+  return Number(value * 1_000n); // seconds (current Trust Protocol API)
+};
+
+const reviewDate = (timestamp: bigint) => {
+  const millis = toEpochMillis(timestamp);
+  if (!Number.isFinite(millis)) return '';
+  const date = new Date(millis);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
 };
 
 const schemaLabel = (schemaId: string) => {
