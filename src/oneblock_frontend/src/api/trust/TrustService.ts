@@ -1,4 +1,4 @@
-import { Actor, type ActorSubclass, type HttpAgent } from '@dfinity/agent';
+import { Actor, type ActorMethod, type ActorSubclass, type HttpAgent } from '@dfinity/agent';
 import { Principal } from '@dfinity/principal';
 
 const RAM_CANISTER_ID = 'pxu6k-jaaaa-aaaap-aaamq-cai';
@@ -61,8 +61,8 @@ export type ActorTrustStats = {
 };
 
 type TrustActor = {
-  getVerifiedReviews: (subject: Principal) => Promise<ReviewViewCandid[]>;
-  getActorTrustStats: (subject: Principal) => Promise<CandidOptional<ActorStatsCandid>>;
+  getVerifiedReviews: ActorMethod<[Principal], ReviewViewCandid[]>;
+  getActorTrustStats: ActorMethod<[Principal], CandidOptional<ActorStatsCandid>>;
 };
 
 const trustIdlFactory = ({ IDL }: { IDL: any }) => {
