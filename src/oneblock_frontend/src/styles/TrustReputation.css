@@ -129,6 +129,7 @@
 .trust-context-heading strong {
   color: #0f172a;
   font-size: 0.82rem;
+  overflow-wrap: anywhere;
 }
 
 .trust-context-heading span {
@@ -176,6 +177,7 @@
 .trust-review-schema {
   color: #334155;
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .trust-review-scores {
