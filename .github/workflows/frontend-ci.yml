@@ -1,0 +1,42 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'src/oneblock_frontend/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/frontend-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/oneblock_frontend/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc -p src/oneblock_frontend/tsconfig.json --noEmit
+
+      - name: Build frontend
+        working-directory: src/oneblock_frontend
+        run: npx vite build
