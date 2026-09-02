@@ -17,6 +17,12 @@ type DimensionSummary = {
   count: number;
 };
 
+type ContextSummary = {
+  schemaId: string;
+  reviews: VerifiedReview[];
+  dimensions: DimensionSummary[];
+};
+
 const titleCase = (value: string) => value
   .replace(/[._-]+/g, ' ')
   .replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -63,6 +69,14 @@ function summarizeDimensions(reviews: VerifiedReview[]): DimensionSummary[] {
     });
 }
 
+function summarizeContexts(reviews: VerifiedReview[]): ContextSummary[] {
+  const grouped = new Map<string, VerifiedReview[]>();
+  reviews.forEach((review) => grouped.set(review.schemaId, [...(grouped.get(review.schemaId) || []), review]));
+  return [...grouped.entries()]
+    .map(([schemaId, contextReviews]) => ({ schemaId, reviews: contextReviews, dimensions: summarizeDimensions(contextReviews) }))
+    .sort((a, b) => b.reviews.length - a.reviews.length || a.schemaId.localeCompare(b.schemaId));
+}
+
 export default function TrustReputation({ subject, agent, compact = false, showPrivateStats = false }: Props) {
   const service = useMemo(() => new TrustService(agent), [agent]);
   const [loading, setLoading] = useState(true);
@@ -100,8 +114,7 @@ export default function TrustReputation({ subject, agent, compact = false, showP
     return () => { active = false; };
   }, [service, subject, showPrivateStats]);
 
-  const dimensions = useMemo(() => summarizeDimensions(reviews), [reviews]);
-  const overall = dimensions.find((dimension) => dimension.key === 'overall');
+  const contexts = useMemo(() => summarizeContexts(reviews), [reviews]);
 
   if (loading) {
     return <section className={`trust-card ${compact ? 'trust-card-compact' : ''}`} aria-busy="true">
@@ -132,8 +145,8 @@ export default function TrustReputation({ subject, agent, compact = false, showP
           <span>Revealed reviews</span>
         </div>
         <div className="trust-summary-item">
-          <strong>{overall ? `${overall.average.toFixed(1)} / 5` : '—'}</strong>
-          <span>Average overall</span>
+          <strong>{contexts.length}</strong>
+          <span>Reputation contexts</span>
         </div>
         {privateStats && !compact && <>
           <div className="trust-summary-item private">
@@ -156,12 +169,18 @@ export default function TrustReputation({ subject, agent, compact = false, showP
         </div>
       ) : (
         <>
-          {!compact && dimensions.length > 0 && <div className="trust-dimensions" aria-label="Verified review dimensions">
-            {dimensions.slice(0, 6).map((dimension) => (
-              <div className="trust-dimension" key={dimension.key}>
-                <span>{titleCase(dimension.key)}</span>
-                <strong>{dimension.average.toFixed(1)}</strong>
-                <small>{dimension.count} review{dimension.count === 1 ? '' : 's'}</small>
+          {!compact && <div className="trust-context-list" aria-label="Reputation contexts">
+            {contexts.slice(0, 6).map((context) => (
+              <div className="trust-context" key={context.schemaId}>
+                <div className="trust-context-heading">
+                  <strong>{schemaLabel(context.schemaId)}</strong>
+                  <span>{context.reviews.length} review{context.reviews.length === 1 ? '' : 's'}</span>
+                </div>
+                <div className="trust-context-dimensions">
+                  {context.dimensions.slice(0, 5).map((dimension) => (
+                    <span key={dimension.key}>{titleCase(dimension.key)} <strong>{dimension.average.toFixed(1)}/5</strong></span>
+                  ))}
+                </div>
               </div>
             ))}
           </div>}
@@ -187,7 +206,7 @@ export default function TrustReputation({ subject, agent, compact = false, showP
       )}
 
       {!compact && <div className="trust-footnote">
-        OneBlock shows provenance and verified evidence rather than collapsing identity into one universal reputation score.
+        Reputation stays contextual. OneBlock exposes provenance and verified evidence instead of collapsing different roles and interactions into one universal score.
       </div>}
     </section>
   );
