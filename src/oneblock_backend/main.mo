@@ -551,14 +551,14 @@ persistent actor {
                                 };
                                 for ((oldSummaryKey, summary) in Iter.toArray(derivedSummaries.entries()).vals()) {
                                     if (summary.profile_id == oid) {
-                                        let newSummaryKey = nid # ":" # summary.app_id # ":" # summary.activity_type;
+                                        let newSummaryKey = summaryKey(nid, summary.app_id, summary.activity_type);
                                         derivedSummaries.put(newSummaryKey, { summary with profile_id = nid });
                                         ignore derivedSummaries.remove(oldSummaryKey);
                                     }
                                 };
                                 for ((oldSummaryKey, summary) in Iter.toArray(publicDerivedSummaries.entries()).vals()) {
                                     if (summary.profile_id == oid) {
-                                        let newSummaryKey = nid # ":" # summary.app_id # ":" # summary.activity_type;
+                                        let newSummaryKey = summaryKey(nid, summary.app_id, summary.activity_type);
                                         publicDerivedSummaries.put(newSummaryKey, { summary with profile_id = nid });
                                         ignore publicDerivedSummaries.remove(oldSummaryKey);
                                     }
