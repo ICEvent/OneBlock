@@ -1,0 +1,33 @@
+name: Backend CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'src/oneblock_backend/**'
+      - 'dfx.json'
+      - '.github/workflows/backend-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/oneblock_backend/**'
+      - 'dfx.json'
+      - '.github/workflows/backend-ci.yml'
+
+jobs:
+  motoko:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dfx
+        uses: dfinity/setup-dfx@main
+
+      - name: Show dfx version
+        run: dfx --version
+
+      - name: Check profile canister
+        run: dfx build --check profile
