@@ -1,0 +1,130 @@
+name: Apply PR17 Incarnation Attribution Fix
+
+on:
+  push:
+    branches:
+      - fix/evidence-visibility-boundaries
+    paths:
+      - '.github/workflows/apply-pr17-incarnation-attribution-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/evidence-visibility-boundaries
+          fetch-depth: 0
+
+      - name: Apply reviewed lifecycle and reverse-attribution fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/oneblock_backend/main.mo')
+          text = path.read_text()
+
+          replacements = [
+              (
+                  "    var stableActivityConnectionEpochs : [(Text, Int)] = []; // recordId -> connection.created_at\n    var stableIdempotencyKeys : [(Text, Text)] = []; // idempotency_key -> record_id",
+                  "    var stableActivityConnectionEpochs : [(Text, Int)] = []; // recordId -> connection.created_at\n    var stableActivityCurrentProfiles : [(Text, Text)] = []; // recordId -> current profileId\n    var stableIdempotencyKeys : [(Text, Text)] = []; // idempotency_key -> record_id",
+              ),
+              (
+                  "    transient var activityConnectionEpochs = TrieMap.TrieMap<Text, Int>(Text.equal, Text.hash);\n    activityConnectionEpochs := TrieMap.fromEntries<Text, Int>(Iter.fromArray(stableActivityConnectionEpochs), Text.equal, Text.hash);\n\n    transient var idempotencyKeys",
+                  "    transient var activityConnectionEpochs = TrieMap.TrieMap<Text, Int>(Text.equal, Text.hash);\n    activityConnectionEpochs := TrieMap.fromEntries<Text, Int>(Iter.fromArray(stableActivityConnectionEpochs), Text.equal, Text.hash);\n\n    transient var activityCurrentProfiles = TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);\n    activityCurrentProfiles := TrieMap.fromEntries<Text, Text>(Iter.fromArray(stableActivityCurrentProfiles), Text.equal, Text.hash);\n\n    transient var idempotencyKeys",
+              ),
+              (
+                  "        stableActivityConnectionEpochs := Iter.toArray(activityConnectionEpochs.entries());\n        stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());",
+                  "        stableActivityConnectionEpochs := Iter.toArray(activityConnectionEpochs.entries());\n        stableActivityCurrentProfiles := Iter.toArray(activityCurrentProfiles.entries());\n        stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());",
+              ),
+              (
+                  "        stableActivityConnectionEpochs := [];\n        stableIdempotencyKeys := [];",
+                  "        stableActivityConnectionEpochs := [];\n        stableActivityCurrentProfiles := [];\n        stableIdempotencyKeys := [];",
+              ),
+          ]
+
+          for old, new in replacements:
+              if text.count(old) != 1:
+                  raise SystemExit(f'expected exactly one persistence block, found {text.count(old)} for {old[:80]!r}')
+              text = text.replace(old, new, 1)
+
+          create_marker = "    public shared ({ caller }) func createProfile(newProfile : Types.NewProfile) : async Result.Result<Nat, Text> {"
+          helper = """    // Public profile IDs are reusable identifiers. A newly claimed ID must not\n    // inherit integration/index/cache state left by an earlier incarnation.\n    private func purgeReusableProfileIntegrationState(profileId : ProfileId) {\n        ignore profileActivityIndex.remove(profileId);\n        for ((recordId, currentProfileId) in Iter.toArray(activityCurrentProfiles.entries()).vals()) {\n            if (currentProfileId == profileId) {\n                ignore activityCurrentProfiles.remove(recordId)\n            }\n        };\n        for ((connectionKeyToRemove, connection) in Iter.toArray(connections.entries()).vals()) {\n            if (connection.profile_id == profileId) {\n                ignore connections.remove(connectionKeyToRemove)\n            }\n        };\n        for ((summaryKeyToRemove, summary) in Iter.toArray(derivedSummaries.entries()).vals()) {\n            if (summary.profile_id == profileId) {\n                ignore derivedSummaries.remove(summaryKeyToRemove)\n            }\n        };\n        for ((summaryKeyToRemove, summary) in Iter.toArray(publicDerivedSummaries.entries()).vals()) {\n            if (summary.profile_id == profileId) {\n                ignore publicDerivedSummaries.remove(summaryKeyToRemove)\n            }\n        }\n    };\n\n"""
+          if text.count(create_marker) != 1:
+              raise SystemExit('createProfile marker missing or duplicated')
+          if 'private func purgeReusableProfileIntegrationState' in text:
+              raise SystemExit('purge helper already exists')
+          text = text.replace(create_marker, helper + create_marker, 1)
+
+          old_create_put = """                            } else {\n                                profiles.put(\n                                    newProfile.id,"""
+          new_create_put = """                            } else {\n                                // Claiming an unused public ID starts a new lifecycle. Purge any\n                                // orphaned state before exposing the new profile incarnation.\n                                purgeReusableProfileIntegrationState(newProfile.id);\n                                profiles.put(\n                                    newProfile.id,"""
+          if text.count(old_create_put) != 1:
+              raise SystemExit('createProfile insertion point missing or duplicated')
+          text = text.replace(old_create_put, new_create_put, 1)
+
+          old_destination_purge = """                                // A public profile ID is reusable. Purge any destination-only\n                                // integration state left behind by a legacy rename before moving\n                                // the current profile into that ID, then migrate only source state.\n                                ignore profileActivityIndex.remove(nid);\n                                for ((connectionKeyToRemove, connection) in Iter.toArray(connections.entries()).vals()) {\n                                    if (connection.profile_id == nid) {\n                                        ignore connections.remove(connectionKeyToRemove)\n                                    }\n                                };\n                                for ((summaryKeyToRemove, summary) in Iter.toArray(derivedSummaries.entries()).vals()) {\n                                    if (summary.profile_id == nid) {\n                                        ignore derivedSummaries.remove(summaryKeyToRemove)\n                                    }\n                                };\n                                for ((summaryKeyToRemove, summary) in Iter.toArray(publicDerivedSummaries.entries()).vals()) {\n                                    if (summary.profile_id == nid) {\n                                        ignore publicDerivedSummaries.remove(summaryKeyToRemove)\n                                    }\n                                };"""
+          new_destination_purge = """                                // A public profile ID is reusable. Purge any destination-only\n                                // state left by an earlier incarnation before moving source state.\n                                purgeReusableProfileIntegrationState(nid);"""
+          if text.count(old_destination_purge) != 1:
+              raise SystemExit('changeId destination purge block missing or duplicated')
+          text = text.replace(old_destination_purge, new_destination_purge, 1)
+
+          old_index_move = """                                    case (?recordIds) {\n                                        profileActivityIndex.put(nid, recordIds);\n                                        ignore profileActivityIndex.remove(oid);\n                                    };"""
+          new_index_move = """                                    case (?recordIds) {\n                                        profileActivityIndex.put(nid, recordIds);\n                                        for (recordId in recordIds.vals()) {\n                                            activityCurrentProfiles.put(recordId, nid)\n                                        };\n                                        ignore profileActivityIndex.remove(oid);\n                                    };"""
+          if text.count(old_index_move) != 1:
+              raise SystemExit('changeId activity index migration block missing or duplicated')
+          text = text.replace(old_index_move, new_index_move, 1)
+
+          old_submit_marker = """        activityRecordsMap.put(recordId, record);\n        activityConnectionEpochs.put(recordId, connection.created_at);\n        idempotencyKeys.put(idemKey, recordId);"""
+          new_submit_marker = """        activityRecordsMap.put(recordId, record);\n        activityConnectionEpochs.put(recordId, connection.created_at);\n        activityCurrentProfiles.put(recordId, newRecord.profile_id);\n        idempotencyKeys.put(idemKey, recordId);"""
+          if text.count(old_submit_marker) != 1:
+              raise SystemExit('submit attribution insertion point missing or duplicated')
+          text = text.replace(old_submit_marker, new_submit_marker, 1)
+
+          old_direct = """    // A direct public lookup has no enclosing profile context, so do not\n    // trust a reusable historical profile_id by itself. Return a global\n    // record only while that stored id still names the current indexed\n    // profile incarnation and the record carries explicit provenance.\n    private func canReadDirectGlobalActivityRecord(record : ActivityRecord) : Bool {\n        switch (profiles.get(record.profile_id)) {\n            case null { false };\n            case (?profile) {\n                activityIndexContains(record.profile_id, record.id) and\n                recordBelongsToProfileIncarnation(profile, record)\n            };\n        }\n    };"""
+          new_direct = """    // ActivityRecord.profile_id is historical and intentionally immutable.\n    // Resolve direct reads through the collision-safe reverse index that follows\n    // the current profile lifecycle across legitimate public-ID renames.\n    private func canReadDirectGlobalActivityRecord(record : ActivityRecord) : Bool {\n        switch (activityCurrentProfiles.get(record.id)) {\n            case null { false };\n            case (?currentProfileId) {\n                switch (profiles.get(currentProfileId)) {\n                    case null { false };\n                    case (?profile) {\n                        activityIndexContains(currentProfileId, record.id) and\n                        recordBelongsToProfileIncarnation(profile, record)\n                    };\n                }\n            };\n        }\n    };"""
+          if text.count(old_direct) != 1:
+              raise SystemExit('direct global helper block missing or duplicated')
+          text = text.replace(old_direct, new_direct, 1)
+
+          required = [
+              'stableActivityCurrentProfiles',
+              'private func purgeReusableProfileIntegrationState',
+              'purgeReusableProfileIntegrationState(newProfile.id)',
+              'purgeReusableProfileIntegrationState(nid)',
+              'activityCurrentProfiles.put(recordId, nid)',
+              'activityCurrentProfiles.put(recordId, newRecord.profile_id)',
+              'switch (activityCurrentProfiles.get(record.id))',
+          ]
+          for needle in required:
+              if needle not in text:
+                  raise SystemExit(f'missing required result: {needle}')
+          if 'switch (profiles.get(record.profile_id))' in text:
+              raise SystemExit('old direct lookup through historical profile_id remains')
+
+          path.write_text(text)
+          PY
+
+      - name: Self-review product diff before commit
+        run: |
+          git diff --check
+          test "$(git diff --name-only)" = "src/oneblock_backend/main.mo"
+          git diff -- src/oneblock_backend/main.mo
+          grep -q 'purgeReusableProfileIntegrationState(newProfile.id)' src/oneblock_backend/main.mo
+          grep -q 'activityCurrentProfiles.put(recordId, nid)' src/oneblock_backend/main.mo
+          grep -q 'switch (activityCurrentProfiles.get(record.id))' src/oneblock_backend/main.mo
+
+      - name: Remove helper workflow
+        run: rm .github/workflows/apply-pr17-incarnation-attribution-fix.yml
+
+      - name: Commit reviewed fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/oneblock_backend/main.mo .github/workflows/apply-pr17-incarnation-attribution-fix.yml
+          git diff --cached --check
+          test "$(git diff --cached --name-only | sort | tr '\n' ' ')" = ".github/workflows/apply-pr17-incarnation-attribution-fix.yml src/oneblock_backend/main.mo "
+          git commit -m 'fix: bind activity reads to current profile lifecycle'
+          git push origin HEAD:fix/evidence-visibility-boundaries
