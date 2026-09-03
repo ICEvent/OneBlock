@@ -518,7 +518,7 @@ persistent actor {
             if (summary.profile_id == profileId) {
                 ignore publicDerivedSummaries.remove(summaryKeyToRemove)
             }
-        }
+        };
         ignore orphanedProfileIntegrationState.remove(profileId)
     };
 
