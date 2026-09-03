@@ -72,6 +72,7 @@ persistent actor {
     var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]
     var stableDerivedSummaries : [(Text, DerivedSummary)] = [];
     var stablePublicDerivedSummaries : [(Text, DerivedSummary)] = [];
+    var summaryCachesMigratedV1 : Bool = false;
     var stableIdentityGraphs : [(Text, IdentityGraph)] = [];
     var stableContextPolicies : [(Text, ContextPolicy)] = [];
     var stableTrustEdges : [(Text, TrustEdge)] = [];
@@ -186,56 +187,83 @@ persistent actor {
         stableDerivedSummaries := [];
 
         // One-time compatibility migration for deployments created before the
-        // visibility-separated public summary cache existed. Future upgrades
-        // restore this cache directly from stablePublicDerivedSummaries.
-        if (Iter.size(publicDerivedSummaries.entries()) == 0) {
-            // TrieMap iteration order is not chronological. Sort legacy records so
-            // currency retains the earliest visible record's value deterministically.
-            let sortedActivityRecords = Array.sort<ActivityRecord>(
-                Iter.toArray(activityRecordsMap.vals()),
-                func(a : ActivityRecord, b : ActivityRecord) : Order.Order {
-                    if (a.ingest_timestamp < b.ingest_timestamp) { #less }
-                    else if (a.ingest_timestamp == b.ingest_timestamp) { #equal }
-                    else { #greater }
-                }
-            );
-            for (record in sortedActivityRecords.vals()) {
-                // Only attach legacy evidence to the current incarnation of an ID.
-                // Records that predate the current profile (or whose old ID is now
-                // orphaned after a rename) fail closed instead of transferring to a
-                // later claimant of the same reusable profile ID.
-                switch (profiles.get(record.profile_id)) {
-                    case (?profile) {
-                        if (record.visibility == #global and record.ingest_timestamp >= profile.createtime) {
-                            let key = record.profile_id # ":" # record.app_id # ":" # record.activity_type;
-                            let existing = publicDerivedSummaries.get(key);
-                            let (prevCount, prevTotal, prevCurrency) = switch (existing) {
-                                case null { (0, null, record.currency) };
-                                case (?summary) { (summary.record_count, summary.total_amount, summary.currency) };
-                            };
-                            let nextTotal : ?Float = switch (record.amount) {
-                                case null { prevTotal };
-                                case (?amount) {
-                                    switch (prevTotal) {
-                                        case null { ?amount };
-                                        case (?total) { ?(total + amount) };
+        // visibility-separated summary caches existed. Rebuild both owner/full
+        // and public/global caches from each current profile's append-only activity
+        // index. The index preserves submission order, so currency selection remains
+        // deterministic even when multiple records share an ingest timestamp.
+        if (not summaryCachesMigratedV1) {
+            derivedSummaries := TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
+            publicDerivedSummaries := TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
+
+            for ((profileId, profile) in profiles.entries()) {
+                switch (profileActivityIndex.get(profileId)) {
+                    case null {};
+                    case (?recordIds) {
+                        for (recordId in recordIds.vals()) {
+                            switch (activityRecordsMap.get(recordId)) {
+                                case null {};
+                                case (?record) {
+                                    // Fail closed across reusable profile IDs: only evidence
+                                    // created during the current profile incarnation is retained.
+                                    if (record.ingest_timestamp >= profile.createtime) {
+                                        let key = profileId # ":" # record.app_id # ":" # record.activity_type;
+                                        let existing = derivedSummaries.get(key);
+                                        let (prevCount, prevTotal, prevCurrency) = switch (existing) {
+                                            case null { (0, null, record.currency) };
+                                            case (?summary) { (summary.record_count, summary.total_amount, summary.currency) };
+                                        };
+                                        let nextTotal : ?Float = switch (record.amount) {
+                                            case null { prevTotal };
+                                            case (?amount) {
+                                                switch (prevTotal) {
+                                                    case null { ?amount };
+                                                    case (?total) { ?(total + amount) };
+                                                }
+                                            };
+                                        };
+                                        derivedSummaries.put(key, {
+                                            profile_id = profileId;
+                                            app_id = record.app_id;
+                                            activity_type = record.activity_type;
+                                            record_count = prevCount + 1;
+                                            total_amount = nextTotal;
+                                            currency = prevCurrency;
+                                            last_updated = record.ingest_timestamp;
+                                        });
+
+                                        if (record.visibility == #global) {
+                                            let publicExisting = publicDerivedSummaries.get(key);
+                                            let (publicPrevCount, publicPrevTotal, publicPrevCurrency) = switch (publicExisting) {
+                                                case null { (0, null, record.currency) };
+                                                case (?summary) { (summary.record_count, summary.total_amount, summary.currency) };
+                                            };
+                                            let publicNextTotal : ?Float = switch (record.amount) {
+                                                case null { publicPrevTotal };
+                                                case (?amount) {
+                                                    switch (publicPrevTotal) {
+                                                        case null { ?amount };
+                                                        case (?total) { ?(total + amount) };
+                                                    }
+                                                };
+                                            };
+                                            publicDerivedSummaries.put(key, {
+                                                profile_id = profileId;
+                                                app_id = record.app_id;
+                                                activity_type = record.activity_type;
+                                                record_count = publicPrevCount + 1;
+                                                total_amount = publicNextTotal;
+                                                currency = publicPrevCurrency;
+                                                last_updated = record.ingest_timestamp;
+                                            })
+                                        }
                                     }
                                 };
-                            };
-                            publicDerivedSummaries.put(key, {
-                                profile_id = record.profile_id;
-                                app_id = record.app_id;
-                                activity_type = record.activity_type;
-                                record_count = prevCount + 1;
-                                total_amount = nextTotal;
-                                currency = prevCurrency;
-                                last_updated = record.ingest_timestamp;
-                            })
+                            }
                         }
                     };
-                    case null {};
                 }
-            }
+            };
+            summaryCachesMigratedV1 := true
         };
         stablePublicDerivedSummaries := [];
         stableIdentityGraphs := [];
@@ -454,6 +482,24 @@ persistent actor {
                                         last_updated = Time.now()
                                     }
                                 );
+                                // A public profile ID is reusable. Purge any destination-only
+                                // integration state left behind by a legacy rename before moving
+                                // the current profile into that ID, then migrate only source state.
+                                ignore profileActivityIndex.remove(nid);
+                                for (app in integrationApps.vals()) {
+                                    ignore connections.remove(nid # ":" # app.id)
+                                };
+                                for ((summaryKeyToRemove, summary) in Iter.toArray(derivedSummaries.entries()).vals()) {
+                                    if (summary.profile_id == nid) {
+                                        ignore derivedSummaries.remove(summaryKeyToRemove)
+                                    }
+                                };
+                                for ((summaryKeyToRemove, summary) in Iter.toArray(publicDerivedSummaries.entries()).vals()) {
+                                    if (summary.profile_id == nid) {
+                                        ignore publicDerivedSummaries.remove(summaryKeyToRemove)
+                                    }
+                                };
+
                                 // Keep integration ownership/indexes attached to the profile when its public id changes.
                                 switch (profileActivityIndex.get(oid)) {
                                     case (?recordIds) {
