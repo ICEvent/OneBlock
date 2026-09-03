@@ -71,6 +71,7 @@ persistent actor {
     var stableIdempotencyKeys : [(Text, Text)] = []; // idempotency_key -> record_id
     var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]
     var stableDerivedSummaries : [(Text, DerivedSummary)] = [];
+    var stablePublicDerivedSummaries : [(Text, DerivedSummary)] = [];
     var stableIdentityGraphs : [(Text, IdentityGraph)] = [];
     var stableContextPolicies : [(Text, ContextPolicy)] = [];
     var stableTrustEdges : [(Text, TrustEdge)] = [];
@@ -131,6 +132,8 @@ persistent actor {
 
     transient var derivedSummaries = TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
     derivedSummaries := TrieMap.fromEntries<Text, DerivedSummary>(Iter.fromArray(stableDerivedSummaries), Text.equal, Text.hash);
+    transient var publicDerivedSummaries = TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
+    publicDerivedSummaries := TrieMap.fromEntries<Text, DerivedSummary>(Iter.fromArray(stablePublicDerivedSummaries), Text.equal, Text.hash);
     transient var identityGraphs = TrieMap.TrieMap<Text, IdentityGraph>(Text.equal, Text.hash);
     identityGraphs := TrieMap.fromEntries<Text, IdentityGraph>(Iter.fromArray(stableIdentityGraphs), Text.equal, Text.hash);
     transient var contextPolicies = TrieMap.TrieMap<Text, ContextPolicy>(Text.equal, Text.hash);
@@ -157,6 +160,7 @@ persistent actor {
         stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());
         stableProfileActivityIndex := Iter.toArray(profileActivityIndex.entries());
         stableDerivedSummaries := Iter.toArray(derivedSummaries.entries());
+        stablePublicDerivedSummaries := Iter.toArray(publicDerivedSummaries.entries());
         stableIdentityGraphs := Iter.toArray(identityGraphs.entries());
         stableContextPolicies := Iter.toArray(contextPolicies.entries());
         stableTrustEdges := Iter.toArray(trustEdges.entries());
@@ -180,6 +184,47 @@ persistent actor {
         stableIdempotencyKeys := [];
         stableProfileActivityIndex := [];
         stableDerivedSummaries := [];
+
+        // One-time compatibility migration for deployments created before the
+        // visibility-separated public summary cache existed. Future upgrades
+        // restore this cache directly from stablePublicDerivedSummaries.
+        if (Iter.size(publicDerivedSummaries.entries()) == 0) {
+            for (record in activityRecordsMap.vals()) {
+                if (record.visibility == #global) {
+                    let key = record.profile_id # ":" # record.app_id # ":" # record.activity_type;
+                    let existing = publicDerivedSummaries.get(key);
+                    let (prevCount, prevTotal, prevCurrency) = switch (existing) {
+                        case null { (0, null, record.currency) };
+                        case (?summary) { (summary.record_count, summary.total_amount, summary.currency) };
+                    };
+                    let nextTotal : ?Float = switch (record.amount) {
+                        case null { prevTotal };
+                        case (?amount) {
+                            switch (prevTotal) {
+                                case null { ?amount };
+                                case (?total) { ?(total + amount) };
+                            }
+                        };
+                    };
+                    let lastUpdated = switch (existing) {
+                        case null { record.ingest_timestamp };
+                        case (?summary) {
+                            if (record.ingest_timestamp > summary.last_updated) { record.ingest_timestamp } else { summary.last_updated }
+                        };
+                    };
+                    publicDerivedSummaries.put(key, {
+                        profile_id = record.profile_id;
+                        app_id = record.app_id;
+                        activity_type = record.activity_type;
+                        record_count = prevCount + 1;
+                        total_amount = nextTotal;
+                        currency = prevCurrency;
+                        last_updated = lastUpdated;
+                    })
+                }
+            }
+        };
+        stablePublicDerivedSummaries := [];
         stableIdentityGraphs := [];
         stableContextPolicies := [];
         stableTrustEdges := [];
@@ -420,6 +465,13 @@ persistent actor {
                                         let newSummaryKey = nid # ":" # summary.app_id # ":" # summary.activity_type;
                                         derivedSummaries.put(newSummaryKey, { summary with profile_id = nid });
                                         ignore derivedSummaries.remove(oldSummaryKey);
+                                    }
+                                };
+                                for ((oldSummaryKey, summary) in Iter.toArray(publicDerivedSummaries.entries()).vals()) {
+                                    if (summary.profile_id == oid) {
+                                        let newSummaryKey = nid # ":" # summary.app_id # ":" # summary.activity_type;
+                                        publicDerivedSummaries.put(newSummaryKey, { summary with profile_id = nid });
+                                        ignore publicDerivedSummaries.remove(oldSummaryKey);
                                     }
                                 };
 
@@ -1241,6 +1293,34 @@ persistent actor {
             currency = prevCurrency;
             last_updated = now
         });
+
+        // Maintain a second aggregate containing public evidence only. This keeps
+        // public summary reads O(1) without allowing private counts/amounts to leak.
+        if (newRecord.visibility == #global) {
+            let publicExisting = publicDerivedSummaries.get(sKey);
+            let (publicPrevCount, publicPrevTotal, publicPrevCurrency) = switch (publicExisting) {
+                case null { (0, null, newRecord.currency) };
+                case (?summary) { (summary.record_count, summary.total_amount, summary.currency) };
+            };
+            let publicNewTotal : ?Float = switch (newRecord.amount) {
+                case null { publicPrevTotal };
+                case (?amount) {
+                    switch (publicPrevTotal) {
+                        case null { ?amount };
+                        case (?total) { ?(total + amount) };
+                    }
+                };
+            };
+            publicDerivedSummaries.put(sKey, {
+                profile_id = newRecord.profile_id;
+                app_id = newRecord.app_id;
+                activity_type = newRecord.activity_type;
+                record_count = publicPrevCount + 1;
+                total_amount = publicNewTotal;
+                currency = publicPrevCurrency;
+                last_updated = now
+            })
+        };
         #ok(recordId)
     };
 
@@ -1325,72 +1405,23 @@ persistent actor {
         Buffer.toArray(buf)
     };
 
-    // Summaries are computed from the caller-visible record set so private records
-    // cannot leak through aggregate counts or amounts. The write-side summary map is
-    // retained as a cache for future internal use, but is not exposed directly.
+    // Keep summary reads O(1) while preserving visibility: owners read the full
+    // aggregate; everyone else reads the global-only aggregate.
     public query ({ caller }) func getDerivedSummary(
         profileId : ProfileId,
         appId : AppId,
         activityType : ActivityTypeKey
     ) : async ?DerivedSummary {
-        let profile = switch (profiles.get(profileId)) {
-            case null { return null };
-            case (?profile) { profile };
-        };
-        let ids = switch (profileActivityIndex.get(profileId)) {
-            case null { return null };
-            case (?ids) { ids };
-        };
-
-        var recordCount : Nat = 0;
-        var totalAmount : ?Float = null;
-        var currency : ?Text = null;
-        var currencyInitialized = false;
-        var lastUpdated : Int = 0;
-
-        for (rid in ids.vals()) {
-            switch (activityRecordsMap.get(rid)) {
-                case null {};
-                case (?record) {
-                    if (
-                        record.app_id == appId and
-                        record.activity_type == activityType and
-                        canReadActivityRecord(caller, profile, record)
-                    ) {
-                        recordCount += 1;
-                        switch (record.amount) {
-                            case null {};
-                            case (?amount) {
-                                totalAmount := switch (totalAmount) {
-                                    case null { ?amount };
-                                    case (?total) { ?(total + amount) };
-                                }
-                            };
-                        };
-                        if (not currencyInitialized) {
-                            currency := record.currency;
-                            currencyInitialized := true
-                        };
-                        if (record.ingest_timestamp > lastUpdated) {
-                            lastUpdated := record.ingest_timestamp
-                        }
-                    }
-                };
-            }
-        };
-
-        if (recordCount == 0) {
-            null
-        } else {
-            ?{
-                profile_id = profileId;
-                app_id = appId;
-                activity_type = activityType;
-                record_count = recordCount;
-                total_amount = totalAmount;
-                currency = currency;
-                last_updated = lastUpdated;
-            }
+        switch (profiles.get(profileId)) {
+            case null { null };
+            case (?profile) {
+                let key = summaryKey(profileId, appId, activityType);
+                if (caller == profile.owner) {
+                    derivedSummaries.get(key)
+                } else {
+                    publicDerivedSummaries.get(key)
+                }
+            };
         }
     };
 
