@@ -69,6 +69,7 @@ persistent actor {
     var stableConnections : [(Text, IntegrationConnection)] = [];
     var stableActivityRecords : [(Text, ActivityRecord)] = [];
     var stableActivityConnectionEpochs : [(Text, Int)] = []; // recordId -> connection.created_at
+    var stableActivityCurrentProfiles : [(Text, Text)] = []; // recordId -> current profileId
     var stableIdempotencyKeys : [(Text, Text)] = []; // idempotency_key -> record_id
     var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]
     var stableDerivedSummaries : [(Text, DerivedSummary)] = [];
@@ -130,6 +131,9 @@ persistent actor {
     transient var activityConnectionEpochs = TrieMap.TrieMap<Text, Int>(Text.equal, Text.hash);
     activityConnectionEpochs := TrieMap.fromEntries<Text, Int>(Iter.fromArray(stableActivityConnectionEpochs), Text.equal, Text.hash);
 
+    transient var activityCurrentProfiles = TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);
+    activityCurrentProfiles := TrieMap.fromEntries<Text, Text>(Iter.fromArray(stableActivityCurrentProfiles), Text.equal, Text.hash);
+
     transient var idempotencyKeys = TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);
     idempotencyKeys := TrieMap.fromEntries<Text, Text>(Iter.fromArray(stableIdempotencyKeys), Text.equal, Text.hash);
 
@@ -164,6 +168,7 @@ persistent actor {
         stableConnections := Iter.toArray(connections.entries());
         stableActivityRecords := Iter.toArray(activityRecordsMap.entries());
         stableActivityConnectionEpochs := Iter.toArray(activityConnectionEpochs.entries());
+        stableActivityCurrentProfiles := Iter.toArray(activityCurrentProfiles.entries());
         stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());
         stableProfileActivityIndex := Iter.toArray(profileActivityIndex.entries());
         stableDerivedSummaries := Iter.toArray(derivedSummaries.entries());
@@ -189,6 +194,7 @@ persistent actor {
         stableConnections := [];
         stableActivityRecords := [];
         stableActivityConnectionEpochs := [];
+        stableActivityCurrentProfiles := [];
         stableIdempotencyKeys := [];
         stableProfileActivityIndex := [];
         stableDerivedSummaries := [];
@@ -359,6 +365,32 @@ persistent actor {
         }
     };
 
+    // Public profile IDs are reusable identifiers. A newly claimed ID must not
+    // inherit integration/index/cache state left by an earlier incarnation.
+    private func purgeReusableProfileIntegrationState(profileId : ProfileId) {
+        ignore profileActivityIndex.remove(profileId);
+        for ((recordId, currentProfileId) in Iter.toArray(activityCurrentProfiles.entries()).vals()) {
+            if (currentProfileId == profileId) {
+                ignore activityCurrentProfiles.remove(recordId)
+            }
+        };
+        for ((connectionKeyToRemove, connection) in Iter.toArray(connections.entries()).vals()) {
+            if (connection.profile_id == profileId) {
+                ignore connections.remove(connectionKeyToRemove)
+            }
+        };
+        for ((summaryKeyToRemove, summary) in Iter.toArray(derivedSummaries.entries()).vals()) {
+            if (summary.profile_id == profileId) {
+                ignore derivedSummaries.remove(summaryKeyToRemove)
+            }
+        };
+        for ((summaryKeyToRemove, summary) in Iter.toArray(publicDerivedSummaries.entries()).vals()) {
+            if (summary.profile_id == profileId) {
+                ignore publicDerivedSummaries.remove(summaryKeyToRemove)
+            }
+        }
+    };
+
     public shared ({ caller }) func createProfile(newProfile : Types.NewProfile) : async Result.Result<Nat, Text> {
         if (Principal.isAnonymous(caller)) {
             #err("no authenticated")
@@ -381,6 +413,9 @@ persistent actor {
                             } else if (Array.find(reserveIds, func(id : Text) : Bool { id == newProfile.id }) != null) {
                                 #err("the id is reserved")
                             } else {
+                                // Claiming an unused public ID starts a new lifecycle. Purge any
+                                // orphaned state before exposing the new profile incarnation.
+                                purgeReusableProfileIntegrationState(newProfile.id);
                                 profiles.put(
                                     newProfile.id,
                                     {
@@ -513,29 +548,16 @@ persistent actor {
                                     }
                                 );
                                 // A public profile ID is reusable. Purge any destination-only
-                                // integration state left behind by a legacy rename before moving
-                                // the current profile into that ID, then migrate only source state.
-                                ignore profileActivityIndex.remove(nid);
-                                for ((connectionKeyToRemove, connection) in Iter.toArray(connections.entries()).vals()) {
-                                    if (connection.profile_id == nid) {
-                                        ignore connections.remove(connectionKeyToRemove)
-                                    }
-                                };
-                                for ((summaryKeyToRemove, summary) in Iter.toArray(derivedSummaries.entries()).vals()) {
-                                    if (summary.profile_id == nid) {
-                                        ignore derivedSummaries.remove(summaryKeyToRemove)
-                                    }
-                                };
-                                for ((summaryKeyToRemove, summary) in Iter.toArray(publicDerivedSummaries.entries()).vals()) {
-                                    if (summary.profile_id == nid) {
-                                        ignore publicDerivedSummaries.remove(summaryKeyToRemove)
-                                    }
-                                };
+                                // state left by an earlier incarnation before moving source state.
+                                purgeReusableProfileIntegrationState(nid);
 
                                 // Keep integration ownership/indexes attached to the profile when its public id changes.
                                 switch (profileActivityIndex.get(oid)) {
                                     case (?recordIds) {
                                         profileActivityIndex.put(nid, recordIds);
+                                        for (recordId in recordIds.vals()) {
+                                            activityCurrentProfiles.put(recordId, nid)
+                                        };
                                         ignore profileActivityIndex.remove(oid);
                                     };
                                     case null {};
@@ -1377,6 +1399,7 @@ persistent actor {
         };
         activityRecordsMap.put(recordId, record);
         activityConnectionEpochs.put(recordId, connection.created_at);
+        activityCurrentProfiles.put(recordId, newRecord.profile_id);
         idempotencyKeys.put(idemKey, recordId);
         // Update per-profile index
         let currentIndex = switch (profileActivityIndex.get(newRecord.profile_id)) {
@@ -1527,16 +1550,20 @@ persistent actor {
         }
     };
 
-    // A direct public lookup has no enclosing profile context, so do not
-    // trust a reusable historical profile_id by itself. Return a global
-    // record only while that stored id still names the current indexed
-    // profile incarnation and the record carries explicit provenance.
+    // ActivityRecord.profile_id is historical and intentionally immutable.
+    // Resolve direct reads through the collision-safe reverse index that follows
+    // the current profile lifecycle across legitimate public-ID renames.
     private func canReadDirectGlobalActivityRecord(record : ActivityRecord) : Bool {
-        switch (profiles.get(record.profile_id)) {
+        switch (activityCurrentProfiles.get(record.id)) {
             case null { false };
-            case (?profile) {
-                activityIndexContains(record.profile_id, record.id) and
-                recordBelongsToProfileIncarnation(profile, record)
+            case (?currentProfileId) {
+                switch (profiles.get(currentProfileId)) {
+                    case null { false };
+                    case (?profile) {
+                        activityIndexContains(currentProfileId, record.id) and
+                        recordBelongsToProfileIncarnation(profile, record)
+                    };
+                }
             };
         }
     };
