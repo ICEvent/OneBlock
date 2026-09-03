@@ -1,0 +1,99 @@
+name: Apply PR17 Direct Global Provenance Fix
+
+on:
+  push:
+    branches:
+      - fix/evidence-visibility-boundaries
+    paths:
+      - '.github/workflows/apply-pr17-global-provenance-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/evidence-visibility-boundaries
+          fetch-depth: 0
+
+      - name: Apply reviewed direct-global provenance boundary
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/oneblock_backend/main.mo')
+          text = path.read_text()
+          old = "\n".join([
+              "    public query ({ caller }) func getActivityRecord(recordId : RecordId) : async ?ActivityRecord {",
+              "        switch (activityRecordsMap.get(recordId)) {",
+              "            case null { null };",
+              "            case (?record) {",
+              "                switch (record.visibility) {",
+              "                    case (#global) { ?record };",
+              "                    case (#unlisted) { if (callerOwnsActivityRecord(caller, recordId)) { ?record } else { null } };",
+              "                    case (#personal) { if (callerOwnsActivityRecord(caller, recordId)) { ?record } else { null } };",
+              "                }",
+              "            };",
+              "        }",
+              "    };",
+          ])
+          new = "\n".join([
+              "    // A direct public lookup has no enclosing profile context, so do not",
+              "    // trust a reusable historical profile_id by itself. Return a global",
+              "    // record only while that stored id still names the current indexed",
+              "    // profile incarnation and the record carries explicit provenance.",
+              "    private func canReadDirectGlobalActivityRecord(record : ActivityRecord) : Bool {",
+              "        switch (profiles.get(record.profile_id)) {",
+              "            case null { false };",
+              "            case (?profile) {",
+              "                activityIndexContains(record.profile_id, record.id) and",
+              "                recordBelongsToProfileIncarnation(profile, record)",
+              "            };",
+              "        }",
+              "    };",
+              "",
+              "    public query ({ caller }) func getActivityRecord(recordId : RecordId) : async ?ActivityRecord {",
+              "        switch (activityRecordsMap.get(recordId)) {",
+              "            case null { null };",
+              "            case (?record) {",
+              "                switch (record.visibility) {",
+              "                    case (#global) {",
+              "                        if (canReadDirectGlobalActivityRecord(record)) { ?record } else { null }",
+              "                    };",
+              "                    case (#unlisted) { if (callerOwnsActivityRecord(caller, recordId)) { ?record } else { null } };",
+              "                    case (#personal) { if (callerOwnsActivityRecord(caller, recordId)) { ?record } else { null } };",
+              "                }",
+              "            };",
+              "        }",
+              "    };",
+          ])
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one direct read block, found {text.count(old)}')
+          text = text.replace(old, new, 1)
+          if text.count('private func canReadDirectGlobalActivityRecord') != 1:
+              raise SystemExit('direct global provenance helper missing or duplicated')
+          if 'case (#global) { ?record };' in text:
+              raise SystemExit('unconditional global direct-read branch still present')
+          path.write_text(text)
+          PY
+
+      - name: Self-review patch shape
+        run: |
+          git diff --check
+          git diff -- src/oneblock_backend/main.mo
+          test "$(git diff --name-only | sort | tr '\n' ' ')" = ".github/workflows/apply-pr17-global-provenance-fix.yml src/oneblock_backend/main.mo "
+
+      - name: Remove helper workflow
+        run: rm .github/workflows/apply-pr17-global-provenance-fix.yml
+
+      - name: Commit reviewed fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/oneblock_backend/main.mo .github/workflows/apply-pr17-global-provenance-fix.yml
+          git diff --cached --check
+          git commit -m 'fix: enforce provenance on direct global activity reads'
+          git push origin HEAD:fix/evidence-visibility-boundaries
