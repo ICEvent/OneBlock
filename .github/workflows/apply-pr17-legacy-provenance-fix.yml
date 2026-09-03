@@ -1,0 +1,64 @@
+name: Apply PR17 Legacy Provenance Fix
+
+on:
+  push:
+    branches:
+      - fix/evidence-visibility-boundaries
+    paths:
+      - '.github/workflows/apply-pr17-legacy-provenance-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/evidence-visibility-boundaries
+          fetch-depth: 0
+
+      - name: Apply reviewed fail-closed legacy provenance fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/oneblock_backend/main.mo')
+          text = path.read_text()
+          old = '''            case null {
+                // Legacy records have no provenance marker. Fail closed unless the
+                // exact current connection itself belongs to this profile incarnation
+                // and existed before the record was ingested.
+                switch (getConnectionExact(profileId, record.app_id)) {
+                    case (?connection) {
+                        connection.created_at >= profile.createtime and
+                        record.ingest_timestamp >= connection.created_at
+                    };
+                    case null { false };
+                }
+            };'''
+          new = '''            case null {
+                // Legacy records have no verifiable connection-incarnation provenance.
+                // Timestamps from the current connection are insufficient because a
+                // reusable profile ID may have inherited stale destination state.
+                // Fail closed rather than guessing historical ownership.
+                false
+            };'''
+          if old not in text:
+              raise SystemExit('expected legacy provenance fallback not found')
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one fallback, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Remove helper workflow
+        run: rm .github/workflows/apply-pr17-legacy-provenance-fix.yml
+
+      - name: Commit reviewed fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/oneblock_backend/main.mo .github/workflows/apply-pr17-legacy-provenance-fix.yml
+          git commit -m 'fix: fail closed for legacy activity provenance'
+          git push origin HEAD:fix/evidence-visibility-boundaries
