@@ -696,15 +696,15 @@ persistent actor {
     };
 
     // Block visibility is enforced at the read boundary. Owners can always read
-    // their own blocks. Public lists contain global blocks only; unlisted blocks
-    // remain directly addressable by id; personal blocks remain owner-only.
-    private func canReadBlock(caller : Principal, profile : Profile, block : Block, allowUnlisted : Bool) : Bool {
+    // their own blocks. Non-owners can read global blocks only. Unlisted
+    // remains owner-only until OneBlock has unguessable capability-based share links.
+    private func canReadBlock(caller : Principal, profile : Profile, block : Block) : Bool {
         if (caller == profile.owner) {
             return true
         };
         switch (block.visibility) {
             case (#global) { true };
-            case (#unlisted) { allowUnlisted };
+            case (#unlisted) { false };
             case (#personal) { false };
         }
     };
@@ -716,7 +716,7 @@ persistent actor {
                 switch (profiles.get(block.profile_id)) {
                     case null { null };
                     case (?profile) {
-                        if (canReadBlock(caller, profile, block, true)) { ?block } else { null }
+                        if (canReadBlock(caller, profile, block)) { ?block } else { null }
                     };
                 }
             };
@@ -731,7 +731,7 @@ persistent actor {
                 for (blockId in p.blocks.vals()) {
                     switch (blocks.get(blockId)) {
                         case (?b) {
-                            if (canReadBlock(caller, p, b, false)) {
+                            if (canReadBlock(caller, p, b)) {
                                 blockList.add(b)
                             }
                         };
@@ -752,7 +752,7 @@ persistent actor {
                 for (blockId in p.blocks.vals()) {
                     switch (blocks.get(blockId)) {
                         case (?b) {
-                            if (canReadBlock(caller, p, b, false)) {
+                            if (canReadBlock(caller, p, b)) {
                                 list.add(b)
                             }
                         };
