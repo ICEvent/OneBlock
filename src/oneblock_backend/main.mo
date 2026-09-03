@@ -67,8 +67,11 @@ persistent actor {
     var stableIntegrationApps : [(Text, IntegrationApp)] = [];
     var stableActivityTypes : [(Text, ActivityType)] = [];
     var stableConnections : [(Text, IntegrationConnection)] = [];
+    var stableProfileLifecycleIds : [(Text, Nat)] = []; // profileId -> lifecycle token
+    var stableConnectionLifecycleIds : [(Text, Nat)] = []; // connectionKey -> profile lifecycle token
     var stableActivityRecords : [(Text, ActivityRecord)] = [];
-    var stableActivityConnectionEpochs : [(Text, Int)] = []; // recordId -> connection.created_at
+    var stableActivityConnectionEpochs : [(Text, Int)] = []; // recordId -> connection.created_at (audit provenance)
+    var stableActivityLifecycleIds : [(Text, Nat)] = []; // recordId -> profile lifecycle token
     var stableActivityCurrentProfiles : [(Text, Text)] = []; // recordId -> current profileId
     var stableIdempotencyKeys : [(Text, Text)] = []; // idempotency_key -> record_id
     var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]
@@ -88,6 +91,7 @@ persistent actor {
     var blockIdCounter : Nat = 0;
     var traitIdCounter : Nat = 0;
     var activityRecordCounter : Nat = 0;
+    var profileLifecycleCounter : Nat = 0;
     var factorIdCounter : Nat = 0;
 
     transient var profiles = TrieMap.TrieMap<Text, Profile>(Text.equal, Text.hash);
@@ -125,11 +129,20 @@ persistent actor {
     transient var connections = TrieMap.TrieMap<Text, IntegrationConnection>(Text.equal, Text.hash);
     connections := TrieMap.fromEntries<Text, IntegrationConnection>(Iter.fromArray(stableConnections), Text.equal, Text.hash);
 
+    transient var profileLifecycleIds = TrieMap.TrieMap<Text, Nat>(Text.equal, Text.hash);
+    profileLifecycleIds := TrieMap.fromEntries<Text, Nat>(Iter.fromArray(stableProfileLifecycleIds), Text.equal, Text.hash);
+
+    transient var connectionLifecycleIds = TrieMap.TrieMap<Text, Nat>(Text.equal, Text.hash);
+    connectionLifecycleIds := TrieMap.fromEntries<Text, Nat>(Iter.fromArray(stableConnectionLifecycleIds), Text.equal, Text.hash);
+
     transient var activityRecordsMap = TrieMap.TrieMap<Text, ActivityRecord>(Text.equal, Text.hash);
     activityRecordsMap := TrieMap.fromEntries<Text, ActivityRecord>(Iter.fromArray(stableActivityRecords), Text.equal, Text.hash);
 
     transient var activityConnectionEpochs = TrieMap.TrieMap<Text, Int>(Text.equal, Text.hash);
     activityConnectionEpochs := TrieMap.fromEntries<Text, Int>(Iter.fromArray(stableActivityConnectionEpochs), Text.equal, Text.hash);
+
+    transient var activityLifecycleIds = TrieMap.TrieMap<Text, Nat>(Text.equal, Text.hash);
+    activityLifecycleIds := TrieMap.fromEntries<Text, Nat>(Iter.fromArray(stableActivityLifecycleIds), Text.equal, Text.hash);
 
     transient var activityCurrentProfiles = TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);
     activityCurrentProfiles := TrieMap.fromEntries<Text, Text>(Iter.fromArray(stableActivityCurrentProfiles), Text.equal, Text.hash);
@@ -166,8 +179,11 @@ persistent actor {
         stableIntegrationApps := Iter.toArray(integrationApps.entries());
         stableActivityTypes := Iter.toArray(activityTypesMap.entries());
         stableConnections := Iter.toArray(connections.entries());
+        stableProfileLifecycleIds := Iter.toArray(profileLifecycleIds.entries());
+        stableConnectionLifecycleIds := Iter.toArray(connectionLifecycleIds.entries());
         stableActivityRecords := Iter.toArray(activityRecordsMap.entries());
         stableActivityConnectionEpochs := Iter.toArray(activityConnectionEpochs.entries());
+        stableActivityLifecycleIds := Iter.toArray(activityLifecycleIds.entries());
         stableActivityCurrentProfiles := Iter.toArray(activityCurrentProfiles.entries());
         stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());
         stableProfileActivityIndex := Iter.toArray(profileActivityIndex.entries());
@@ -192,12 +208,28 @@ persistent actor {
         stableIntegrationApps := [];
         stableActivityTypes := [];
         stableConnections := [];
+        stableProfileLifecycleIds := [];
+        stableConnectionLifecycleIds := [];
         stableActivityRecords := [];
         stableActivityConnectionEpochs := [];
+        stableActivityLifecycleIds := [];
         stableActivityCurrentProfiles := [];
         stableIdempotencyKeys := [];
         stableProfileActivityIndex := [];
         stableDerivedSummaries := [];
+
+        // Give every current profile a distinct internal lifecycle token. Legacy
+        // connections/records intentionally receive no token and must be re-authorized
+        // or fail closed; timestamps are not unique enough to prove incarnation.
+        for ((profileId, _) in profiles.entries()) {
+            switch (profileLifecycleIds.get(profileId)) {
+                case (?_) {};
+                case null {
+                    let lifecycleId = nextProfileLifecycleId();
+                    profileLifecycleIds.put(profileId, lifecycleId)
+                };
+            }
+        };
 
         // Migrate delimiter-based integration keys to collision-free length-prefixed
         // keys. Re-key from stored identities rather than trusting the old key text.
@@ -365,9 +397,15 @@ persistent actor {
         }
     };
 
+    private func nextProfileLifecycleId() : Nat {
+        profileLifecycleCounter := profileLifecycleCounter + 1;
+        profileLifecycleCounter
+    };
+
     // Public profile IDs are reusable identifiers. A newly claimed ID must not
     // inherit integration/index/cache state left by an earlier incarnation.
     private func purgeReusableProfileIntegrationState(profileId : ProfileId) {
+        ignore profileLifecycleIds.remove(profileId);
         ignore profileActivityIndex.remove(profileId);
         for ((recordId, currentProfileId) in Iter.toArray(activityCurrentProfiles.entries()).vals()) {
             if (currentProfileId == profileId) {
@@ -376,6 +414,7 @@ persistent actor {
         };
         for ((connectionKeyToRemove, connection) in Iter.toArray(connections.entries()).vals()) {
             if (connection.profile_id == profileId) {
+                ignore connectionLifecycleIds.remove(connectionKeyToRemove);
                 ignore connections.remove(connectionKeyToRemove)
             }
         };
@@ -416,6 +455,8 @@ persistent actor {
                                 // Claiming an unused public ID starts a new lifecycle. Purge any
                                 // orphaned state before exposing the new profile incarnation.
                                 purgeReusableProfileIntegrationState(newProfile.id);
+                                let lifecycleId = nextProfileLifecycleId();
+                                profileLifecycleIds.put(newProfile.id, lifecycleId);
                                 profiles.put(
                                     newProfile.id,
                                     {
@@ -531,6 +572,14 @@ persistent actor {
                                 #err("this id has been taken")
                             };
                             case (_) {
+                                let sourceLifecycleId = switch (profileLifecycleIds.get(oid)) {
+                                    case (?lifecycleId) { lifecycleId };
+                                    case null {
+                                        let lifecycleId = nextProfileLifecycleId();
+                                        profileLifecycleIds.put(oid, lifecycleId);
+                                        lifecycleId
+                                    };
+                                };
                                 profiles.put(
                                     nid,
                                     {
@@ -550,6 +599,8 @@ persistent actor {
                                 // A public profile ID is reusable. Purge any destination-only
                                 // state left by an earlier incarnation before moving source state.
                                 purgeReusableProfileIntegrationState(nid);
+                                profileLifecycleIds.put(nid, sourceLifecycleId);
+                                ignore profileLifecycleIds.remove(oid);
 
                                 // Keep integration ownership/indexes attached to the profile when its public id changes.
                                 switch (profileActivityIndex.get(oid)) {
@@ -564,11 +615,17 @@ persistent actor {
                                 };
                                 for ((oldConnectionKey, connection) in Iter.toArray(connections.entries()).vals()) {
                                     if (connection.profile_id == oid) {
+                                        let lifecycleOpt = connectionLifecycleIds.remove(oldConnectionKey);
                                         ignore connections.remove(oldConnectionKey);
+                                        let newConnectionKey = connectionKey(nid, connection.app_id);
                                         connections.put(
-                                            connectionKey(nid, connection.app_id),
+                                            newConnectionKey,
                                             { connection with profile_id = nid }
-                                        )
+                                        );
+                                        switch (lifecycleOpt) {
+                                            case (?lifecycleId) { connectionLifecycleIds.put(newConnectionKey, lifecycleId) };
+                                            case null {};
+                                        }
                                     }
                                 };
                                 for ((oldSummaryKey, summary) in Iter.toArray(derivedSummaries.entries()).vals()) {
@@ -1282,7 +1339,12 @@ persistent actor {
                             created_at = Time.now();
                             revoked_at = null
                         };
+                        let lifecycleId = switch (profileLifecycleIds.get(profileId)) {
+                            case (?lifecycleId) { lifecycleId };
+                            case null { return #err("profile lifecycle unavailable") };
+                        };
                         connections.put(key, conn);
+                        connectionLifecycleIds.put(key, lifecycleId);
                         #ok(1)
                     }
                 }
@@ -1357,16 +1419,28 @@ persistent actor {
         if (not app.active) {
             return #err("app is not active")
         };
-        // Check an exact active connection exists for this profile+app and bind
-        // the record to that connection epoch for future ownership checks.
+        let lifecycleId = switch (profileLifecycleIds.get(newRecord.profile_id)) {
+            case (?lifecycleId) { lifecycleId };
+            case null { return #err("profile lifecycle unavailable") };
+        };
+        let exactConnectionKey = connectionKey(newRecord.profile_id, newRecord.app_id);
+        // Require an explicit lifecycle binding for the exact current connection.
+        // Legacy connections have no binding and must be re-authorized by the user.
         let connection = switch (getConnectionExact(newRecord.profile_id, newRecord.app_id)) {
             case null { return #err("no active connection for this profile and app") };
             case (?connection) {
                 if (connection.status != #active) {
                     return #err("connection is not active")
                 };
-                if (connection.created_at < profile.createtime) {
-                    return #err("connection belongs to an earlier profile incarnation")
+                switch (connectionLifecycleIds.get(exactConnectionKey)) {
+                    case (?connectionLifecycleId) {
+                        if (connectionLifecycleId != lifecycleId) {
+                            return #err("connection belongs to a different profile lifecycle")
+                        }
+                    };
+                    case null {
+                        return #err("connection must be re-authorized for this profile lifecycle")
+                    };
                 };
                 connection
             };
@@ -1399,6 +1473,7 @@ persistent actor {
         };
         activityRecordsMap.put(recordId, record);
         activityConnectionEpochs.put(recordId, connection.created_at);
+        activityLifecycleIds.put(recordId, lifecycleId);
         activityCurrentProfiles.put(recordId, newRecord.profile_id);
         idempotencyKeys.put(idemKey, recordId);
         // Update per-profile index
@@ -1493,21 +1568,17 @@ persistent actor {
         profile : Profile,
         record : ActivityRecord
     ) : Bool {
-        if (record.ingest_timestamp < profile.createtime) {
-            return false
-        };
-
-        switch (activityConnectionEpochs.get(record.id)) {
-            case (?connectionEpoch) {
-                // New records carry the exact connection epoch used at submission.
-                connectionEpoch >= profile.createtime and record.ingest_timestamp >= connectionEpoch
-            };
-            case null {
-                // Legacy records have no verifiable connection-incarnation provenance.
-                // Timestamps from the current connection are insufficient because a
-                // reusable profile ID may have inherited stale destination state.
-                // Fail closed rather than guessing historical ownership.
-                false
+        switch (profileLifecycleIds.get(profile.id)) {
+            case null { false };
+            case (?currentLifecycleId) {
+                switch (activityLifecycleIds.get(record.id)) {
+                    case (?recordLifecycleId) { recordLifecycleId == currentLifecycleId };
+                    case null {
+                        // Legacy records have no verifiable lifecycle provenance.
+                        // Fail closed rather than inferring ownership from timestamps.
+                        false
+                    };
+                }
             };
         }
     };
