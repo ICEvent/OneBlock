@@ -78,6 +78,8 @@ persistent actor {
     var stableDerivedSummaries : [(Text, DerivedSummary)] = [];
     var stablePublicDerivedSummaries : [(Text, DerivedSummary)] = [];
     var integrationCompositeKeysMigratedV1 : Bool = false;
+    var idempotencyCompositeKeysMigratedV1 : Bool = false;
+    var profileLifecycleTokensMigratedV1 : Bool = false;
     var summaryCachesMigratedV1 : Bool = false;
     var stableIdentityGraphs : [(Text, IdentityGraph)] = [];
     var stableContextPolicies : [(Text, ContextPolicy)] = [];
@@ -218,17 +220,23 @@ persistent actor {
         stableProfileActivityIndex := [];
         stableDerivedSummaries := [];
 
-        // Give every current profile a distinct internal lifecycle token. Legacy
-        // connections/records intentionally receive no token and must be re-authorized
-        // or fail closed; timestamps are not unique enough to prove incarnation.
-        for ((profileId, _) in profiles.entries()) {
-            switch (profileLifecycleIds.get(profileId)) {
-                case (?_) {};
-                case null {
-                    let lifecycleId = nextProfileLifecycleId();
-                    profileLifecycleIds.put(profileId, lifecycleId)
-                };
-            }
+        // Give every current profile a distinct internal lifecycle token once.
+        // Legacy connections/records intentionally receive no token and must be
+        // re-authorized or fail closed; timestamps are not unique incarnation IDs.
+        // Rebuild summary caches under this stricter provenance boundary even when
+        // an intermediate deployment had already marked the old cache migration done.
+        if (not profileLifecycleTokensMigratedV1) {
+            for ((profileId, _) in profiles.entries()) {
+                switch (profileLifecycleIds.get(profileId)) {
+                    case (?_) {};
+                    case null {
+                        let lifecycleId = nextProfileLifecycleId();
+                        profileLifecycleIds.put(profileId, lifecycleId)
+                    };
+                }
+            };
+            summaryCachesMigratedV1 := false;
+            profileLifecycleTokensMigratedV1 := true
         };
 
         // Migrate delimiter-based integration keys to collision-free length-prefixed
@@ -251,6 +259,16 @@ persistent actor {
             // are never carried forward under the new key format.
             summaryCachesMigratedV1 := false;
             integrationCompositeKeysMigratedV1 := true
+        };
+
+        // Rebuild ambiguous legacy app:idempotency keys from the record's stored
+        // identity fields. The new length-prefixed key is collision-free.
+        if (not idempotencyCompositeKeysMigratedV1) {
+            idempotencyKeys := TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);
+            for (record in activityRecordsMap.vals()) {
+                idempotencyKeys.put(idempotencyKey(record.app_id, record.idempotency_key), record.id)
+            };
+            idempotencyCompositeKeysMigratedV1 := true
         };
 
         // One-time compatibility migration for deployments created before the
@@ -1239,6 +1257,10 @@ persistent actor {
         "summary:" # keyPart(profileId) # keyPart(appId) # keyPart(activityType)
     };
 
+    private func idempotencyKey(appId : Text, externalKey : Text) : Text {
+        "idempotency:" # keyPart(appId) # keyPart(externalKey)
+    };
+
     private func getConnectionExact(profileId : ProfileId, appId : AppId) : ?IntegrationConnection {
         switch (connections.get(connectionKey(profileId, appId))) {
             case (?connection) {
@@ -1446,7 +1468,7 @@ persistent actor {
             };
         };
         // Enforce idempotency: reject duplicate external events
-        let idemKey = newRecord.app_id # ":" # newRecord.idempotency_key;
+        let idemKey = idempotencyKey(newRecord.app_id, newRecord.idempotency_key);
         switch (idempotencyKeys.get(idemKey)) {
             case (?existingId) { return #err("duplicate event: already recorded as " # existingId) };
             case null {}
