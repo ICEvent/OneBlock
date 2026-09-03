@@ -1,0 +1,63 @@
+name: Apply PR17 Purge Separator Cleanup
+
+on:
+  push:
+    branches:
+      - fix/evidence-visibility-boundaries
+    paths:
+      - '.github/workflows/apply-pr17-purge-separator-cleanup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/evidence-visibility-boundaries
+          fetch-depth: 0
+
+      - name: Apply reviewed cleanup
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/oneblock_backend/main.mo')
+          s = p.read_text()
+          old = '''        for ((summaryKeyToRemove, summary) in Iter.toArray(publicDerivedSummaries.entries()).vals()) {
+            if (summary.profile_id == profileId) {
+                ignore publicDerivedSummaries.remove(summaryKeyToRemove)
+            }
+        }
+        ignore orphanedProfileIntegrationState.remove(profileId)
+'''
+          new = '''        for ((summaryKeyToRemove, summary) in Iter.toArray(publicDerivedSummaries.entries()).vals()) {
+            if (summary.profile_id == profileId) {
+                ignore publicDerivedSummaries.remove(summaryKeyToRemove)
+            }
+        };
+        ignore orphanedProfileIntegrationState.remove(profileId)
+'''
+          if s.count(old) != 1:
+              raise SystemExit(f'expected one purge tail, found {s.count(old)}')
+          p.write_text(s.replace(old, new, 1))
+          PY
+
+      - name: Self-review cleanup
+        run: |
+          git diff --check
+          test "$(git diff --name-only)" = "src/oneblock_backend/main.mo"
+          grep -A7 'for ((summaryKeyToRemove, summary) in Iter.toArray(publicDerivedSummaries.entries()).vals())' src/oneblock_backend/main.mo | grep -q '^        };$'
+          grep -q '^        ignore orphanedProfileIntegrationState.remove(profileId)$' src/oneblock_backend/main.mo
+
+      - name: Remove helper workflow
+        run: rm .github/workflows/apply-pr17-purge-separator-cleanup.yml
+
+      - name: Commit reviewed cleanup
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/oneblock_backend/main.mo .github/workflows/apply-pr17-purge-separator-cleanup.yml
+          git commit -m 'chore: clean purge marker boundary'
+          git push origin HEAD:fix/evidence-visibility-boundaries
