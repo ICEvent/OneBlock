@@ -260,9 +260,10 @@ export const BlocksPanel: React.FC = () => {
             onChange={(e) => setNewBlock({ ...newBlock, visibilityKey: e.target.value as 'global' | 'unlisted' | 'personal' })}
           >
             <option value="global">Public — listed on your profile and chain</option>
-            <option value="unlisted">Unlisted — direct link only</option>
+            <option value="unlisted">Unlisted — hidden from public views, owner-only for now</option>
             <option value="personal">Private — only you can read it</option>
           </select>
+          <small>Share-by-link for unlisted blocks will require unguessable capability links; sequential block IDs are not treated as private links.</small>
         </div>
 
         <button type="submit" disabled={creating}>
