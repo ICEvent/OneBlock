@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  # Keep only the newest backend validation for each branch/ref.
+  # Keep only the newest reviewed backend validation for each branch/ref.
   group: backend-ci-${{ github.ref }}
   cancel-in-progress: true
 
