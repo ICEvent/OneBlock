@@ -27,33 +27,14 @@ jobs:
           path = Path('src/oneblock_backend/main.mo')
           text = path.read_text()
 
-          record_sig = '''    private func recordBelongsToProfileIncarnation(
-              profileId : ProfileId,
-              profile : Profile,
-              record : ActivityRecord
-          ) : Bool {'''
-          record_sig_new = '''    private func recordBelongsToProfileIncarnation(
-              profile : Profile,
-              record : ActivityRecord
-          ) : Bool {'''
+          record_sig = "    private func recordBelongsToProfileIncarnation(\n        profileId : ProfileId,\n        profile : Profile,\n        record : ActivityRecord\n    ) : Bool {"
+          record_sig_new = "    private func recordBelongsToProfileIncarnation(\n        profile : Profile,\n        record : ActivityRecord\n    ) : Bool {"
           if text.count(record_sig) != 1:
               raise SystemExit(f'unexpected record signature count: {text.count(record_sig)}')
           text = text.replace(record_sig, record_sig_new, 1)
 
-          dirty_case = '''            case null {
-      // Legacy records have no verifiable connection-incarnation provenance.
-      // Timestamps from the current connection are insufficient because a
-      // reusable profile ID may have inherited stale destination state.
-      // Fail closed rather than guessing historical ownership.
-      false
-  };'''
-          clean_case = '''            case null {
-                // Legacy records have no verifiable connection-incarnation provenance.
-                // Timestamps from the current connection are insufficient because a
-                // reusable profile ID may have inherited stale destination state.
-                // Fail closed rather than guessing historical ownership.
-                false
-            };'''
+          dirty_case = "            case null {\n      // Legacy records have no verifiable connection-incarnation provenance.\n      // Timestamps from the current connection are insufficient because a\n      // reusable profile ID may have inherited stale destination state.\n      // Fail closed rather than guessing historical ownership.\n      false\n  };"
+          clean_case = "            case null {\n                // Legacy records have no verifiable connection-incarnation provenance.\n                // Timestamps from the current connection are insufficient because a\n                // reusable profile ID may have inherited stale destination state.\n                // Fail closed rather than guessing historical ownership.\n                false\n            };"
           if text.count(dirty_case) != 1:
               raise SystemExit(f'unexpected dirty case count: {text.count(dirty_case)}')
           text = text.replace(dirty_case, clean_case, 1)
@@ -63,17 +44,8 @@ jobs:
               raise SystemExit(f'unexpected record call count: {text.count(old_record_call)}')
           text = text.replace(old_record_call, 'recordBelongsToProfileIncarnation(profile, record)')
 
-          can_read_sig = '''    private func canReadActivityRecord(
-              caller : Principal,
-              profileId : ProfileId,
-              profile : Profile,
-              record : ActivityRecord
-          ) : Bool {'''
-          can_read_sig_new = '''    private func canReadActivityRecord(
-              caller : Principal,
-              profile : Profile,
-              record : ActivityRecord
-          ) : Bool {'''
+          can_read_sig = "    private func canReadActivityRecord(\n        caller : Principal,\n        profileId : ProfileId,\n        profile : Profile,\n        record : ActivityRecord\n    ) : Bool {"
+          can_read_sig_new = "    private func canReadActivityRecord(\n        caller : Principal,\n        profile : Profile,\n        record : ActivityRecord\n    ) : Bool {"
           if text.count(can_read_sig) != 1:
               raise SystemExit(f'unexpected canRead signature count: {text.count(can_read_sig)}')
           text = text.replace(can_read_sig, can_read_sig_new, 1)
