@@ -84,7 +84,7 @@ jobs:
         run: |
           git diff --check
           git diff -- src/oneblock_backend/main.mo
-          test "$(git diff --name-only | sort | tr '\n' ' ')" = ".github/workflows/apply-pr17-global-provenance-fix.yml src/oneblock_backend/main.mo "
+          test "$(git diff --name-only | sort | tr '\n' ' ')" = "src/oneblock_backend/main.mo "
 
       - name: Remove helper workflow
         run: rm .github/workflows/apply-pr17-global-provenance-fix.yml
