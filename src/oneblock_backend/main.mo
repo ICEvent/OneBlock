@@ -1527,12 +1527,28 @@ persistent actor {
         }
     };
 
+    // A direct public lookup has no enclosing profile context, so do not
+    // trust a reusable historical profile_id by itself. Return a global
+    // record only while that stored id still names the current indexed
+    // profile incarnation and the record carries explicit provenance.
+    private func canReadDirectGlobalActivityRecord(record : ActivityRecord) : Bool {
+        switch (profiles.get(record.profile_id)) {
+            case null { false };
+            case (?profile) {
+                activityIndexContains(record.profile_id, record.id) and
+                recordBelongsToProfileIncarnation(profile, record)
+            };
+        }
+    };
+
     public query ({ caller }) func getActivityRecord(recordId : RecordId) : async ?ActivityRecord {
         switch (activityRecordsMap.get(recordId)) {
             case null { null };
             case (?record) {
                 switch (record.visibility) {
-                    case (#global) { ?record };
+                    case (#global) {
+                        if (canReadDirectGlobalActivityRecord(record)) { ?record } else { null }
+                    };
                     case (#unlisted) { if (callerOwnsActivityRecord(caller, recordId)) { ?record } else { null } };
                     case (#personal) { if (callerOwnsActivityRecord(caller, recordId)) { ?record } else { null } };
                 }
