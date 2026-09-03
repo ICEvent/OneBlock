@@ -1,0 +1,57 @@
+name: Patch Unlisted Privacy
+
+on:
+  push:
+    branches:
+      - feat/block-visibility-latest-update
+    paths:
+      - .github/workflows/patch-unlisted-privacy.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/block-visibility-latest-update
+      - name: Harden unlisted reads
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/oneblock_backend/main.mo')
+          text = path.read_text()
+          replacements = [
+              (
+                  '// their own blocks. Public lists contain global blocks only; unlisted blocks\n    // remain directly addressable by id; personal blocks remain owner-only.',
+                  '// their own blocks. Non-owners can read global blocks only. Unlisted\n    // remains owner-only until OneBlock has unguessable capability-based share links.'
+              ),
+              (
+                  'private func canReadBlock(caller : Principal, profile : Profile, block : Block, allowUnlisted : Bool) : Bool {',
+                  'private func canReadBlock(caller : Principal, profile : Profile, block : Block) : Bool {'
+              ),
+              ('case (#unlisted) { allowUnlisted };', 'case (#unlisted) { false };'),
+              ('canReadBlock(caller, profile, block, true)', 'canReadBlock(caller, profile, block)'),
+              ('canReadBlock(caller, p, b, false)', 'canReadBlock(caller, p, b)'),
+          ]
+          for old, new in replacements:
+              count = text.count(old)
+              if count == 0:
+                  raise SystemExit(f'Missing expected source fragment: {old}')
+              text = text.replace(old, new)
+          path.write_text(text)
+          PY
+          git diff --check
+      - name: Commit hardening
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/oneblock_backend/main.mo
+          git rm .github/workflows/patch-unlisted-privacy.yml
+          git commit -m "fix: keep unlisted blocks owner-only"
+          git push origin HEAD:feat/block-visibility-latest-update
