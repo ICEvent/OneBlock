@@ -235,7 +235,7 @@ persistent actor {
                                     // Fail closed across reusable profile IDs and legacy
                                     // connections. A record must be attributable to a connection
                                     // epoch belonging to the current profile incarnation.
-                                    if (recordBelongsToProfileIncarnation(profileId, profile, record)) {
+                                    if (recordBelongsToProfileIncarnation(profile, record)) {
                                         let key = summaryKey(profileId, record.app_id, record.activity_type);
                                         let existing = derivedSummaries.get(key);
                                         let (prevCount, prevTotal, prevCurrency) = switch (existing) {
@@ -1467,7 +1467,6 @@ persistent actor {
     };
 
     private func recordBelongsToProfileIncarnation(
-        profileId : ProfileId,
         profile : Profile,
         record : ActivityRecord
     ) : Bool {
@@ -1481,12 +1480,12 @@ persistent actor {
                 connectionEpoch >= profile.createtime and record.ingest_timestamp >= connectionEpoch
             };
             case null {
-      // Legacy records have no verifiable connection-incarnation provenance.
-      // Timestamps from the current connection are insufficient because a
-      // reusable profile ID may have inherited stale destination state.
-      // Fail closed rather than guessing historical ownership.
-      false
-  };
+                // Legacy records have no verifiable connection-incarnation provenance.
+                // Timestamps from the current connection are insufficient because a
+                // reusable profile ID may have inherited stale destination state.
+                // Fail closed rather than guessing historical ownership.
+                false
+            };
         }
     };
 
@@ -1501,7 +1500,7 @@ persistent actor {
                             case null { false };
                             case (?record) {
                                 activityIndexContains(profileId, recordId) and
-                                recordBelongsToProfileIncarnation(profileId, profile, record)
+                                recordBelongsToProfileIncarnation(profile, record)
                             };
                         }
                     };
@@ -1512,11 +1511,10 @@ persistent actor {
 
     private func canReadActivityRecord(
         caller : Principal,
-        profileId : ProfileId,
         profile : Profile,
         record : ActivityRecord
     ) : Bool {
-        if (not recordBelongsToProfileIncarnation(profileId, profile, record)) {
+        if (not recordBelongsToProfileIncarnation(profile, record)) {
             return false
         };
         if (caller == profile.owner) {
@@ -1569,7 +1567,7 @@ persistent actor {
                         case null { true };
                         case (?at) { record.activity_type == at };
                     };
-                    if (appMatch and typeMatch and canReadActivityRecord(caller, profileId, profile, record)) {
+                    if (appMatch and typeMatch and canReadActivityRecord(caller, profile, record)) {
                         buf.add(record)
                     }
                 };
