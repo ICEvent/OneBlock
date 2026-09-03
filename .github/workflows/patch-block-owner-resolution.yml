@@ -1,0 +1,99 @@
+name: Patch Block Owner Resolution
+
+on:
+  push:
+    branches:
+      - feat/block-visibility-latest-update
+    paths:
+      - .github/workflows/patch-block-owner-resolution.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/block-visibility-latest-update
+      - name: Preserve ownership across profile id changes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/oneblock_backend/main.mo')
+          text = path.read_text()
+          old = '''    public query ({ caller }) func getBlock(blockId : Text) : async ?Block {
+        switch (blocks.get(blockId)) {
+            case null { null };
+            case (?block) {
+                switch (profiles.get(block.profile_id)) {
+                    case null { null };
+                    case (?profile) {
+                        if (canReadBlock(caller, profile, block)) { ?block } else { null }
+                    };
+                }
+            };
+        }
+    };
+'''
+          new = '''    private func profileContainsBlock(profile : Profile, blockId : Text) : Bool {
+        for (candidateId in profile.blocks.vals()) {
+            if (candidateId == blockId) {
+                return true
+            }
+        };
+        false
+    };
+
+    // A block keeps the profile id that existed when it was created. `changeId`
+    // moves the profile without rewriting historical blocks, so authorization must
+    // resolve ownership through the profile's current block index. We also verify
+    // membership before trusting block.profile_id because an old id may be reused.
+    private func resolveBlockProfile(block : Block) : ?Profile {
+        switch (profiles.get(block.profile_id)) {
+            case (?profile) {
+                if (profileContainsBlock(profile, block.id)) {
+                    return ?profile
+                }
+            };
+            case null {};
+        };
+        for (profile in profiles.vals()) {
+            if (profileContainsBlock(profile, block.id)) {
+                return ?profile
+            }
+        };
+        null
+    };
+
+    public query ({ caller }) func getBlock(blockId : Text) : async ?Block {
+        switch (blocks.get(blockId)) {
+            case null { null };
+            case (?block) {
+                switch (resolveBlockProfile(block)) {
+                    case null { null };
+                    case (?profile) {
+                        if (canReadBlock(caller, profile, block)) { ?block } else { null }
+                    };
+                }
+            };
+        }
+    };
+'''
+          if text.count(old) != 1:
+              raise SystemExit(f'Expected getBlock section exactly once, found {text.count(old)}')
+          path.write_text(text.replace(old, new))
+          PY
+          git diff --check
+      - name: Commit fix and remove helper workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/oneblock_backend/main.mo
+          git rm .github/workflows/patch-block-owner-resolution.yml
+          git commit -m "fix: resolve block owner across profile renames"
+          git push origin HEAD:feat/block-visibility-latest-update
