@@ -396,6 +396,33 @@ persistent actor {
                                         last_updated = Time.now()
                                     }
                                 );
+                                // Keep integration ownership/indexes attached to the profile when its public id changes.
+                                switch (profileActivityIndex.get(oid)) {
+                                    case (?recordIds) {
+                                        profileActivityIndex.put(nid, recordIds);
+                                        ignore profileActivityIndex.remove(oid);
+                                    };
+                                    case null {};
+                                };
+                                for (app in integrationApps.vals()) {
+                                    let oldConnectionKey = oid # ":" # app.id;
+                                    switch (connections.get(oldConnectionKey)) {
+                                        case (?connection) {
+                                            let newConnectionKey = nid # ":" # app.id;
+                                            connections.put(newConnectionKey, { connection with profile_id = nid });
+                                            ignore connections.remove(oldConnectionKey);
+                                        };
+                                        case null {};
+                                    }
+                                };
+                                for ((oldSummaryKey, summary) in Iter.toArray(derivedSummaries.entries()).vals()) {
+                                    if (summary.profile_id == oid) {
+                                        let newSummaryKey = nid # ":" # summary.app_id # ":" # summary.activity_type;
+                                        derivedSummaries.put(newSummaryKey, { summary with profile_id = nid });
+                                        ignore derivedSummaries.remove(oldSummaryKey);
+                                    }
+                                };
+
                                 ignore profiles.remove(oid);
                                 userprofiles.put(p.owner, nid);
                                 #ok(1)
@@ -857,28 +884,69 @@ persistent actor {
         };
     };
 
-    public query func getTrait(traitId : Text) : async ?Trait {
-        traits.get(traitId)
+    private func profileContainsTrait(profile : Profile, traitId : Text) : Bool {
+        for (candidateId in profile.traits.vals()) {
+            if (candidateId == traitId) {
+                return true
+            }
+        };
+        false
     };
 
-    public query func getTraits(profileId : Text) : async [Trait] {
-        let profile = profiles.get(profileId);
-        switch (profile) {
-            case (?p) {
+    private func callerOwnsTrait(caller : Principal, traitId : Text) : Bool {
+        switch (userprofiles.get(caller)) {
+            case null { false };
+            case (?profileId) {
+                switch (profiles.get(profileId)) {
+                    case null { false };
+                    case (?profile) { profileContainsTrait(profile, traitId) };
+                }
+            };
+        }
+    };
+
+    private func canReadTrait(caller : Principal, profile : Profile, trait : Trait) : Bool {
+        if (caller == profile.owner) {
+            return true
+        };
+        switch (trait.visibility) {
+            case (#global) { true };
+            case (#unlisted) { false };
+            case (#personal) { false };
+        }
+    };
+
+    public query ({ caller }) func getTrait(traitId : Text) : async ?Trait {
+        switch (traits.get(traitId)) {
+            case null { null };
+            case (?trait) {
+                switch (trait.visibility) {
+                    case (#global) { ?trait };
+                    case (#unlisted) { if (callerOwnsTrait(caller, traitId)) { ?trait } else { null } };
+                    case (#personal) { if (callerOwnsTrait(caller, traitId)) { ?trait } else { null } };
+                }
+            };
+        }
+    };
+
+    public query ({ caller }) func getTraits(profileId : Text) : async [Trait] {
+        switch (profiles.get(profileId)) {
+            case (?profile) {
                 let traitList = Buffer.Buffer<Trait>(0);
-                for (traitId in p.traits.vals()) {
-                    let trait = traits.get(traitId);
-                    switch (trait) {
-                        case (?t) {
-                            traitList.add(t);
+                for (traitId in profile.traits.vals()) {
+                    switch (traits.get(traitId)) {
+                        case (?trait) {
+                            if (canReadTrait(caller, profile, trait)) {
+                                traitList.add(trait)
+                            }
                         };
                         case null {};
-                    };
+                    }
                 };
                 Buffer.toArray(traitList)
             };
             case null { [] };
-        };
+        }
     };
 
     //----------------------------- Integration System ------------------------------------
@@ -1131,48 +1199,154 @@ persistent actor {
         #ok(recordId)
     };
 
-    public query func getActivityRecord(recordId : RecordId) : async ?ActivityRecord {
-        activityRecordsMap.get(recordId)
+    private func activityIndexContains(profileId : ProfileId, recordId : RecordId) : Bool {
+        switch (profileActivityIndex.get(profileId)) {
+            case null { false };
+            case (?recordIds) {
+                for (candidateId in recordIds.vals()) {
+                    if (candidateId == recordId) {
+                        return true
+                    }
+                };
+                false
+            };
+        }
+    };
+
+    private func callerOwnsActivityRecord(caller : Principal, recordId : RecordId) : Bool {
+        switch (userprofiles.get(caller)) {
+            case null { false };
+            case (?profileId) { activityIndexContains(profileId, recordId) };
+        }
+    };
+
+    private func canReadActivityRecord(caller : Principal, profile : Profile, record : ActivityRecord) : Bool {
+        if (caller == profile.owner) {
+            return true
+        };
+        switch (record.visibility) {
+            case (#global) { true };
+            case (#unlisted) { false };
+            case (#personal) { false };
+        }
+    };
+
+    public query ({ caller }) func getActivityRecord(recordId : RecordId) : async ?ActivityRecord {
+        switch (activityRecordsMap.get(recordId)) {
+            case null { null };
+            case (?record) {
+                switch (record.visibility) {
+                    case (#global) { ?record };
+                    case (#unlisted) { if (callerOwnsActivityRecord(caller, recordId)) { ?record } else { null } };
+                    case (#personal) { if (callerOwnsActivityRecord(caller, recordId)) { ?record } else { null } };
+                }
+            };
+        }
     };
 
     // List activity records for a profile, optionally filtered by app and/or activity type.
-    public query func getActivityRecords(
+    public query ({ caller }) func getActivityRecords(
         profileId : ProfileId,
         appId : ?AppId,
         activityType : ?ActivityTypeKey
     ) : async [ActivityRecord] {
+        let profile = switch (profiles.get(profileId)) {
+            case null { return [] };
+            case (?profile) { profile };
+        };
         let ids = switch (profileActivityIndex.get(profileId)) {
             case null { return [] };
-            case (?ids) { ids }
+            case (?ids) { ids };
         };
         let buf = Buffer.Buffer<ActivityRecord>(0);
         for (rid in ids.vals()) {
             switch (activityRecordsMap.get(rid)) {
                 case null {};
-                case (?r) {
+                case (?record) {
                     let appMatch = switch (appId) {
                         case null { true };
-                        case (?aid) { r.app_id == aid }
+                        case (?aid) { record.app_id == aid };
                     };
                     let typeMatch = switch (activityType) {
                         case null { true };
-                        case (?at) { r.activity_type == at }
+                        case (?at) { record.activity_type == at };
                     };
-                    if (appMatch and typeMatch) {
-                        buf.add(r)
+                    if (appMatch and typeMatch and canReadActivityRecord(caller, profile, record)) {
+                        buf.add(record)
                     }
-                }
+                };
             }
         };
         Buffer.toArray(buf)
     };
 
-    public query func getDerivedSummary(
+    // Summaries are computed from the caller-visible record set so private records
+    // cannot leak through aggregate counts or amounts. The write-side summary map is
+    // retained as a cache for future internal use, but is not exposed directly.
+    public query ({ caller }) func getDerivedSummary(
         profileId : ProfileId,
         appId : AppId,
         activityType : ActivityTypeKey
     ) : async ?DerivedSummary {
-        derivedSummaries.get(summaryKey(profileId, appId, activityType))
+        let profile = switch (profiles.get(profileId)) {
+            case null { return null };
+            case (?profile) { profile };
+        };
+        let ids = switch (profileActivityIndex.get(profileId)) {
+            case null { return null };
+            case (?ids) { ids };
+        };
+
+        var recordCount : Nat = 0;
+        var totalAmount : ?Float = null;
+        var currency : ?Text = null;
+        var currencyInitialized = false;
+        var lastUpdated : Int = 0;
+
+        for (rid in ids.vals()) {
+            switch (activityRecordsMap.get(rid)) {
+                case null {};
+                case (?record) {
+                    if (
+                        record.app_id == appId and
+                        record.activity_type == activityType and
+                        canReadActivityRecord(caller, profile, record)
+                    ) {
+                        recordCount += 1;
+                        switch (record.amount) {
+                            case null {};
+                            case (?amount) {
+                                totalAmount := switch (totalAmount) {
+                                    case null { ?amount };
+                                    case (?total) { ?(total + amount) };
+                                }
+                            };
+                        };
+                        if (not currencyInitialized) {
+                            currency := record.currency;
+                            currencyInitialized := true
+                        };
+                        if (record.ingest_timestamp > lastUpdated) {
+                            lastUpdated := record.ingest_timestamp
+                        }
+                    }
+                };
+            }
+        };
+
+        if (recordCount == 0) {
+            null
+        } else {
+            ?{
+                profile_id = profileId;
+                app_id = appId;
+                activity_type = activityType;
+                record_count = recordCount;
+                total_amount = totalAmount;
+                currency = currency;
+                last_updated = lastUpdated;
+            }
+        }
     };
 
     public query func getApp(appId : AppId) : async ?IntegrationApp {
