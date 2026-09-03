@@ -73,12 +73,15 @@ persistent actor {
     var stableActivityConnectionEpochs : [(Text, Int)] = []; // recordId -> connection.created_at (audit provenance)
     var stableActivityLifecycleIds : [(Text, Nat)] = []; // recordId -> profile lifecycle token
     var stableActivityCurrentProfiles : [(Text, Text)] = []; // recordId -> current profileId
-    var stableIdempotencyKeys : [(Text, Text)] = []; // idempotency_key -> record_id
+    var stableIdempotencyKeys : [(Text, Text)] = []; // namespaced idempotency key -> record/factor id
     var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]
+    var stableOrphanedProfileIntegrationState : [(Text, Bool)] = []; // reusable profile IDs with legacy orphaned state
     var stableDerivedSummaries : [(Text, DerivedSummary)] = [];
     var stablePublicDerivedSummaries : [(Text, DerivedSummary)] = [];
     var integrationCompositeKeysMigratedV1 : Bool = false;
     var idempotencyCompositeKeysMigratedV1 : Bool = false;
+    var idempotencyNamespacesMigratedV2 : Bool = false;
+    var orphanedProfileStateIndexMigratedV1 : Bool = false;
     var profileLifecycleTokensMigratedV1 : Bool = false;
     var summaryCachesMigratedV1 : Bool = false;
     var stableIdentityGraphs : [(Text, IdentityGraph)] = [];
@@ -155,6 +158,9 @@ persistent actor {
     transient var profileActivityIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
     profileActivityIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileActivityIndex), Text.equal, Text.hash);
 
+    transient var orphanedProfileIntegrationState = TrieMap.TrieMap<Text, Bool>(Text.equal, Text.hash);
+    orphanedProfileIntegrationState := TrieMap.fromEntries<Text, Bool>(Iter.fromArray(stableOrphanedProfileIntegrationState), Text.equal, Text.hash);
+
     transient var derivedSummaries = TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
     derivedSummaries := TrieMap.fromEntries<Text, DerivedSummary>(Iter.fromArray(stableDerivedSummaries), Text.equal, Text.hash);
     transient var publicDerivedSummaries = TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
@@ -189,6 +195,7 @@ persistent actor {
         stableActivityCurrentProfiles := Iter.toArray(activityCurrentProfiles.entries());
         stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());
         stableProfileActivityIndex := Iter.toArray(profileActivityIndex.entries());
+        stableOrphanedProfileIntegrationState := Iter.toArray(orphanedProfileIntegrationState.entries());
         stableDerivedSummaries := Iter.toArray(derivedSummaries.entries());
         stablePublicDerivedSummaries := Iter.toArray(publicDerivedSummaries.entries());
         stableIdentityGraphs := Iter.toArray(identityGraphs.entries());
@@ -218,6 +225,7 @@ persistent actor {
         stableActivityCurrentProfiles := [];
         stableIdempotencyKeys := [];
         stableProfileActivityIndex := [];
+        stableOrphanedProfileIntegrationState := [];
         stableDerivedSummaries := [];
 
         // Give every current profile a distinct internal lifecycle token once.
@@ -261,14 +269,71 @@ persistent actor {
             integrationCompositeKeysMigratedV1 := true
         };
 
-        // Rebuild ambiguous legacy app:idempotency keys from the record's stored
-        // identity fields. The new length-prefixed key is collision-free.
-        if (not idempotencyCompositeKeysMigratedV1) {
+        // Rebuild both idempotency namespaces from durable source records. Activity
+        // entries come from ActivityRecord; provider entries come from internal
+        // provider_submission history events, whose metadata stores provider_id and
+        // idempotency_key. This preserves replay protection across the V1->V2 key
+        // migration instead of resetting the provider namespace.
+        if (not idempotencyNamespacesMigratedV2) {
             idempotencyKeys := TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);
             for (record in activityRecordsMap.vals()) {
                 idempotencyKeys.put(idempotencyKey(record.app_id, record.idempotency_key), record.id)
             };
-            idempotencyCompositeKeysMigratedV1 := true
+            for (graph in identityGraphs.vals()) {
+                for (event in graph.history.vals()) {
+                    switch (event.reason) {
+                        case (?reason) {
+                            if (reason == "provider_submission") {
+                                switch (event.factor_id) {
+                                    case (?factorId) {
+                                        switch (metadataValue(event.metadata, "provider_id")) {
+                                            case (?providerId) {
+                                                switch (metadataValue(event.metadata, "idempotency_key")) {
+                                                    case (?idem) {
+                                                        idempotencyKeys.put(providerIdemKey(providerId, idem), factorId)
+                                                    };
+                                                    case null {};
+                                                }
+                                            };
+                                            case null {};
+                                        }
+                                    };
+                                    case null {};
+                                }
+                            }
+                        };
+                        case null {};
+                    }
+                }
+            };
+            idempotencyCompositeKeysMigratedV1 := true;
+            idempotencyNamespacesMigratedV2 := true
+        };
+
+        // Discover reusable IDs that actually carry orphaned legacy integration
+        // state once during upgrade. Normal profile creation then performs only an
+        // O(1) marker lookup; global cleanup scans are reserved for flagged IDs.
+        if (not orphanedProfileStateIndexMigratedV1) {
+            orphanedProfileIntegrationState := TrieMap.TrieMap<Text, Bool>(Text.equal, Text.hash);
+            for ((profileId, _) in profileActivityIndex.entries()) {
+                if (profiles.get(profileId) == null) { orphanedProfileIntegrationState.put(profileId, true) }
+            };
+            for ((_, currentProfileId) in activityCurrentProfiles.entries()) {
+                if (profiles.get(currentProfileId) == null) { orphanedProfileIntegrationState.put(currentProfileId, true) }
+            };
+            for ((_, connection) in connections.entries()) {
+                if (profiles.get(connection.profile_id) == null) { orphanedProfileIntegrationState.put(connection.profile_id, true) }
+            };
+            for ((_, summary) in derivedSummaries.entries()) {
+                if (profiles.get(summary.profile_id) == null) { orphanedProfileIntegrationState.put(summary.profile_id, true) }
+            };
+            for ((_, summary) in publicDerivedSummaries.entries()) {
+                if (profiles.get(summary.profile_id) == null) { orphanedProfileIntegrationState.put(summary.profile_id, true) }
+            };
+            for ((profileId, _) in profileLifecycleIds.entries()) {
+                if (profiles.get(profileId) == null) { orphanedProfileIntegrationState.put(profileId, true) }
+            };
+            orphanedProfileStateIndexMigratedV1 := true
         };
 
         // One-time compatibility migration for deployments created before the
@@ -374,7 +439,15 @@ persistent actor {
         "factor_" # Nat.toText(factorIdCounter)
     };
     private func edgeKey(fromP : Text, toP : Text, context : Text) : Text { fromP # "->" # toP # ":" # context };
-    private func providerIdemKey(providerId : Text, idem : Text) : Text { "provider:" # providerId # ":" # idem };
+    private func providerIdemKey(providerId : Text, idem : Text) : Text {
+        "provider-idempotency:" # keyPart(providerId) # keyPart(idem)
+    };
+    private func metadataValue(metadata : [MetadataEntry], key : Text) : ?Text {
+        for (entry in metadata.vals()) {
+            if (entry.key == key) { return ?entry.value }
+        };
+        null
+    };
     private func scoreForCategory(weights : PolicyWeights, c : Types.FactorCategory) : Float {
         switch (c) { case (#existence) weights.existence; case (#continuity) weights.continuity; case (#human) weights.human; case (#social) weights.social; case (#economic) weights.economic; case (#reputation) weights.reputation }
     };
@@ -446,6 +519,14 @@ persistent actor {
                 ignore publicDerivedSummaries.remove(summaryKeyToRemove)
             }
         }
+        ignore orphanedProfileIntegrationState.remove(profileId)
+    };
+
+    private func purgeReusableProfileIntegrationStateIfNeeded(profileId : ProfileId) {
+        switch (orphanedProfileIntegrationState.get(profileId)) {
+            case (?true) { purgeReusableProfileIntegrationState(profileId) };
+            case _ {};
+        }
     };
 
     public shared ({ caller }) func createProfile(newProfile : Types.NewProfile) : async Result.Result<Nat, Text> {
@@ -472,7 +553,7 @@ persistent actor {
                             } else {
                                 // Claiming an unused public ID starts a new lifecycle. Purge any
                                 // orphaned state before exposing the new profile incarnation.
-                                purgeReusableProfileIntegrationState(newProfile.id);
+                                purgeReusableProfileIntegrationStateIfNeeded(newProfile.id);
                                 let lifecycleId = nextProfileLifecycleId();
                                 profileLifecycleIds.put(newProfile.id, lifecycleId);
                                 profiles.put(
@@ -616,7 +697,7 @@ persistent actor {
                                 );
                                 // A public profile ID is reusable. Purge any destination-only
                                 // state left by an earlier incarnation before moving source state.
-                                purgeReusableProfileIntegrationState(nid);
+                                purgeReusableProfileIntegrationStateIfNeeded(nid);
                                 profileLifecycleIds.put(nid, sourceLifecycleId);
                                 ignore profileLifecycleIds.remove(oid);
 
