@@ -1,0 +1,37 @@
+name: Apply PR17 Provenance Key Fixes
+
+on:
+  push:
+    branches:
+      - fix/evidence-visibility-boundaries
+    paths:
+      - 'scripts/apply-pr17-provenance-key-fixes.py'
+      - '.github/workflows/apply-pr17-provenance-key-fixes.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/evidence-visibility-boundaries
+          fetch-depth: 0
+
+      - name: Apply reviewed fixes
+        run: python3 scripts/apply-pr17-provenance-key-fixes.py
+
+      - name: Remove helper files
+        run: |
+          rm scripts/apply-pr17-provenance-key-fixes.py
+          rm .github/workflows/apply-pr17-provenance-key-fixes.yml
+
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/oneblock_backend/main.mo scripts/apply-pr17-provenance-key-fixes.py .github/workflows/apply-pr17-provenance-key-fixes.yml
+          git commit -m 'fix: bind activity records to connection epochs'
+          git push origin HEAD:fix/evidence-visibility-boundaries
