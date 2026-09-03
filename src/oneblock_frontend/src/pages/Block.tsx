@@ -55,7 +55,13 @@ const BlockPage = () => {
           ownerText ? oneblock.getScores(ownerText).catch(() => []) : Promise.resolve([]),
         ]);
         if (!active) return;
-        setBlocks(blocksData as Block[]);
+
+        // This route is the public chain view. The backend intentionally lets an
+        // owner read every visibility level, so filter again at the presentation
+        // boundary to prevent an authenticated owner from rendering private data
+        // into a page that is explicitly presented as public.
+        const publicBlocks = (blocksData as Block[]).filter(block => 'global' in block.visibility);
+        setBlocks(publicBlocks);
         const [scoreData] = scoreResult;
         if (scoreData) setScores(scoreData);
       } catch (error) {
