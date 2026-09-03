@@ -695,20 +695,71 @@ persistent actor {
         };
     };
 
-    public query func getBlock(blockId : Text) : async ?Block {
-        blocks.get(blockId)
+    // Block visibility is enforced at the read boundary. Owners can always read
+    // their own blocks. Non-owners can read global blocks only. Unlisted
+    // remains owner-only until OneBlock has unguessable capability-based share links.
+    private func canReadBlock(caller : Principal, profile : Profile, block : Block) : Bool {
+        if (caller == profile.owner) {
+            return true
+        };
+        switch (block.visibility) {
+            case (#global) { true };
+            case (#unlisted) { false };
+            case (#personal) { false };
+        }
     };
 
-    public query func listBlocks(profileId : Text) : async [Block] {
+    private func callerOwnsBlock(caller : Principal, blockId : Text) : Bool {
+        switch (userprofiles.get(caller)) {
+            case null { false };
+            case (?profileId) {
+                switch (profiles.get(profileId)) {
+                    case null { false };
+                    case (?profile) {
+                        for (candidateId in profile.blocks.vals()) {
+                            if (candidateId == blockId) {
+                                return true
+                            }
+                        };
+                        false
+                    };
+                }
+            };
+        }
+    };
+
+    // Direct reads do not trust block.profile_id for authorization. Profile IDs
+    // can change, while a historical block keeps the ID it was created under.
+    // Ownership is resolved through the caller's current profile block index,
+    // which also prevents a reused old profile ID from hijacking block access.
+    public query ({ caller }) func getBlock(blockId : Text) : async ?Block {
+        switch (blocks.get(blockId)) {
+            case null { null };
+            case (?block) {
+                switch (block.visibility) {
+                    case (#global) { ?block };
+                    case (#unlisted) {
+                        if (callerOwnsBlock(caller, blockId)) { ?block } else { null }
+                    };
+                    case (#personal) {
+                        if (callerOwnsBlock(caller, blockId)) { ?block } else { null }
+                    };
+                }
+            };
+        }
+    };
+
+    public query ({ caller }) func listBlocks(profileId : Text) : async [Block] {
         let profile = profiles.get(profileId);
         switch (profile) {
             case (?p) {
                 let blockList = Buffer.Buffer<Block>(0);
                 for (blockId in p.blocks.vals()) {
-                    let block = blocks.get(blockId);
-                    switch (block) {
+                    switch (blocks.get(blockId)) {
                         case (?b) {
-                            blockList.add(b);
+                            if (canReadBlock(caller, p, b)) {
+                                blockList.add(b)
+                            }
                         };
                         case null {};
                     };
@@ -719,15 +770,18 @@ persistent actor {
         };
     };
 
-    public query func getChain(profileId : Text) : async [Block] {
+    public query ({ caller }) func getChain(profileId : Text) : async [Block] {
         let profile = profiles.get(profileId);
         let blockList = switch (profile) {
             case (?p) {
                 let list = Buffer.Buffer<Block>(0);
                 for (blockId in p.blocks.vals()) {
-                    let block = blocks.get(blockId);
-                    switch (block) {
-                        case (?b) { list.add(b); };
+                    switch (blocks.get(blockId)) {
+                        case (?b) {
+                            if (canReadBlock(caller, p, b)) {
+                                list.add(b)
+                            }
+                        };
                         case null {};
                     };
                 };
