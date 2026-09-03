@@ -709,14 +709,40 @@ persistent actor {
         }
     };
 
+    private func callerOwnsBlock(caller : Principal, blockId : Text) : Bool {
+        switch (userprofiles.get(caller)) {
+            case null { false };
+            case (?profileId) {
+                switch (profiles.get(profileId)) {
+                    case null { false };
+                    case (?profile) {
+                        for (candidateId in profile.blocks.vals()) {
+                            if (candidateId == blockId) {
+                                return true
+                            }
+                        };
+                        false
+                    };
+                }
+            };
+        }
+    };
+
+    // Direct reads do not trust block.profile_id for authorization. Profile IDs
+    // can change, while a historical block keeps the ID it was created under.
+    // Ownership is resolved through the caller's current profile block index,
+    // which also prevents a reused old profile ID from hijacking block access.
     public query ({ caller }) func getBlock(blockId : Text) : async ?Block {
         switch (blocks.get(blockId)) {
             case null { null };
             case (?block) {
-                switch (profiles.get(block.profile_id)) {
-                    case null { null };
-                    case (?profile) {
-                        if (canReadBlock(caller, profile, block)) { ?block } else { null }
+                switch (block.visibility) {
+                    case (#global) { ?block };
+                    case (#unlisted) {
+                        if (callerOwnsBlock(caller, blockId)) { ?block } else { null }
+                    };
+                    case (#personal) {
+                        if (callerOwnsBlock(caller, blockId)) { ?block } else { null }
                     };
                 }
             };
