@@ -1,75 +1,72 @@
-import React, { useEffect } from 'react';
-import moment from 'moment';
+import React from 'react';
 import { Profile } from '../types/profile';
 
-interface ProfileSidebarProps  {
+interface ProfileSidebarProps {
   profile: Profile;
   tags: string[];
   blockCount?: number;
   traitCount?: number;
 }
 
-const ProfileSidebar: React.FC<ProfileSidebarProps>  = ( {profile, tags, blockCount = 0, traitCount = 0} ) => {
-
+const ProfileSidebar: React.FC<ProfileSidebarProps> = ({ profile, tags, blockCount = 0, traitCount = 0 }) => {
   return (
     <div className="profile-sidebar-container">
-      <section className="profile-section">
-      <div className="profile-avatar">
-        {profile.pfp ? (
-          <img src={profile.pfp} alt={profile.name} />
-        ) : (
-          <div className="avatar-placeholder">
-            {profile.name?.charAt(0).toUpperCase()}
+      <section className="profile-section profile-identity-card">
+        <span className="section-eyebrow">Public profile</span>
+        <div className="profile-avatar">
+          {profile.pfp ? (
+            <img src={profile.pfp} alt={profile.name || 'Profile'} />
+          ) : (
+            <div className="avatar-placeholder" aria-hidden="true">
+              {profile.name?.charAt(0).toUpperCase() || '?'}
+            </div>
+          )}
+        </div>
+        <h2>{profile.name}</h2>
+        {profile.id && <div className="profile-handle">@{profile.id}</div>}
+        {profile.bio && <p className="intro">{profile.bio}</p>}
+
+        {(blockCount > 0 || traitCount > 0) && (
+          <div className="chain-stats">
+            {blockCount > 0 && (
+              <div className="chain-stat">
+                <span className="stat-value">{blockCount}</span>
+                <span className="stat-label">block{blockCount !== 1 ? 's' : ''}</span>
+              </div>
+            )}
+            {traitCount > 0 && (
+              <div className="chain-stat">
+                <span className="stat-value">{traitCount}</span>
+                <span className="stat-label">trait{traitCount !== 1 ? 's' : ''}</span>
+              </div>
+            )}
           </div>
         )}
-      </div>
-      <h2>{profile.name}</h2>
-      {profile.id && <h5>@{profile.id}</h5>}
-      
-      <p className="intro">{profile.bio}</p>
-      
-      {(blockCount > 0 || traitCount > 0) && (
-        <div className="chain-stats">
-          {blockCount > 0 && (
-            <div className="chain-stat">
-              <span className="stat-value">{blockCount}</span>
-              <span className="stat-label">block{blockCount !== 1 ? 's' : ''}</span>
-            </div>
-          )}
-          {traitCount > 0 && (
-            <div className="chain-stat">
-              <span className="stat-value">{traitCount}</span>
-              <span className="stat-label">trait{traitCount !== 1 ? 's' : ''}</span>
-            </div>
-          )}
-        </div>
-      )}
 
-      {tags.length > 0 && <div className="tags-section">
-        
-        <div className="tags-list">
-          {tags.map((tag, i) => (
-            <span key={i} className="tag">{tag}</span>
-          ))}
-        </div>
-      </div>}
-      
-      </section>      
+        {tags.length > 0 && (
+          <div className="tags-list">
+            {tags.map((tag, i) => <span key={i} className="tag">{tag}</span>)}
+          </div>
+        )}
+      </section>
 
-      <div className="links-section">        
-        <ul>
-          {profile.links?.map((link, i) => (
-            <li key={i}>
-            <a href={link.url} className="link-item" target="_blank" rel="noopener noreferrer">
-            <span className="link-title">{link.name}</span>
-            <span className="material-icons link-icon">link</span>
-              
-            </a>
-          </li>
-          ))}
-        </ul>
-      </div>
-      {/* <div>Since {moment.unix((profile.createtime)).format("MMM DD, YY")}</div> */}
+      <section className="profile-section profile-sources-card">
+        <div className="profile-section-label">Connected sources</div>
+        {profile.links?.length ? (
+          <ul className="profile-links-list">
+            {profile.links.map((link, i) => (
+              <li key={i}>
+                <a href={link.url} className="link-item" target="_blank" rel="noopener noreferrer">
+                  <span className="link-title">{link.name}</span>
+                  <span className="material-icons link-icon" aria-hidden="true">north_east</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="profile-sources-empty">No public sources connected yet.</p>
+        )}
+      </section>
     </div>
   );
 };

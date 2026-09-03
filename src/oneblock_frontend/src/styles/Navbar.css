@@ -3,20 +3,18 @@
 }
 
 .navbar {
-  position: fixed;
+  position: sticky;
   top: 0;
-  left: 0;
-  right: 0;
   z-index: 1000;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 32px;
+  padding: 0 max(20px, calc((100vw - var(--content-max)) / 2));
   height: var(--navbar-height);
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.90);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(165, 243, 252, 0.65);
   box-sizing: border-box;
 }
 
@@ -24,91 +22,96 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 170px;
 }
 
 .nav-logo {
-  height: 28px;
+  height: 30px;
   width: auto;
 }
 
 .nav-brand a {
   display: flex;
   align-items: center;
-  font-weight: 700;
+  font-weight: 750;
   font-size: 18px;
   color: var(--text-primary);
   text-decoration: none;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.35px;
 }
 
 .nav-brand a span {
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
+  -webkit-text-fill-color: currentColor;
 }
 
 .nav-links {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
 }
 
 .nav-links a {
   color: var(--text-secondary);
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 14px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  transition: all 0.2s;
+  padding: 8px 12px;
+  border-radius: 9px;
+  transition: color 0.18s, background 0.18s;
 }
 
 .nav-links a:hover {
-  color: var(--text-primary);
-  background: var(--bg-card-hover);
+  color: var(--accent);
+  background: #ecfeff;
 }
 
 .nav-links a.active {
-  color: var(--accent);
-  background: rgba(99, 102, 241, 0.1);
+  color: var(--accent-strong);
+  background: #ecfeff;
+}
+
+.login-btn,
+.logout-btn {
+  border-radius: 9px;
+  cursor: pointer;
+  font-weight: 650;
+  font-size: 14px;
+  transition: color 0.18s, background 0.18s, border-color 0.18s;
+  box-shadow: none;
 }
 
 .login-btn {
-  background: var(--accent-gradient);
+  background: var(--accent);
   color: #fff;
-  border: none;
-  padding: 8px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 14px;
-  transition: all 0.2s;
-  box-shadow: none;
+  border: 1px solid var(--accent);
+  padding: 8px 16px;
 }
 
-.login-btn:hover {
-  opacity: 0.9;
-  box-shadow: none;
-  transform: translateY(-1px);
+.login-btn:hover:not(:disabled) {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  transform: none;
+  opacity: 1;
+}
+
+.login-btn:disabled {
+  opacity: 0.48;
+  cursor: wait;
 }
 
 .logout-btn {
-  background: transparent;
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
-  padding: 7px 18px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 14px;
-  transition: all 0.2s;
+  background: #ecfeff;
+  color: var(--accent-strong);
+  border: 1px solid #a5f3fc;
+  padding: 7px 14px;
 }
 
 .logout-btn:hover {
-  border-color: var(--border-hover);
-  color: var(--text-primary);
-  background: var(--bg-card);
+  border-color: #67e8f9;
+  color: #164e63;
+  background: #cffafe;
+  transform: none;
 }
 
 .menu-toggle {
@@ -119,13 +122,13 @@
   font-size: 24px;
   cursor: pointer;
   padding: 8px;
-  border-radius: 8px;
-  transition: all 0.2s;
+  border-radius: 9px;
+  transition: background 0.18s, color 0.18s;
 }
 
 .menu-toggle:hover {
-  background: var(--bg-card);
-  color: var(--text-primary);
+  background: #ecfeff;
+  color: var(--accent-strong);
 }
 
 @media (max-width: 768px) {
@@ -135,8 +138,13 @@
 
   .navbar {
     padding: 0 16px;
-    position: relative;
+    min-height: var(--navbar-height);
+    height: auto;
     flex-wrap: wrap;
+  }
+
+  .nav-brand {
+    min-width: auto;
   }
 
   .menu-toggle {
@@ -148,10 +156,10 @@
     width: 100%;
     flex-direction: column;
     align-items: stretch;
-    padding: 12px 0;
+    padding: 10px 0 12px;
     gap: 4px;
     background: rgba(255, 255, 255, 0.97);
-    border-top: 1px solid var(--border);
+    border-top: 1px solid #cffafe;
   }
 
   .nav-links.active {

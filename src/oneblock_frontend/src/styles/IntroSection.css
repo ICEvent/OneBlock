@@ -1,44 +1,42 @@
 .intro-section {
-  min-height: 100vh;
+  min-height: calc(100vh - var(--navbar-height));
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: calc(var(--navbar-height) + 2rem) 1.5rem 4rem;
-  background: var(--bg-primary);
+  padding: 3rem 1.5rem 4rem;
+  background: transparent;
   position: relative;
   overflow: hidden;
 }
 
-/* Subtle grid background */
 .intro-section::before {
   content: '';
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(99, 102, 241, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99, 102, 241, 0.04) 1px, transparent 1px);
-  background-size: 48px 48px;
+    linear-gradient(rgba(6, 182, 212, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(6, 182, 212, 0.035) 1px, transparent 1px);
+  background-size: 52px 52px;
   pointer-events: none;
 }
 
-/* Radial glow */
 .intro-section::after {
   content: '';
   position: absolute;
-  top: 20%;
+  top: 8%;
   left: 50%;
   transform: translateX(-50%);
-  width: 700px;
-  height: 500px;
-  background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
+  width: 760px;
+  height: 520px;
+  background: radial-gradient(ellipse at center, rgba(34, 211, 238, 0.16) 0%, rgba(96, 165, 250, 0.07) 35%, transparent 72%);
   pointer-events: none;
 }
 
 .intro-hero {
-  max-width: 1100px;
+  width: min(1100px, 100%);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: minmax(0, 1fr) 360px;
   gap: 4rem;
   align-items: center;
   position: relative;
@@ -48,22 +46,22 @@
 .hero-left {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.35rem;
 }
 
 .hero-eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.25);
-  color: #4338ca;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
+  background: #ecfeff;
+  border: 1px solid #a5f3fc;
+  color: var(--accent-strong);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  padding: 5px 12px;
-  border-radius: 100px;
+  padding: 5px 11px;
+  border-radius: 999px;
   width: fit-content;
 }
 
@@ -71,9 +69,8 @@
   content: '';
   width: 6px;
   height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: none;
+  border-radius: 999px;
+  background: var(--accent-emerald);
   animation: blink 2s infinite;
 }
 
@@ -83,97 +80,96 @@
 }
 
 .intro-title {
-  font-size: 3.75rem;
+  font-size: clamp(2.65rem, 5vw, 3.75rem);
   font-weight: 800;
-  letter-spacing: -2px;
+  letter-spacing: -0.055em;
   margin: 0;
   color: var(--text-primary);
-  line-height: 1.05;
+  line-height: 1.03;
 }
 
 .intro-title .gradient-text {
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--accent-strong);
+  background: none;
+  -webkit-text-fill-color: currentColor;
 }
 
 .intro-tagline {
-  font-size: 1.1rem;
+  font-size: 1.06rem;
   color: var(--text-secondary);
   margin: 0;
-  font-weight: 400;
-  line-height: 1.65;
+  font-weight: 450;
+  line-height: 1.6;
 }
 
 .hero-description {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: var(--text-muted);
-  line-height: 1.75;
+  line-height: 1.7;
   margin: 0;
-  max-width: 500px;
+  max-width: 520px;
 }
 
 .view-example-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-top: 0.5rem;
-  padding: 12px 24px;
-  background: var(--accent-gradient);
-  color: #ffffff;
+  margin-top: 2px;
+  padding: 10px 17px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
   text-decoration: none;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.2s ease;
+  border-radius: 9px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  transition: background 0.16s, border-color 0.16s;
   width: fit-content;
-  box-shadow: none;
 }
 
 .view-example-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: none;
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  transform: none;
 }
 
 .intro-features {
-  margin-top: 0.5rem;
+  margin-top: 3px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
+  gap: 9px;
 }
 
 .feature-card {
-  background: var(--bg-card);
+  background: rgba(255, 255, 255, 0.82);
   border: 1px solid var(--border);
-  padding: 1.25rem;
+  padding: 14px;
   border-radius: 12px;
-  transition: all 0.2s ease;
+  transition: background 0.16s, border-color 0.16s;
 }
 
 .feature-card:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--border-hover);
-  transform: translateY(-2px);
+  background: #fff;
+  border-color: #bae6fd;
+  transform: none;
 }
 
 .feature-card h3 {
-  font-size: 0.8rem;
-  font-weight: 700;
-  margin: 0 0 0.4rem 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  margin: 0 0 4px;
   color: var(--text-primary);
   text-transform: uppercase;
-  letter-spacing: 0.75px;
+  letter-spacing: 0.08em;
 }
 
 .feature-card p {
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   color: var(--text-muted);
   margin: 0;
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
-/* Right Side - Blockchain Visual */
 .hero-right {
   display: flex;
   justify-content: center;
@@ -185,56 +181,56 @@
   flex-direction: column;
   align-items: stretch;
   width: 100%;
-  max-width: 260px;
+  max-width: 270px;
 }
 
 .block-item {
-  background: var(--bg-card);
+  background: rgba(255, 255, 255, 0.94);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1rem 1.5rem;
+  border-radius: 14px;
+  padding: 13px 16px;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  transition: all 0.2s ease;
+  gap: 12px;
+  transition: background 0.16s, border-color 0.16s;
   cursor: default;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
 }
 
 .block-item:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--border-hover);
-  transform: translateX(4px);
+  background: #fff;
+  border-color: #bae6fd;
+  transform: none;
 }
 
 .block-item.active {
-  background: rgba(99, 102, 241, 0.1);
-  border-color: rgba(99, 102, 241, 0.4);
-  box-shadow: none;
+  background: #ecfeff;
+  border-color: #a5f3fc;
 }
 
 .block-icon {
-  font-size: 1.25rem;
-  width: 32px;
+  font-size: 1.2rem;
+  width: 30px;
   text-align: center;
 }
 
 .block-label {
   color: var(--text-secondary);
-  font-weight: 500;
-  font-size: 0.85rem;
+  font-weight: 700;
+  font-size: 0.76rem;
   text-transform: uppercase;
-  letter-spacing: 0.75px;
+  letter-spacing: 0.07em;
 }
 
 .block-item.active .block-label {
-  color: #4338ca;
+  color: var(--accent-strong);
 }
 
 .chain-connector {
   width: 2px;
-  height: 20px;
-  background: var(--border);
-  margin: 0 0 0 calc(1rem + 16px + 1rem - 1px);
+  height: 18px;
+  background: #cbd5e1;
+  margin: 0 0 0 30px;
   position: relative;
 }
 
@@ -247,15 +243,13 @@
   width: 5px;
   height: 5px;
   background: var(--accent);
-  border-radius: 50%;
-  opacity: 0.7;
+  border-radius: 999px;
 }
 
-/* Responsive */
 @media (max-width: 1024px) {
   .intro-hero {
     grid-template-columns: 1fr;
-    gap: 3rem;
+    gap: 2.5rem;
   }
 
   .blockchain-visual {
@@ -268,32 +262,22 @@
   .block-item {
     flex-direction: column;
     width: 110px;
-    padding: 1rem 0.75rem;
+    padding: 12px 8px;
     text-align: center;
-    gap: 0.5rem;
-  }
-
-  .block-item:hover {
-    transform: translateY(-4px);
+    gap: 5px;
   }
 
   .chain-connector {
-    width: 32px;
+    width: 28px;
     height: 2px;
     margin: 0;
     align-self: center;
   }
-
-  .chain-connector::after {
-    top: 50%;
-    left: 50%;
-  }
 }
 
 @media (max-width: 768px) {
-  .intro-title {
-    font-size: 2.75rem;
-    letter-spacing: -1px;
+  .intro-section {
+    padding: 2rem 1rem 3rem;
   }
 
   .intro-features {
@@ -302,24 +286,19 @@
 
   .block-item {
     width: 88px;
-    padding: 0.75rem 0.5rem;
   }
 
   .block-label {
-    font-size: 0.7rem;
+    font-size: 0.64rem;
   }
 }
 
 @media (max-width: 480px) {
-  .intro-title {
-    font-size: 2.25rem;
-  }
-
   .block-item {
-    width: 70px;
+    width: 72px;
   }
 
   .chain-connector {
-    width: 16px;
+    width: 14px;
   }
 }
