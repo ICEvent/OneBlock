@@ -1,0 +1,183 @@
+name: Apply PR17 Provider Idempotency And Signup Fix
+
+on:
+  push:
+    branches:
+      - fix/evidence-visibility-boundaries
+    paths:
+      - '.github/workflows/apply-pr17-provider-orphan-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/evidence-visibility-boundaries
+          fetch-depth: 0
+
+      - name: Apply reviewed product fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/oneblock_backend/main.mo')
+          s = p.read_text()
+
+          def rep(old, new, label):
+              global s
+              c = s.count(old)
+              if c != 1:
+                  raise SystemExit(f'{label}: expected 1 match, found {c}')
+              s = s.replace(old, new, 1)
+
+          rep(
+          '    var stableIdempotencyKeys : [(Text, Text)] = []; // idempotency_key -> record_id\n    var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]\n    var stableDerivedSummaries : [(Text, DerivedSummary)] = [];\n',
+          '    var stableIdempotencyKeys : [(Text, Text)] = []; // namespaced idempotency key -> record/factor id\n    var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]\n    var stableOrphanedProfileIntegrationState : [(Text, Bool)] = []; // reusable profile IDs with legacy orphaned state\n    var stableDerivedSummaries : [(Text, DerivedSummary)] = [];\n',
+          'stable orphan index')
+
+          rep(
+          '    var integrationCompositeKeysMigratedV1 : Bool = false;\n    var idempotencyCompositeKeysMigratedV1 : Bool = false;\n    var profileLifecycleTokensMigratedV1 : Bool = false;\n    var summaryCachesMigratedV1 : Bool = false;\n',
+          '    var integrationCompositeKeysMigratedV1 : Bool = false;\n    var idempotencyCompositeKeysMigratedV1 : Bool = false;\n    var idempotencyNamespacesMigratedV2 : Bool = false;\n    var orphanedProfileStateIndexMigratedV1 : Bool = false;\n    var profileLifecycleTokensMigratedV1 : Bool = false;\n    var summaryCachesMigratedV1 : Bool = false;\n',
+          'migration markers')
+
+          rep(
+          '    transient var profileActivityIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);\n    profileActivityIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileActivityIndex), Text.equal, Text.hash);\n\n    transient var derivedSummaries',
+          '    transient var profileActivityIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);\n    profileActivityIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileActivityIndex), Text.equal, Text.hash);\n\n    transient var orphanedProfileIntegrationState = TrieMap.TrieMap<Text, Bool>(Text.equal, Text.hash);\n    orphanedProfileIntegrationState := TrieMap.fromEntries<Text, Bool>(Iter.fromArray(stableOrphanedProfileIntegrationState), Text.equal, Text.hash);\n\n    transient var derivedSummaries',
+          'transient orphan index')
+
+          rep(
+          '        stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());\n        stableProfileActivityIndex := Iter.toArray(profileActivityIndex.entries());\n        stableDerivedSummaries := Iter.toArray(derivedSummaries.entries());\n',
+          '        stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());\n        stableProfileActivityIndex := Iter.toArray(profileActivityIndex.entries());\n        stableOrphanedProfileIntegrationState := Iter.toArray(orphanedProfileIntegrationState.entries());\n        stableDerivedSummaries := Iter.toArray(derivedSummaries.entries());\n',
+          'preupgrade orphan index')
+
+          rep(
+          '        stableIdempotencyKeys := [];\n        stableProfileActivityIndex := [];\n        stableDerivedSummaries := [];\n',
+          '        stableIdempotencyKeys := [];\n        stableProfileActivityIndex := [];\n        stableOrphanedProfileIntegrationState := [];\n        stableDerivedSummaries := [];\n',
+          'postupgrade orphan stable clear')
+
+          old_migration = '''        // Rebuild ambiguous legacy app:idempotency keys from the record's stored
+        // identity fields. The new length-prefixed key is collision-free.
+        if (not idempotencyCompositeKeysMigratedV1) {
+            idempotencyKeys := TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);
+            for (record in activityRecordsMap.vals()) {
+                idempotencyKeys.put(idempotencyKey(record.app_id, record.idempotency_key), record.id)
+            };
+            idempotencyCompositeKeysMigratedV1 := true
+        };
+'''
+          new_migration = '''        // Rebuild both idempotency namespaces from durable source records. Activity
+        // entries come from ActivityRecord; provider entries come from internal
+        // provider_submission history events, whose metadata stores provider_id and
+        // idempotency_key. This preserves replay protection across the V1->V2 key
+        // migration instead of resetting the provider namespace.
+        if (not idempotencyNamespacesMigratedV2) {
+            idempotencyKeys := TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);
+            for (record in activityRecordsMap.vals()) {
+                idempotencyKeys.put(idempotencyKey(record.app_id, record.idempotency_key), record.id)
+            };
+            for (graph in identityGraphs.vals()) {
+                for (event in graph.history.vals()) {
+                    switch (event.reason) {
+                        case (?reason) {
+                            if (reason == "provider_submission") {
+                                switch (event.factor_id) {
+                                    case (?factorId) {
+                                        switch (metadataValue(event.metadata, "provider_id")) {
+                                            case (?providerId) {
+                                                switch (metadataValue(event.metadata, "idempotency_key")) {
+                                                    case (?idem) {
+                                                        idempotencyKeys.put(providerIdemKey(providerId, idem), factorId)
+                                                    };
+                                                    case null {};
+                                                }
+                                            };
+                                            case null {};
+                                        }
+                                    };
+                                    case null {};
+                                }
+                            }
+                        };
+                        case null {};
+                    }
+                }
+            };
+            idempotencyCompositeKeysMigratedV1 := true;
+            idempotencyNamespacesMigratedV2 := true
+        };
+
+        // Discover reusable IDs that actually carry orphaned legacy integration
+        // state once during upgrade. Normal profile creation then performs only an
+        // O(1) marker lookup; global cleanup scans are reserved for flagged IDs.
+        if (not orphanedProfileStateIndexMigratedV1) {
+            orphanedProfileIntegrationState := TrieMap.TrieMap<Text, Bool>(Text.equal, Text.hash);
+            for ((profileId, _) in profileActivityIndex.entries()) {
+                if (profiles.get(profileId) == null) { orphanedProfileIntegrationState.put(profileId, true) }
+            };
+            for ((_, currentProfileId) in activityCurrentProfiles.entries()) {
+                if (profiles.get(currentProfileId) == null) { orphanedProfileIntegrationState.put(currentProfileId, true) }
+            };
+            for ((_, connection) in connections.entries()) {
+                if (profiles.get(connection.profile_id) == null) { orphanedProfileIntegrationState.put(connection.profile_id, true) }
+            };
+            for ((_, summary) in derivedSummaries.entries()) {
+                if (profiles.get(summary.profile_id) == null) { orphanedProfileIntegrationState.put(summary.profile_id, true) }
+            };
+            for ((_, summary) in publicDerivedSummaries.entries()) {
+                if (profiles.get(summary.profile_id) == null) { orphanedProfileIntegrationState.put(summary.profile_id, true) }
+            };
+            for ((profileId, _) in profileLifecycleIds.entries()) {
+                if (profiles.get(profileId) == null) { orphanedProfileIntegrationState.put(profileId, true) }
+            };
+            orphanedProfileStateIndexMigratedV1 := true
+        };
+'''
+          rep(old_migration, new_migration, 'idempotency and orphan migration')
+
+          rep(
+          '    private func edgeKey(fromP : Text, toP : Text, context : Text) : Text { fromP # "->" # toP # ":" # context };\n    private func providerIdemKey(providerId : Text, idem : Text) : Text { "provider:" # providerId # ":" # idem };\n',
+          '    private func edgeKey(fromP : Text, toP : Text, context : Text) : Text { fromP # "->" # toP # ":" # context };\n    private func providerIdemKey(providerId : Text, idem : Text) : Text {\n        "provider-idempotency:" # keyPart(providerId) # keyPart(idem)\n    };\n    private func metadataValue(metadata : [MetadataEntry], key : Text) : ?Text {\n        for (entry in metadata.vals()) {\n            if (entry.key == key) { return ?entry.value }\n        };\n        null\n    };\n',
+          'provider key and metadata helper')
+
+          rep(
+          '        for ((summaryKeyToRemove, summary) in Iter.toArray(publicDerivedSummaries.entries()).vals()) {\n            if (summary.profile_id == profileId) {\n                ignore publicDerivedSummaries.remove(summaryKeyToRemove)\n            }\n        }\n    };\n\n    public shared ({ caller }) func createProfile',
+          '        for ((summaryKeyToRemove, summary) in Iter.toArray(publicDerivedSummaries.entries()).vals()) {\n            if (summary.profile_id == profileId) {\n                ignore publicDerivedSummaries.remove(summaryKeyToRemove)\n            }\n        };\n        ignore orphanedProfileIntegrationState.remove(profileId)\n    };\n\n    private func purgeReusableProfileIntegrationStateIfNeeded(profileId : ProfileId) {\n        switch (orphanedProfileIntegrationState.get(profileId)) {\n            case (?true) { purgeReusableProfileIntegrationState(profileId) };\n            case _ {};\n        }\n    };\n\n    public shared ({ caller }) func createProfile',
+          'gated purge helper')
+
+          rep(
+          '                                purgeReusableProfileIntegrationState(newProfile.id);',
+          '                                purgeReusableProfileIntegrationStateIfNeeded(newProfile.id);',
+          'create profile gated purge')
+          rep(
+          '                                purgeReusableProfileIntegrationState(nid);',
+          '                                purgeReusableProfileIntegrationStateIfNeeded(nid);',
+          'change id gated purge')
+
+          p.write_text(s)
+          PY
+
+      - name: Self-review product diff before commit
+        run: |
+          git diff --check
+          test "$(git diff --name-only | sort)" = "src/oneblock_backend/main.mo"
+          grep -q 'idempotencyNamespacesMigratedV2' src/oneblock_backend/main.mo
+          grep -q 'provider-idempotency:' src/oneblock_backend/main.mo
+          grep -q 'reason == "provider_submission"' src/oneblock_backend/main.mo
+          grep -q 'orphanedProfileIntegrationState.get(profileId)' src/oneblock_backend/main.mo
+          grep -q 'purgeReusableProfileIntegrationStateIfNeeded(newProfile.id)' src/oneblock_backend/main.mo
+          grep -q 'purgeReusableProfileIntegrationStateIfNeeded(nid)' src/oneblock_backend/main.mo
+          ! grep -q 'private func providerIdemKey(providerId : Text, idem : Text) : Text { "provider:"' src/oneblock_backend/main.mo
+
+      - name: Remove helper workflow
+        run: rm .github/workflows/apply-pr17-provider-orphan-fix.yml
+
+      - name: Commit reviewed fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/oneblock_backend/main.mo .github/workflows/apply-pr17-provider-orphan-fix.yml
+          git commit -m 'fix: preserve provider replay guards and bound signup work'
+          git push origin HEAD:fix/evidence-visibility-boundaries
