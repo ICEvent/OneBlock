@@ -443,24 +443,63 @@ persistent actor {
         }
     };
 
-    public query func getProfiles(pageSize : Nat, pageNumber : Nat) : async [Profile] {
+    // Public profile reads expose only public evidence indexes. The owner keeps
+    // the full block/trait index through caller-aware reads and getMyProfile.
+    private func sanitizeProfileEvidence(caller : Principal, profile : Profile) : Profile {
+        if (caller == profile.owner) {
+            return profile
+        };
+
+        let publicBlocks = Buffer.Buffer<Text>(0);
+        for (blockId in profile.blocks.vals()) {
+            switch (blocks.get(blockId)) {
+                case (?block) {
+                    if (block.visibility == #global) {
+                        publicBlocks.add(blockId)
+                    }
+                };
+                case null {};
+            }
+        };
+
+        let publicTraits = Buffer.Buffer<Text>(0);
+        for (traitId in profile.traits.vals()) {
+            switch (traits.get(traitId)) {
+                case (?trait) {
+                    if (trait.visibility == #global) {
+                        publicTraits.add(traitId)
+                    }
+                };
+                case null {};
+            }
+        };
+
+        {
+            profile with
+            blocks = Buffer.toArray(publicBlocks);
+            traits = Buffer.toArray(publicTraits);
+        }
+    };
+
+    public query ({ caller }) func getProfiles(pageSize : Nat, pageNumber : Nat) : async [Profile] {
         let profileEntries = Iter.toArray(profiles.entries());
         let totalProfiles = profileEntries.size();
         let startIndex = pageNumber * pageSize;
-        let endIndex = startIndex + pageSize;
+        if (startIndex >= totalProfiles) {
+            return []
+        };
+        let resultSize = Nat.min(pageSize, totalProfiles - startIndex);
 
-        let slicedProfiles = Array.tabulate<Profile>(
-            Nat.min(endIndex - startIndex, totalProfiles - startIndex),
+        Array.tabulate<Profile>(
+            resultSize,
             func(i) {
                 let (_, profile) = profileEntries[startIndex + i];
-                profile
+                sanitizeProfileEvidence(caller, profile)
             },
-        );
-
-        slicedProfiles
+        )
     };
 
-    public query func getDefaultProfiles(size : Nat) : async [Profile] {
+    public query ({ caller }) func getDefaultProfiles(size : Nat) : async [Profile] {
 
         let profileEntries = Iter.toArray(profiles.vals());
         let filteredProfiles = Array.filter<Profile>(
@@ -483,11 +522,11 @@ persistent actor {
 
         Array.tabulate<Profile>(
             Nat.min(size, sortedProfiles.size()),
-            func(i) { sortedProfiles[i] },
+            func(i) { sanitizeProfileEvidence(caller, sortedProfiles[i]) },
         )
     };
 
-    public query func searchProfilesByName(q : Text) : async [Profile] {
+    public query ({ caller }) func searchProfilesByName(q : Text) : async [Profile] {
         let profileEntries = Iter.toArray(profiles.vals());
         let filteredProfiles = Array.filter<Profile>(
             profileEntries,
@@ -512,7 +551,7 @@ persistent actor {
             Nat.min(100, sortedProfiles.size()),
             func(i) {
                 let (profile) = sortedProfiles[i];
-                profile
+                sanitizeProfileEvidence(caller, profile)
             },
         )
     };
@@ -612,15 +651,21 @@ persistent actor {
         }
     };
 
-    public query func getProfile(id : Text) : async ?Profile {
-        profiles.get(id)
+    public query ({ caller }) func getProfile(id : Text) : async ?Profile {
+        switch (profiles.get(id)) {
+            case null { null };
+            case (?profile) { ?sanitizeProfileEvidence(caller, profile) };
+        }
     };
 
-    public query func getProfileByPrincipal(principal : Text) : async ?Profile {
+    public query ({ caller }) func getProfileByPrincipal(principal : Text) : async ?Profile {
         let pt = userprofiles.get(Principal.fromText(principal));
         switch (pt) {
             case (?pt) {
-                profiles.get(pt)
+                switch (profiles.get(pt)) {
+                    case null { null };
+                    case (?profile) { ?sanitizeProfileEvidence(caller, profile) };
+                }
             };
             case (_) {
                 null
