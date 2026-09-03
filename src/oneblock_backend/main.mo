@@ -695,20 +695,45 @@ persistent actor {
         };
     };
 
-    public query func getBlock(blockId : Text) : async ?Block {
-        blocks.get(blockId)
+    // Block visibility is enforced at the read boundary. Owners can always read
+    // their own blocks. Public lists contain global blocks only; unlisted blocks
+    // remain directly addressable by id; personal blocks remain owner-only.
+    private func canReadBlock(caller : Principal, profile : Profile, block : Block, allowUnlisted : Bool) : Bool {
+        if (caller == profile.owner) {
+            return true
+        };
+        switch (block.visibility) {
+            case (#global) { true };
+            case (#unlisted) { allowUnlisted };
+            case (#personal) { false };
+        }
     };
 
-    public query func listBlocks(profileId : Text) : async [Block] {
+    public query ({ caller }) func getBlock(blockId : Text) : async ?Block {
+        switch (blocks.get(blockId)) {
+            case null { null };
+            case (?block) {
+                switch (profiles.get(block.profile_id)) {
+                    case null { null };
+                    case (?profile) {
+                        if (canReadBlock(caller, profile, block, true)) { ?block } else { null }
+                    };
+                }
+            };
+        }
+    };
+
+    public query ({ caller }) func listBlocks(profileId : Text) : async [Block] {
         let profile = profiles.get(profileId);
         switch (profile) {
             case (?p) {
                 let blockList = Buffer.Buffer<Block>(0);
                 for (blockId in p.blocks.vals()) {
-                    let block = blocks.get(blockId);
-                    switch (block) {
+                    switch (blocks.get(blockId)) {
                         case (?b) {
-                            blockList.add(b);
+                            if (canReadBlock(caller, p, b, false)) {
+                                blockList.add(b)
+                            }
                         };
                         case null {};
                     };
@@ -719,15 +744,18 @@ persistent actor {
         };
     };
 
-    public query func getChain(profileId : Text) : async [Block] {
+    public query ({ caller }) func getChain(profileId : Text) : async [Block] {
         let profile = profiles.get(profileId);
         let blockList = switch (profile) {
             case (?p) {
                 let list = Buffer.Buffer<Block>(0);
                 for (blockId in p.blocks.vals()) {
-                    let block = blocks.get(blockId);
-                    switch (block) {
-                        case (?b) { list.add(b); };
+                    switch (blocks.get(blockId)) {
+                        case (?b) {
+                            if (canReadBlock(caller, p, b, false)) {
+                                list.add(b)
+                            }
+                        };
                         case null {};
                     };
                 };
