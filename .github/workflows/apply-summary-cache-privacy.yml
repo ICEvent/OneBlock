@@ -1,0 +1,35 @@
+name: Apply Summary Cache Privacy
+
+on:
+  push:
+    branches:
+      - fix/evidence-visibility-boundaries
+    paths:
+      - '.github/workflows/apply-summary-cache-privacy.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: fix/evidence-visibility-boundaries
+
+      - name: Apply summary cache patch
+        run: python3 scripts/apply_summary_cache_privacy.py
+
+      - name: Validate diff
+        run: git diff --check
+
+      - name: Commit product changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: maintain visibility-separated activity summaries"
+          git push origin HEAD:fix/evidence-visibility-boundaries
