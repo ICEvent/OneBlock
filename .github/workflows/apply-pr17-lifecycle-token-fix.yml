@@ -1,0 +1,185 @@
+name: Apply PR17 Lifecycle Token Fix
+
+on:
+  push:
+    branches:
+      - fix/evidence-visibility-boundaries
+    paths:
+      - '.github/workflows/apply-pr17-lifecycle-token-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/evidence-visibility-boundaries
+          fetch-depth: 0
+
+      - name: Apply reviewed lifecycle-token hardening
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/oneblock_backend/main.mo')
+          text = path.read_text()
+
+          replacements = [
+              (
+                  "    var stableConnections : [(Text, IntegrationConnection)] = [];\n    var stableActivityRecords : [(Text, ActivityRecord)] = [];\n    var stableActivityConnectionEpochs : [(Text, Int)] = []; // recordId -> connection.created_at\n    var stableActivityCurrentProfiles : [(Text, Text)] = []; // recordId -> current profileId",
+                  "    var stableConnections : [(Text, IntegrationConnection)] = [];\n    var stableProfileLifecycleIds : [(Text, Nat)] = []; // profileId -> lifecycle token\n    var stableConnectionLifecycleIds : [(Text, Nat)] = []; // connectionKey -> profile lifecycle token\n    var stableActivityRecords : [(Text, ActivityRecord)] = [];\n    var stableActivityConnectionEpochs : [(Text, Int)] = []; // recordId -> connection.created_at (audit provenance)\n    var stableActivityLifecycleIds : [(Text, Nat)] = []; // recordId -> profile lifecycle token\n    var stableActivityCurrentProfiles : [(Text, Text)] = []; // recordId -> current profileId",
+              ),
+              (
+                  "    var activityRecordCounter : Nat = 0;\n    var factorIdCounter : Nat = 0;",
+                  "    var activityRecordCounter : Nat = 0;\n    var profileLifecycleCounter : Nat = 0;\n    var factorIdCounter : Nat = 0;",
+              ),
+              (
+                  "    transient var connections = TrieMap.TrieMap<Text, IntegrationConnection>(Text.equal, Text.hash);\n    connections := TrieMap.fromEntries<Text, IntegrationConnection>(Iter.fromArray(stableConnections), Text.equal, Text.hash);\n\n    transient var activityRecordsMap",
+                  "    transient var connections = TrieMap.TrieMap<Text, IntegrationConnection>(Text.equal, Text.hash);\n    connections := TrieMap.fromEntries<Text, IntegrationConnection>(Iter.fromArray(stableConnections), Text.equal, Text.hash);\n\n    transient var profileLifecycleIds = TrieMap.TrieMap<Text, Nat>(Text.equal, Text.hash);\n    profileLifecycleIds := TrieMap.fromEntries<Text, Nat>(Iter.fromArray(stableProfileLifecycleIds), Text.equal, Text.hash);\n\n    transient var connectionLifecycleIds = TrieMap.TrieMap<Text, Nat>(Text.equal, Text.hash);\n    connectionLifecycleIds := TrieMap.fromEntries<Text, Nat>(Iter.fromArray(stableConnectionLifecycleIds), Text.equal, Text.hash);\n\n    transient var activityRecordsMap",
+              ),
+              (
+                  "    transient var activityConnectionEpochs = TrieMap.TrieMap<Text, Int>(Text.equal, Text.hash);\n    activityConnectionEpochs := TrieMap.fromEntries<Text, Int>(Iter.fromArray(stableActivityConnectionEpochs), Text.equal, Text.hash);\n\n    transient var activityCurrentProfiles",
+                  "    transient var activityConnectionEpochs = TrieMap.TrieMap<Text, Int>(Text.equal, Text.hash);\n    activityConnectionEpochs := TrieMap.fromEntries<Text, Int>(Iter.fromArray(stableActivityConnectionEpochs), Text.equal, Text.hash);\n\n    transient var activityLifecycleIds = TrieMap.TrieMap<Text, Nat>(Text.equal, Text.hash);\n    activityLifecycleIds := TrieMap.fromEntries<Text, Nat>(Iter.fromArray(stableActivityLifecycleIds), Text.equal, Text.hash);\n\n    transient var activityCurrentProfiles",
+              ),
+              (
+                  "        stableConnections := Iter.toArray(connections.entries());\n        stableActivityRecords := Iter.toArray(activityRecordsMap.entries());\n        stableActivityConnectionEpochs := Iter.toArray(activityConnectionEpochs.entries());\n        stableActivityCurrentProfiles := Iter.toArray(activityCurrentProfiles.entries());",
+                  "        stableConnections := Iter.toArray(connections.entries());\n        stableProfileLifecycleIds := Iter.toArray(profileLifecycleIds.entries());\n        stableConnectionLifecycleIds := Iter.toArray(connectionLifecycleIds.entries());\n        stableActivityRecords := Iter.toArray(activityRecordsMap.entries());\n        stableActivityConnectionEpochs := Iter.toArray(activityConnectionEpochs.entries());\n        stableActivityLifecycleIds := Iter.toArray(activityLifecycleIds.entries());\n        stableActivityCurrentProfiles := Iter.toArray(activityCurrentProfiles.entries());",
+              ),
+              (
+                  "        stableConnections := [];\n        stableActivityRecords := [];\n        stableActivityConnectionEpochs := [];\n        stableActivityCurrentProfiles := [];",
+                  "        stableConnections := [];\n        stableProfileLifecycleIds := [];\n        stableConnectionLifecycleIds := [];\n        stableActivityRecords := [];\n        stableActivityConnectionEpochs := [];\n        stableActivityLifecycleIds := [];\n        stableActivityCurrentProfiles := [];",
+              ),
+          ]
+          for old, new in replacements:
+              if text.count(old) != 1:
+                  raise SystemExit(f'expected exactly one lifecycle persistence block, found {text.count(old)} for {old[:90]!r}')
+              text = text.replace(old, new, 1)
+
+          migration_marker = """        // Migrate delimiter-based integration keys to collision-free length-prefixed\n        // keys. Re-key from stored identities rather than trusting the old key text."""
+          lifecycle_migration = """        // Give every current profile a distinct internal lifecycle token. Legacy\n        // connections/records intentionally receive no token and must be re-authorized\n        // or fail closed; timestamps are not unique enough to prove incarnation.\n        for ((profileId, _) in profiles.entries()) {\n            switch (profileLifecycleIds.get(profileId)) {\n                case (?_) {};\n                case null {\n                    let lifecycleId = nextProfileLifecycleId();\n                    profileLifecycleIds.put(profileId, lifecycleId)\n                };\n            }\n        };\n\n"""
+          if text.count(migration_marker) != 1:
+              raise SystemExit('postupgrade integration migration marker missing')
+          text = text.replace(migration_marker, lifecycle_migration + migration_marker, 1)
+
+          purge_marker = """    // Public profile IDs are reusable identifiers. A newly claimed ID must not\n    // inherit integration/index/cache state left by an earlier incarnation."""
+          lifecycle_helpers = """    private func nextProfileLifecycleId() : Nat {\n        profileLifecycleCounter := profileLifecycleCounter + 1;\n        profileLifecycleCounter\n    };\n\n"""
+          if text.count(purge_marker) != 1:
+              raise SystemExit('purge helper marker missing')
+          text = text.replace(purge_marker, lifecycle_helpers + purge_marker, 1)
+
+          old_purge_start = """    private func purgeReusableProfileIntegrationState(profileId : ProfileId) {\n        ignore profileActivityIndex.remove(profileId);"""
+          new_purge_start = """    private func purgeReusableProfileIntegrationState(profileId : ProfileId) {\n        ignore profileLifecycleIds.remove(profileId);\n        ignore profileActivityIndex.remove(profileId);"""
+          if text.count(old_purge_start) != 1:
+              raise SystemExit('purge start missing')
+          text = text.replace(old_purge_start, new_purge_start, 1)
+
+          old_purge_conn = """        for ((connectionKeyToRemove, connection) in Iter.toArray(connections.entries()).vals()) {\n            if (connection.profile_id == profileId) {\n                ignore connections.remove(connectionKeyToRemove)\n            }\n        };"""
+          new_purge_conn = """        for ((connectionKeyToRemove, connection) in Iter.toArray(connections.entries()).vals()) {\n            if (connection.profile_id == profileId) {\n                ignore connectionLifecycleIds.remove(connectionKeyToRemove);\n                ignore connections.remove(connectionKeyToRemove)\n            }\n        };"""
+          if text.count(old_purge_conn) != 1:
+              raise SystemExit('purge connection block missing')
+          text = text.replace(old_purge_conn, new_purge_conn, 1)
+
+          old_create_call = """                                purgeReusableProfileIntegrationState(newProfile.id);\n                                profiles.put("""
+          new_create_call = """                                purgeReusableProfileIntegrationState(newProfile.id);\n                                let lifecycleId = nextProfileLifecycleId();\n                                profileLifecycleIds.put(newProfile.id, lifecycleId);\n                                profiles.put("""
+          if text.count(old_create_call) != 1:
+              raise SystemExit('create lifecycle insertion point missing')
+          text = text.replace(old_create_call, new_create_call, 1)
+
+          old_change_case = """                            case (_) {\n                                profiles.put(\n                                    nid,"""
+          new_change_case = """                            case (_) {\n                                let sourceLifecycleId = switch (profileLifecycleIds.get(oid)) {\n                                    case (?lifecycleId) { lifecycleId };\n                                    case null {\n                                        let lifecycleId = nextProfileLifecycleId();\n                                        profileLifecycleIds.put(oid, lifecycleId);\n                                        lifecycleId\n                                    };\n                                };\n                                profiles.put(\n                                    nid,"""
+          if text.count(old_change_case) != 1:
+              raise SystemExit('changeId lifecycle capture insertion point missing')
+          text = text.replace(old_change_case, new_change_case, 1)
+
+          old_change_purge = """                                purgeReusableProfileIntegrationState(nid);\n\n                                // Keep integration ownership/indexes attached"""
+          new_change_purge = """                                purgeReusableProfileIntegrationState(nid);\n                                profileLifecycleIds.put(nid, sourceLifecycleId);\n                                ignore profileLifecycleIds.remove(oid);\n\n                                // Keep integration ownership/indexes attached"""
+          if text.count(old_change_purge) != 1:
+              raise SystemExit('changeId lifecycle move insertion point missing')
+          text = text.replace(old_change_purge, new_change_purge, 1)
+
+          old_connection_move = """                                for ((oldConnectionKey, connection) in Iter.toArray(connections.entries()).vals()) {\n                                    if (connection.profile_id == oid) {\n                                        ignore connections.remove(oldConnectionKey);\n                                        connections.put(\n                                            connectionKey(nid, connection.app_id),\n                                            { connection with profile_id = nid }\n                                        )\n                                    }\n                                };"""
+          new_connection_move = """                                for ((oldConnectionKey, connection) in Iter.toArray(connections.entries()).vals()) {\n                                    if (connection.profile_id == oid) {\n                                        let lifecycleOpt = connectionLifecycleIds.remove(oldConnectionKey);\n                                        ignore connections.remove(oldConnectionKey);\n                                        let newConnectionKey = connectionKey(nid, connection.app_id);\n                                        connections.put(\n                                            newConnectionKey,\n                                            { connection with profile_id = nid }\n                                        );\n                                        switch (lifecycleOpt) {\n                                            case (?lifecycleId) { connectionLifecycleIds.put(newConnectionKey, lifecycleId) };\n                                            case null {};\n                                        }\n                                    }\n                                };"""
+          if text.count(old_connection_move) != 1:
+              raise SystemExit('connection migration block missing')
+          text = text.replace(old_connection_move, new_connection_move, 1)
+
+          old_connect_put = """                        connections.put(key, conn);\n                        #ok(1)"""
+          new_connect_put = """                        let lifecycleId = switch (profileLifecycleIds.get(profileId)) {\n                            case (?lifecycleId) { lifecycleId };\n                            case null { return #err(\"profile lifecycle unavailable\") };\n                        };\n                        connections.put(key, conn);\n                        connectionLifecycleIds.put(key, lifecycleId);\n                        #ok(1)"""
+          if text.count(old_connect_put) != 1:
+              raise SystemExit('connectApp lifecycle bind insertion point missing')
+          text = text.replace(old_connect_put, new_connect_put, 1)
+
+          old_submit_intro = """        // Check an exact active connection exists for this profile+app and bind\n        // the record to that connection epoch for future ownership checks.\n        let connection = switch (getConnectionExact(newRecord.profile_id, newRecord.app_id)) {"""
+          new_submit_intro = """        let lifecycleId = switch (profileLifecycleIds.get(newRecord.profile_id)) {\n            case (?lifecycleId) { lifecycleId };\n            case null { return #err(\"profile lifecycle unavailable\") };\n        };\n        let exactConnectionKey = connectionKey(newRecord.profile_id, newRecord.app_id);\n        // Require an explicit lifecycle binding for the exact current connection.\n        // Legacy connections have no binding and must be re-authorized by the user.\n        let connection = switch (getConnectionExact(newRecord.profile_id, newRecord.app_id)) {"""
+          if text.count(old_submit_intro) != 1:
+              raise SystemExit('submit lifecycle intro missing')
+          text = text.replace(old_submit_intro, new_submit_intro, 1)
+
+          old_submit_guard = """                if (connection.created_at < profile.createtime) {\n                    return #err(\"connection belongs to an earlier profile incarnation\")\n                };\n                connection"""
+          new_submit_guard = """                switch (connectionLifecycleIds.get(exactConnectionKey)) {\n                    case (?connectionLifecycleId) {\n                        if (connectionLifecycleId != lifecycleId) {\n                            return #err(\"connection belongs to a different profile lifecycle\")\n                        }\n                    };\n                    case null {\n                        return #err(\"connection must be re-authorized for this profile lifecycle\")\n                    };\n                };\n                connection"""
+          if text.count(old_submit_guard) != 1:
+              raise SystemExit('timestamp-only submit guard missing')
+          text = text.replace(old_submit_guard, new_submit_guard, 1)
+
+          old_record_bind = """        activityRecordsMap.put(recordId, record);\n        activityConnectionEpochs.put(recordId, connection.created_at);\n        activityCurrentProfiles.put(recordId, newRecord.profile_id);"""
+          new_record_bind = """        activityRecordsMap.put(recordId, record);\n        activityConnectionEpochs.put(recordId, connection.created_at);\n        activityLifecycleIds.put(recordId, lifecycleId);\n        activityCurrentProfiles.put(recordId, newRecord.profile_id);"""
+          if text.count(old_record_bind) != 1:
+              raise SystemExit('activity lifecycle bind insertion point missing')
+          text = text.replace(old_record_bind, new_record_bind, 1)
+
+          old_record_belongs = """    private func recordBelongsToProfileIncarnation(\n        profile : Profile,\n        record : ActivityRecord\n    ) : Bool {\n        if (record.ingest_timestamp < profile.createtime) {\n            return false\n        };\n\n        switch (activityConnectionEpochs.get(record.id)) {\n            case (?connectionEpoch) {\n                // New records carry the exact connection epoch used at submission.\n                connectionEpoch >= profile.createtime and record.ingest_timestamp >= connectionEpoch\n            };\n            case null {\n                // Legacy records have no verifiable connection-incarnation provenance.\n                // Timestamps from the current connection are insufficient because a\n                // reusable profile ID may have inherited stale destination state.\n                // Fail closed rather than guessing historical ownership.\n                false\n            };\n        }\n    };"""
+          new_record_belongs = """    private func recordBelongsToProfileIncarnation(\n        profile : Profile,\n        record : ActivityRecord\n    ) : Bool {\n        switch (profileLifecycleIds.get(profile.id)) {\n            case null { false };\n            case (?currentLifecycleId) {\n                switch (activityLifecycleIds.get(record.id)) {\n                    case (?recordLifecycleId) { recordLifecycleId == currentLifecycleId };\n                    case null {\n                        // Legacy records have no verifiable lifecycle provenance.\n                        // Fail closed rather than inferring ownership from timestamps.\n                        false\n                    };\n                }\n            };\n        }\n    };"""
+          if text.count(old_record_belongs) != 1:
+              raise SystemExit('timestamp-based record attribution helper missing')
+          text = text.replace(old_record_belongs, new_record_belongs, 1)
+
+          required = [
+              'stableProfileLifecycleIds',
+              'stableConnectionLifecycleIds',
+              'stableActivityLifecycleIds',
+              'profileLifecycleCounter',
+              'private func nextProfileLifecycleId()',
+              'profileLifecycleIds.put(newProfile.id, lifecycleId)',
+              'profileLifecycleIds.put(nid, sourceLifecycleId)',
+              'connectionLifecycleIds.put(key, lifecycleId)',
+              'connection must be re-authorized for this profile lifecycle',
+              'activityLifecycleIds.put(recordId, lifecycleId)',
+              'recordLifecycleId == currentLifecycleId',
+          ]
+          for needle in required:
+              if needle not in text:
+                  raise SystemExit(f'missing required lifecycle result: {needle}')
+          if 'connection.created_at < profile.createtime' in text:
+              raise SystemExit('timestamp-only connection incarnation guard remains')
+          if 'connectionEpoch >= profile.createtime' in text:
+              raise SystemExit('timestamp-based record incarnation inference remains')
+
+          path.write_text(text)
+          PY
+
+      - name: Self-review product diff before commit
+        run: |
+          git diff --check
+          test "$(git diff --name-only)" = "src/oneblock_backend/main.mo"
+          git diff -- src/oneblock_backend/main.mo
+          grep -q 'connectionLifecycleIds.put(key, lifecycleId)' src/oneblock_backend/main.mo
+          grep -q 'activityLifecycleIds.put(recordId, lifecycleId)' src/oneblock_backend/main.mo
+          grep -q 'recordLifecycleId == currentLifecycleId' src/oneblock_backend/main.mo
+          ! grep -q 'connection.created_at < profile.createtime' src/oneblock_backend/main.mo
+          ! grep -q 'connectionEpoch >= profile.createtime' src/oneblock_backend/main.mo
+
+      - name: Remove helper workflow
+        run: rm .github/workflows/apply-pr17-lifecycle-token-fix.yml
+
+      - name: Commit reviewed hardening
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/oneblock_backend/main.mo .github/workflows/apply-pr17-lifecycle-token-fix.yml
+          git diff --cached --check
+          test "$(git diff --cached --name-only | sort | tr '\n' ' ')" = ".github/workflows/apply-pr17-lifecycle-token-fix.yml src/oneblock_backend/main.mo "
+          git commit -m 'fix: bind integrations to profile lifecycle tokens'
+          git push origin HEAD:fix/evidence-visibility-boundaries
