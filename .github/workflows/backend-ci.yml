@@ -15,6 +15,9 @@ on:
       - 'dfx.json'
       - '.github/workflows/backend-ci.yml'
 
+permissions:
+  contents: read
+
 jobs:
   motoko:
     runs-on: ubuntu-latest
