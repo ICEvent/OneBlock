@@ -1481,17 +1481,12 @@ persistent actor {
                 connectionEpoch >= profile.createtime and record.ingest_timestamp >= connectionEpoch
             };
             case null {
-                // Legacy records have no provenance marker. Fail closed unless the
-                // exact current connection itself belongs to this profile incarnation
-                // and existed before the record was ingested.
-                switch (getConnectionExact(profileId, record.app_id)) {
-                    case (?connection) {
-                        connection.created_at >= profile.createtime and
-                        record.ingest_timestamp >= connection.created_at
-                    };
-                    case null { false };
-                }
-            };
+      // Legacy records have no verifiable connection-incarnation provenance.
+      // Timestamps from the current connection are insufficient because a
+      // reusable profile ID may have inherited stale destination state.
+      // Fail closed rather than guessing historical ownership.
+      false
+  };
         }
     };
 
