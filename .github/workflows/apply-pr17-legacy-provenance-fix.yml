@@ -26,30 +26,25 @@ jobs:
 
           path = Path('src/oneblock_backend/main.mo')
           text = path.read_text()
-          old = '''            case null {
-                // Legacy records have no provenance marker. Fail closed unless the
-                // exact current connection itself belongs to this profile incarnation
-                // and existed before the record was ingested.
-                switch (getConnectionExact(profileId, record.app_id)) {
-                    case (?connection) {
-                        connection.created_at >= profile.createtime and
-                        record.ingest_timestamp >= connection.created_at
-                    };
-                    case null { false };
-                }
-            };'''
-          new = '''            case null {
+          start_marker = "            case null {\n                // Legacy records have no provenance marker."
+          end_marker = "            };\n        }\n    };\n\n    private func callerOwnsActivityRecord"
+          start = text.find(start_marker)
+          if start < 0:
+              raise SystemExit('legacy provenance fallback start marker not found')
+          end_context = text.find(end_marker, start)
+          if end_context < 0:
+              raise SystemExit('legacy provenance fallback end marker not found')
+          replacement = '''            case null {
                 // Legacy records have no verifiable connection-incarnation provenance.
                 // Timestamps from the current connection are insufficient because a
                 // reusable profile ID may have inherited stale destination state.
                 // Fail closed rather than guessing historical ownership.
                 false
             };'''
-          if old not in text:
-              raise SystemExit('expected legacy provenance fallback not found')
-          if text.count(old) != 1:
-              raise SystemExit(f'expected exactly one fallback, found {text.count(old)}')
-          path.write_text(text.replace(old, new, 1))
+          old_block = text[start:end_context + len("            };")]
+          if old_block.count('getConnectionExact(profileId, record.app_id)') != 1:
+              raise SystemExit('unexpected legacy fallback structure')
+          path.write_text(text[:start] + replacement + text[end_context + len("            };"):])
           PY
 
       - name: Remove helper workflow
