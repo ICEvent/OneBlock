@@ -173,6 +173,35 @@ persistent actor {
     transient var historicalProfileOwners = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
     historicalProfileOwners := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableHistoricalProfileOwners), Text.equal, Text.hash);
 
+    private func backfillLegacyActivitySubjects() {
+        // Backfill only when legacy state proves the record belongs to the
+        // current profile owner. A reused profile ID will have a profile
+        // creation time newer than the old connection, so it is excluded.
+        for ((recordId, record) in activityRecordsMap.entries()) {
+            switch (activityRecordSubjects.get(recordId)) {
+                case (?_) {};
+                case null {
+                    switch (profiles.get(record.profile_id)) {
+                        case null {};
+                        case (?profile) {
+                            switch (connections.get(connectionKey(record.profile_id, record.app_id))) {
+                                case null {};
+                                case (?connection) {
+                                    if (
+                                        connection.created_at >= profile.createtime and
+                                        record.ingest_timestamp >= connection.created_at
+                                    ) {
+                                        activityRecordSubjects.put(recordId, profile.owner)
+                                    }
+                                };
+                            }
+                        };
+                    }
+                };
+            }
+        }
+    };
+
     system func preupgrade() {
         stableProfiles := Iter.toArray(profiles.entries());
         stableBlocks := Iter.toArray(blocks.entries());
@@ -203,6 +232,9 @@ persistent actor {
     };
 
     system func postupgrade() {
+        // Restore safe provenance bindings for legacy records before clearing
+        // upgrade arrays. Ambiguous records remain unbound and unprojected.
+        backfillLegacyActivitySubjects();
         stableProfiles := [];
         stableBlocks := [];
         stableTraits := [];
