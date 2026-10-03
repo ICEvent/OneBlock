@@ -33,7 +33,7 @@ export interface Provenance {
 
 export interface CapabilityRef {
   path: string;
-  label?: string;
+  displayLabel?: string;
 }
 
 export type ClaimValue =
