@@ -24,7 +24,7 @@ export interface EvidenceRef {
 export interface Provenance {
   sourceKind: SourceKind;
   issuer?: string;
-  issuerId?: string;
+  issuerId: string;
   verification: VerificationMethod;
   evidence: EvidenceRef[];
   observedAt?: bigint;
@@ -42,8 +42,11 @@ export type ClaimValue =
   | { type: "boolean"; value: boolean }
   | { type: "reference"; value: string };
 
+export type Visibility = "global" | "unlisted" | "personal";
+
 export interface ProfileClaim {
   id: string;
+  profileId: string;
   subject: string;
   predicate: string;
   value: ClaimValue;
@@ -52,6 +55,7 @@ export interface ProfileClaim {
   provenance: Provenance;
   validFrom?: bigint;
   validUntil?: bigint;
+  visibility: Visibility;
   createdAt: bigint;
 }
 
@@ -69,6 +73,7 @@ export type ReviewStatus = "active" | "disputed" | "withdrawn";
 
 export interface PeerReview {
   id: string;
+  profileId: string;
   subject: string;
   reviewer: string;
   relationship: ReviewRelationship;
@@ -80,12 +85,14 @@ export interface PeerReview {
   relatedClaims: string[];
   status: ReviewStatus;
   response?: string;
+  visibility: Visibility;
   createdAt: bigint;
   updatedAt: bigint;
 }
 
 export interface DerivedSignal {
   id: string;
+  profileId: string;
   subject: string;
   signalType: string;
   capability?: CapabilityRef;
