@@ -1837,13 +1837,26 @@ persistent actor {
             case null { return #err("profile not found") };
             case (?p) p;
         };
-        // Check an active connection exists for this profile+app
+        // Check an active connection exists for this profile+app and that
+        // the consent belongs to the current immutable profile owner.
         let connKey = connectionKey(newRecord.profile_id, newRecord.app_id);
         switch (connections.get(connKey)) {
             case null { return #err("no active connection for this profile and app") };
             case (?c) {
                 if (c.status != #active) {
                     return #err("connection is not active")
+                };
+                switch (connectionSubjects.get(connKey)) {
+                    case (?subject) {
+                        if (subject != targetProfile.owner) {
+                            return #err("connection ownership does not match current profile owner")
+                        }
+                    };
+                    case null {
+                        // Legacy/unbound connections are intentionally
+                        // quarantined until the current owner reconnects.
+                        return #err("connection ownership is not established; reconnect app")
+                    };
                 }
             }
         };
