@@ -73,6 +73,10 @@ persistent actor {
     var stableActivityTypes : [(Text, ActivityType)] = [];
     var stableConnections : [(Text, IntegrationConnection)] = [];
     var stableActivityRecords : [(Text, ActivityRecord)] = [];
+    // Immutable subject binding for external activity evidence. Legacy records
+    // without a binding are intentionally not projected until ownership can be
+    // established safely.
+    var stableActivityRecordSubjects : [(Text, Principal)] = [];
     var stableIdempotencyKeys : [(Text, Text)] = []; // idempotency_key -> record_id
     var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]
     var stableDerivedSummaries : [(Text, DerivedSummary)] = [];
@@ -138,6 +142,9 @@ persistent actor {
     transient var activityRecordsMap = TrieMap.TrieMap<Text, ActivityRecord>(Text.equal, Text.hash);
     activityRecordsMap := TrieMap.fromEntries<Text, ActivityRecord>(Iter.fromArray(stableActivityRecords), Text.equal, Text.hash);
 
+    transient var activityRecordSubjects = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
+    activityRecordSubjects := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableActivityRecordSubjects), Text.equal, Text.hash);
+
     transient var idempotencyKeys = TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);
     idempotencyKeys := TrieMap.fromEntries<Text, Text>(Iter.fromArray(stableIdempotencyKeys), Text.equal, Text.hash);
 
@@ -180,6 +187,7 @@ persistent actor {
         stableActivityTypes := Iter.toArray(activityTypesMap.entries());
         stableConnections := Iter.toArray(connections.entries());
         stableActivityRecords := Iter.toArray(activityRecordsMap.entries());
+        stableActivityRecordSubjects := Iter.toArray(activityRecordSubjects.entries());
         stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());
         stableProfileActivityIndex := Iter.toArray(profileActivityIndex.entries());
         stableDerivedSummaries := Iter.toArray(derivedSummaries.entries());
@@ -208,6 +216,7 @@ persistent actor {
         stableActivityTypes := [];
         stableConnections := [];
         stableActivityRecords := [];
+        stableActivityRecordSubjects := [];
         stableIdempotencyKeys := [];
         stableProfileActivityIndex := [];
         stableDerivedSummaries := [];
@@ -442,6 +451,20 @@ persistent actor {
         }
     };
 
+    private func bindUnboundActivitySubjects(profileId : Text, owner : Principal) {
+        switch (profileActivityIndex.get(profileId)) {
+            case null {};
+            case (?recordIds) {
+                for (recordId in recordIds.vals()) {
+                    switch (activityRecordSubjects.get(recordId)) {
+                        case null { activityRecordSubjects.put(recordId, owner) };
+                        case (?_) {};
+                    }
+                }
+            };
+        }
+    };
+
     private func migrateConnections(oldId : Text, newId : Text) {
         let appIds = Buffer.Buffer<Text>(0);
         for ((_, conn) in connections.entries()) {
@@ -489,6 +512,9 @@ persistent actor {
                                     case null {};
                                 };
                                 historicalProfileOwners.put(oid, p.owner);
+                                // At this moment oid is still owned by p.owner, so any
+                                // legacy records indexed there can be bound safely.
+                                bindUnboundActivitySubjects(oid, p.owner);
                                 migrateConnections(oid, nid);
                                 migrateDerivedSummaries(oid, nid);
                                 migrateTextIndex(profileActivityIndex, oid, nid);
@@ -1196,18 +1222,16 @@ persistent actor {
     };
 
     private func activityClaim(record : ActivityRecord) : ?ProfileClaim {
-        let profile = switch (profiles.get(record.profile_id)) {
+        // Never infer an external record's subject from a mutable/reusable
+        // profile ID. Pre-upgrade records without an immutable binding are
+        // omitted rather than risk attributing evidence to the wrong person.
+        let subject = switch (activityRecordSubjects.get(record.id)) {
+            case null { return null };
+            case (?owner) owner;
+        };
+        let profile = switch (findProfileByOwner(subject)) {
+            case null { return null };
             case (?p) p;
-            case null {
-                let historicalOwner = switch (historicalProfileOwners.get(record.profile_id)) {
-                    case null { return null };
-                    case (?owner) owner;
-                };
-                switch (findProfileByOwner(historicalOwner)) {
-                    case null { return null };
-                    case (?p) p;
-                }
-            };
         };
         let issuer = switch (integrationApps.get(record.app_id)) {
             case (?app) ?app.owner;
@@ -1217,7 +1241,7 @@ persistent actor {
         ?{
             id = "external:activity:" # record.id;
             profile_id = record.profile_id;
-            subject = profile.owner;
+            subject = subject;
             predicate = record.activity_type;
             value = #reference("oneblock://activity/" # record.id);
             capability = null;
@@ -1684,6 +1708,10 @@ persistent actor {
         if (not app.active) {
             return #err("app is not active")
         };
+        let targetProfile = switch (profiles.get(newRecord.profile_id)) {
+            case null { return #err("profile not found") };
+            case (?p) p;
+        };
         // Check an active connection exists for this profile+app
         let connKey = connectionKey(newRecord.profile_id, newRecord.app_id);
         switch (connections.get(connKey)) {
@@ -1721,6 +1749,7 @@ persistent actor {
             hash = generateHash(content)
         };
         activityRecordsMap.put(recordId, record);
+        activityRecordSubjects.put(recordId, targetProfile.owner);
         idempotencyKeys.put(idemKey, recordId);
         // Update per-profile index
         let currentIndex = switch (profileActivityIndex.get(newRecord.profile_id)) {
