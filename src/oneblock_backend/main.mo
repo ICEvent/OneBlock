@@ -87,6 +87,7 @@ persistent actor {
     var stableProfileClaimIndex : [(Text, [Text])] = [];
     var stablePeerReviews : [(Text, PeerReview)] = [];
     var stableProfileReviewIndex : [(Text, [Text])] = [];
+    var stableHistoricalProfileOwners : [(Text, Principal)] = [];
 
     var reserveIds : [Text] = ["oneblock", "block", "about", "admin", "status", "update"];
 
@@ -162,6 +163,8 @@ persistent actor {
     peerReviews := TrieMap.fromEntries<Text, PeerReview>(Iter.fromArray(stablePeerReviews), Text.equal, Text.hash);
     transient var profileReviewIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
     profileReviewIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileReviewIndex), Text.equal, Text.hash);
+    transient var historicalProfileOwners = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
+    historicalProfileOwners := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableHistoricalProfileOwners), Text.equal, Text.hash);
 
     system func preupgrade() {
         stableProfiles := Iter.toArray(profiles.entries());
@@ -187,7 +190,8 @@ persistent actor {
         stableProfileClaims := Iter.toArray(profileClaims.entries());
         stableProfileClaimIndex := Iter.toArray(profileClaimIndex.entries());
         stablePeerReviews := Iter.toArray(peerReviews.entries());
-        stableProfileReviewIndex := Iter.toArray(profileReviewIndex.entries())
+        stableProfileReviewIndex := Iter.toArray(profileReviewIndex.entries());
+        stableHistoricalProfileOwners := Iter.toArray(historicalProfileOwners.entries())
     };
 
     system func postupgrade() {
@@ -214,7 +218,8 @@ persistent actor {
         stableProfileClaims := [];
         stableProfileClaimIndex := [];
         stablePeerReviews := [];
-        stableProfileReviewIndex := []
+        stableProfileReviewIndex := [];
+        stableHistoricalProfileOwners := []
     };
     private func clamp01(v : Float) : Float {
         if (v < 0.0) { 0.0 } else if (v > 1.0) { 1.0 } else { v }
@@ -290,6 +295,10 @@ persistent actor {
                             #err("the id is taken!")
                         };
                         case (_) {
+                            switch (historicalProfileOwners.get(newProfile.id)) {
+                                case (?_) { return #err("the id was previously used and is reserved") };
+                                case null {};
+                            };
 
                             if (Text.size(newProfile.id) < 4) {
                                 #err("profile id length must be greater than 3")
@@ -411,6 +420,11 @@ persistent actor {
                                 #err("this id has been taken")
                             };
                             case (_) {
+                                switch (historicalProfileOwners.get(nid)) {
+                                    case (?_) { return #err("this id was previously used and is reserved") };
+                                    case null {};
+                                };
+                                historicalProfileOwners.put(oid, p.owner);
                                 profiles.put(
                                     nid,
                                     {
@@ -1095,8 +1109,17 @@ persistent actor {
 
     private func activityClaim(record : ActivityRecord) : ?ProfileClaim {
         let profile = switch (profiles.get(record.profile_id)) {
-            case null { return null };
             case (?p) p;
+            case null {
+                let historicalOwner = switch (historicalProfileOwners.get(record.profile_id)) {
+                    case null { return null };
+                    case (?owner) owner;
+                };
+                switch (findProfileByOwner(historicalOwner)) {
+                    case null { return null };
+                    case (?p) p;
+                }
+            };
         };
         let issuer = switch (integrationApps.get(record.app_id)) {
             case (?app) ?app.owner;
@@ -1166,23 +1189,17 @@ persistent actor {
             }
         };
 
-        // External integrations remain the system of record. ActivityRecord is
-        // projected as a claim at read time instead of being duplicated.
-        let activityIds = switch (profileActivityIndex.get(profileId)) {
-            case null { [] };
-            case (?value) { value };
-        };
-        for (recordId in activityIds.vals()) {
-            switch (activityRecordsMap.get(recordId)) {
+        // External integrations remain the system of record. Select by immutable
+        // subject so records survive profile ID changes without rewriting history.
+        for ((_, record) in activityRecordsMap.entries()) {
+            switch (activityClaim(record)) {
                 case null {};
-                case (?record) {
-                    switch (activityClaim(record)) {
-                        case null {};
-                        case (?claim) {
-                            if (canReadGraphItem(caller, profile.owner, claim.visibility)) {
-                                buf.add(claim)
-                            }
-                        };
+                case (?claim) {
+                    if (
+                        claim.subject == profile.owner and
+                        canReadGraphItem(caller, claim.subject, claim.visibility)
+                    ) {
+                        buf.add(claim)
                     }
                 };
             }
