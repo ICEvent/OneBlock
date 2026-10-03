@@ -40,6 +40,16 @@ jobs:
 
       - name: Build backend and generate declarations
         run: |
+          python3 - <<'PY'
+          import json
+          path = "dfx.json"
+          with open(path) as f:
+              data = json.load(f)
+          data.get("networks", {}).get("local", {}).pop("providers", None)
+          with open(path, "w") as f:
+              json.dump(data, f, indent=2)
+              f.write("\n")
+          PY
           dfx start --background --clean
           trap 'dfx stop || true' EXIT
           dfx canister create profile
