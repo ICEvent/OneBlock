@@ -6,6 +6,12 @@ module {
   public type SignalId = Text;
   public type Timestamp = Int;
 
+  public type Visibility = {
+    #global;
+    #unlisted;
+    #personal;
+  };
+
   // Where a profile fact came from. This is independent from how strongly it
   // was verified; provenance must never be collapsed into a single score.
   public type SourceKind = {
@@ -60,6 +66,7 @@ module {
   // Generic statement used by self-declared and externally attested profile data.
   public type ProfileClaim = {
     id : ClaimId;
+    profile_id : Text;
     subject : Principal;
     predicate : Text;
     value : ClaimValue;
@@ -68,7 +75,20 @@ module {
     provenance : Provenance;
     valid_from : ?Timestamp;
     valid_until : ?Timestamp;
+    visibility : Visibility;
     created_at : Timestamp;
+  };
+
+  public type NewSelfClaim = {
+    profile_id : Text;
+    predicate : Text;
+    value : ClaimValue;
+    capability : ?CapabilityRef;
+    context : ?Text;
+    evidence : [EvidenceRef];
+    valid_from : ?Timestamp;
+    valid_until : ?Timestamp;
+    visibility : Visibility;
   };
 
   public type ReviewRelationship = {
@@ -91,6 +111,7 @@ module {
   // Reviews are attestations in context, not global star ratings.
   public type PeerReview = {
     id : ReviewId;
+    profile_id : Text;
     subject : Principal;
     reviewer : Principal;
     relationship : ReviewRelationship;
@@ -102,8 +123,21 @@ module {
     related_claims : [ClaimId];
     status : ReviewStatus;
     response : ?Text;
+    visibility : Visibility;
     created_at : Timestamp;
     updated_at : Timestamp;
+  };
+
+  public type NewPeerReview = {
+    profile_id : Text;
+    relationship : ReviewRelationship;
+    capability : ?CapabilityRef;
+    context : Text;
+    assessment_tags : [Text];
+    narrative : ?Text;
+    evidence : [EvidenceRef];
+    related_claims : [ClaimId];
+    visibility : Visibility;
   };
 
   public type SignalMethod = {
@@ -114,6 +148,7 @@ module {
   // Derived signals are rebuildable views above immutable claims/reviews.
   public type DerivedSignal = {
     id : SignalId;
+    profile_id : Text;
     subject : Principal;
     signal_type : Text;
     capability : ?CapabilityRef;
