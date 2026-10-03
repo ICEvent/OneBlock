@@ -1,6 +1,5 @@
 import Cycles "mo:base/ExperimentalCycles";
 import Nat "mo:base/Nat";
-import Nat32 "mo:base/Nat32";
 import Int "mo:base/Int";
 import Text "mo:base/Text";
 import TrieMap "mo:base/TrieMap";
@@ -416,6 +415,33 @@ persistent actor {
         }
     };
 
+    private func migrateDerivedSummaries(oldId : Text, newId : Text) {
+        let keys = Buffer.Buffer<(Text, Text, Text)>(0);
+        for ((key, summary) in derivedSummaries.entries()) {
+            if (summary.profile_id == oldId) {
+                keys.add((key, summary.app_id, summary.activity_type))
+            }
+        };
+        for ((oldKey, appId, activityType) in keys.vals()) {
+            switch (derivedSummaries.get(oldKey)) {
+                case null {};
+                case (?summary) {
+                    let newKey = summaryKey(newId, appId, activityType);
+                    derivedSummaries.put(newKey, {
+                        profile_id = newId;
+                        app_id = summary.app_id;
+                        activity_type = summary.activity_type;
+                        record_count = summary.record_count;
+                        total_amount = summary.total_amount;
+                        currency = summary.currency;
+                        last_updated = summary.last_updated;
+                    });
+                    ignore derivedSummaries.remove(oldKey);
+                };
+            }
+        }
+    };
+
     private func migrateConnections(oldId : Text, newId : Text) {
         let appIds = Buffer.Buffer<Text>(0);
         for ((_, conn) in connections.entries()) {
@@ -464,6 +490,7 @@ persistent actor {
                                 };
                                 historicalProfileOwners.put(oid, p.owner);
                                 migrateConnections(oid, nid);
+                                migrateDerivedSummaries(oid, nid);
                                 migrateTextIndex(profileActivityIndex, oid, nid);
                                 migrateTextIndex(profileClaimIndex, oid, nid);
                                 migrateTextIndex(profileReviewIndex, oid, nid);
@@ -1067,8 +1094,10 @@ persistent actor {
     };
 
     private func legacyLinkClaimId(profile : Profile, link : Types.Link) : Text {
-        let contentHash = Nat32.toNat(Text.hash(link.name # "\u{1f}" # link.url));
-        legacyClaimId(profile, "link:" # Nat.toText(contentHash))
+        // Length-prefix the mutable text fields so the identifier is deterministic
+        // and boundary-safe without relying on a short non-cryptographic hash.
+        let key = Nat.toText(Text.size(link.name)) # ":" # link.name # ":" # link.url;
+        legacyClaimId(profile, "link:" # key)
     };
 
     private func findProfileByOwner(owner : Principal) : ?Profile {
