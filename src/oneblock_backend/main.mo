@@ -980,7 +980,7 @@ persistent actor {
         let now = Time.now();
         let id = generateProfileClaimId();
         let claim : ProfileClaim = {
-            id;
+            id = id;
             profile_id = input.profile_id;
             subject = profile.owner;
             predicate = input.predicate;
@@ -1027,11 +1027,11 @@ persistent actor {
         value : ProfileGraph.ClaimValue
     ) : ProfileClaim {
         {
-            id;
+            id = id;
             profile_id = profile.id;
             subject = profile.owner;
-            predicate;
-            value;
+            predicate = predicate;
+            value = value;
             capability = null;
             context = ?"legacy-profile";
             provenance = {
@@ -1070,11 +1070,11 @@ persistent actor {
             context = ?record.app_id;
             provenance = {
                 source_kind = #external;
-                issuer;
+                issuer = issuer;
                 issuer_id = record.app_id;
                 verification = externalVerification(record);
                 evidence = [{
-                    schema;
+                    schema = schema;
                     uri = ?"oneblock://activity/" # record.id;
                     hash = ?record.hash;
                     external_id = ?record.idempotency_key;
@@ -1181,7 +1181,7 @@ persistent actor {
         let now = Time.now();
         let id = generatePeerReviewId();
         let review : PeerReview = {
-            id;
+            id = id;
             profile_id = input.profile_id;
             subject = profile.owner;
             reviewer = caller;
@@ -1304,7 +1304,7 @@ persistent actor {
             evidence = review.evidence;
             related_claims = review.related_claims;
             status = #disputed;
-            response;
+            response = response;
             visibility = review.visibility;
             created_at = review.created_at;
             updated_at = Time.now();
