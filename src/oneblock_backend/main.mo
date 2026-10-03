@@ -1093,6 +1093,13 @@ persistent actor {
         "legacy:profile:" # Principal.toText(profile.owner) # ":" # suffix
     };
 
+    private func legacyTextClaimId(profile : Profile, field : Text, value : Text) : Text {
+        // Include the projected value so edits cannot silently retarget an old
+        // review reference to different profile content.
+        let versionKey = Nat.toText(Text.size(value)) # ":" # value;
+        legacyClaimId(profile, field # ":" # versionKey)
+    };
+
     private func legacyLinkClaimId(profile : Profile, link : Types.Link) : Text {
         // Length-prefix the mutable text fields so the identifier is deterministic
         // and boundary-safe without relying on a short non-cryptographic hash.
@@ -1116,10 +1123,10 @@ persistent actor {
         // Legacy projections use owner-stable IDs so profile renames do not
         // change identity or transfer authorization to a future ID holder.
         for ((_, profile) in profiles.entries()) {
-            if (claimId == legacyClaimId(profile, "name")) {
+            if (claimId == legacyTextClaimId(profile, "name", profile.name)) {
                 return ?legacyProfileClaim(profile, claimId, "profile.name", #text(profile.name))
             };
-            if (Text.size(profile.bio) > 0 and claimId == legacyClaimId(profile, "bio")) {
+            if (Text.size(profile.bio) > 0 and claimId == legacyTextClaimId(profile, "bio", profile.bio)) {
                 return ?legacyProfileClaim(profile, claimId, "profile.bio", #text(profile.bio))
             };
             for (link in profile.links.vals()) {
@@ -1130,10 +1137,14 @@ persistent actor {
             }
         };
 
-        for ((_, record) in activityRecordsMap.entries()) {
-            if (claimId == "external:activity:" # record.id) {
-                return activityClaim(record)
-            }
+        switch (Text.stripStart(claimId, #text "external:activity:")) {
+            case (?recordId) {
+                switch (activityRecordsMap.get(recordId)) {
+                    case (?record) { return activityClaim(record) };
+                    case null {};
+                }
+            };
+            case null {};
         };
         null
     };
@@ -1240,9 +1251,9 @@ persistent actor {
         // self-declared claims without copying or migrating legacy stable state.
         let profileVisibility = graphVisibility(profile.visibility);
         if (canReadGraphItem(caller, profile.owner, profileVisibility)) {
-            buf.add(legacyProfileClaim(profile, legacyClaimId(profile, "name"), "profile.name", #text(profile.name)));
+            buf.add(legacyProfileClaim(profile, legacyTextClaimId(profile, "name", profile.name), "profile.name", #text(profile.name)));
             if (Text.size(profile.bio) > 0) {
-                buf.add(legacyProfileClaim(profile, legacyClaimId(profile, "bio"), "profile.bio", #text(profile.bio)))
+                buf.add(legacyProfileClaim(profile, legacyTextClaimId(profile, "bio", profile.bio), "profile.bio", #text(profile.bio)))
             };
             for (link in profile.links.vals()) {
                 let linkId = legacyLinkClaimId(profile, link);
@@ -1320,6 +1331,9 @@ persistent actor {
                 case (?claim) {
                     if (claim.subject != profile.owner) {
                         return #err("related claim belongs to another subject")
+                    };
+                    if (not canReadGraphItem(caller, claim.subject, claim.visibility)) {
+                        return #err("related claim is not visible to reviewer")
                     }
                 };
             }
