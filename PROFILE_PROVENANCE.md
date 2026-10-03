@@ -165,14 +165,30 @@ OneBlock should expose the evidence graph and let different contexts interpret i
 
 Do not replace existing Profile, Block, ActivityRecord, Factor, or Personal Chain storage in-place.
 
-Migration should be additive:
+Migration should be additive and projection-first. Existing Profile fields and Integration ActivityRecords remain their systems of record and are exposed through provenance-aware claim projections instead of being copied.
 
 1. introduce shared provenance types;
-2. map current self-authored Profile/Block data to `self_declared`;
-3. map Integration ActivityRecord and protocol issuers to `external`;
+2. project current self-authored Profile data as `self_declared`;
+3. project Integration ActivityRecord data as `external` and keep provider/app attribution mandatory;
 4. introduce structured PeerReview storage/API;
 5. build DerivedSignal projections from claims/reviews;
 6. render profile views grouped/filterable by provenance;
 7. migrate legacy views only after the new path is proven.
 
 This avoids stable-memory migrations while the model is still evolving.
+
+## Current Phase-2 API
+
+The backend now adds native storage for new self-declared claims and structured peer reviews:
+
+- `createSelfClaim`
+- `getProfileClaim`
+- `listProfileClaims`
+- `createPeerReview`
+- `getPeerReview`
+- `listPeerReviews`
+- `respondToPeerReview`
+- `disputePeerReview`
+- `withdrawPeerReview`
+
+`listProfileClaims` also projects legacy Profile name/bio/links and Integration ActivityRecords into the same claim view. This makes existing data immediately provenance-aware without a stable-memory rewrite or duplicate external records.
