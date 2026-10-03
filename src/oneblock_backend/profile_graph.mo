@@ -42,7 +42,7 @@ module {
   public type Provenance = {
     source_kind : SourceKind;
     issuer : ?Principal;
-    issuer_id : ?Text;
+    issuer_id : Text;
     verification : VerificationMethod;
     evidence : [EvidenceRef];
     observed_at : ?Timestamp;
