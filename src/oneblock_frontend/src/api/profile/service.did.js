@@ -68,6 +68,38 @@ export const idlFactory = ({ IDL }) => {
     'principal' : IdentityPrincipal,
     'entity_kind' : EntityKind,
   });
+  const ReviewRelationship = IDL.Variant({
+    'manager' : IDL.Null,
+    'provider' : IDL.Null,
+    'customer' : IDL.Null,
+    'other' : IDL.Text,
+    'collaborator' : IDL.Null,
+    'peer' : IDL.Null,
+    'participant' : IDL.Null,
+    'coworker' : IDL.Null,
+  });
+  const EvidenceRef = IDL.Record({
+    'uri' : IDL.Opt(IDL.Text),
+    'schema' : IDL.Text,
+    'hash' : IDL.Opt(IDL.Text),
+    'external_id' : IDL.Opt(IDL.Text),
+  });
+  const ClaimId = IDL.Text;
+  const CapabilityRef = IDL.Record({
+    'path' : IDL.Text,
+    'display_label' : IDL.Opt(IDL.Text),
+  });
+  const NewPeerReview = IDL.Record({
+    'assessment_tags' : IDL.Vec(IDL.Text),
+    'context' : IDL.Text,
+    'relationship' : ReviewRelationship,
+    'evidence' : IDL.Vec(EvidenceRef),
+    'narrative' : IDL.Opt(IDL.Text),
+    'visibility' : Visibility,
+    'profile_id' : IDL.Text,
+    'related_claims' : IDL.Vec(ClaimId),
+    'capability' : IDL.Opt(CapabilityRef),
+  });
   const PolicyWeights = IDL.Record({
     'existence' : IDL.Float64,
     'social' : IDL.Float64,
@@ -98,6 +130,23 @@ export const idlFactory = ({ IDL }) => {
     'bio' : IDL.Text,
     'pfp' : IDL.Text,
     'name' : IDL.Text,
+  });
+  const ClaimValue = IDL.Variant({
+    'text' : IDL.Text,
+    'reference' : IDL.Text,
+    'boolean' : IDL.Bool,
+    'number' : IDL.Float64,
+  });
+  const NewSelfClaim = IDL.Record({
+    'context' : IDL.Opt(IDL.Text),
+    'value' : ClaimValue,
+    'evidence' : IDL.Vec(EvidenceRef),
+    'valid_until' : IDL.Opt(Timestamp),
+    'valid_from' : IDL.Opt(Timestamp),
+    'visibility' : Visibility,
+    'profile_id' : IDL.Text,
+    'predicate' : IDL.Text,
+    'capability' : IDL.Opt(CapabilityRef),
   });
   const BlockId = IDL.Text;
   const Strength = IDL.Variant({
@@ -287,6 +336,69 @@ export const idlFactory = ({ IDL }) => {
     'created_at' : Timestamp,
     'verification' : ProviderVerification,
   });
+  const ReviewId = IDL.Text;
+  const ReviewStatus = IDL.Variant({
+    'active' : IDL.Null,
+    'disputed' : IDL.Null,
+    'withdrawn' : IDL.Null,
+  });
+  const PeerReview = IDL.Record({
+    'id' : ReviewId,
+    'status' : ReviewStatus,
+    'updated_at' : Timestamp,
+    'assessment_tags' : IDL.Vec(IDL.Text),
+    'context' : IDL.Text,
+    'relationship' : ReviewRelationship,
+    'subject' : IDL.Principal,
+    'created_at' : Timestamp,
+    'evidence' : IDL.Vec(EvidenceRef),
+    'narrative' : IDL.Opt(IDL.Text),
+    'response' : IDL.Opt(IDL.Text),
+    'reviewer' : IDL.Principal,
+    'visibility' : Visibility,
+    'profile_id' : IDL.Text,
+    'related_claims' : IDL.Vec(ClaimId),
+    'capability' : IDL.Opt(CapabilityRef),
+  });
+  const SourceKind = IDL.Variant({
+    'peer' : IDL.Null,
+    'self_declared' : IDL.Null,
+    'derived' : IDL.Null,
+    'external' : IDL.Null,
+  });
+  const VerificationMethod = IDL.Variant({
+    'imported' : IDL.Null,
+    'oauth' : IDL.Null,
+    'custom' : IDL.Text,
+    'onchain' : IDL.Null,
+    'none' : IDL.Null,
+    'institutional' : IDL.Null,
+    'signed' : IDL.Null,
+    'system_derived' : IDL.Null,
+  });
+  const Provenance = IDL.Record({
+    'issuer_id' : IDL.Text,
+    'issuer' : IDL.Opt(IDL.Principal),
+    'recorded_at' : Timestamp,
+    'evidence' : IDL.Vec(EvidenceRef),
+    'source_kind' : SourceKind,
+    'verification' : VerificationMethod,
+    'observed_at' : IDL.Opt(Timestamp),
+  });
+  const ProfileClaim = IDL.Record({
+    'id' : ClaimId,
+    'provenance' : Provenance,
+    'context' : IDL.Opt(IDL.Text),
+    'subject' : IDL.Principal,
+    'value' : ClaimValue,
+    'created_at' : Timestamp,
+    'valid_until' : IDL.Opt(Timestamp),
+    'valid_from' : IDL.Opt(Timestamp),
+    'visibility' : Visibility,
+    'profile_id' : IDL.Text,
+    'predicate' : IDL.Text,
+    'capability' : IDL.Opt(CapabilityRef),
+  });
   const ProbabilityScores = IDL.Record({
     'human_score' : IDL.Float64,
     'updated_at' : Timestamp,
@@ -381,10 +493,13 @@ export const idlFactory = ({ IDL }) => {
     'connectApp' : IDL.Func([AppId, IDL.Text, IDL.Vec(IDL.Text)], [Result], []),
     'createBlock' : IDL.Func([NewBlock], [Result_1], []),
     'createIdentityGraph' : IDL.Func([NewIdentityGraph], [Result], []),
+    'createPeerReview' : IDL.Func([NewPeerReview], [Result_1], []),
     'createPolicy' : IDL.Func([NewContextPolicy], [Result], []),
     'createProfile' : IDL.Func([NewProfile], [Result], []),
+    'createSelfClaim' : IDL.Func([NewSelfClaim], [Result_1], []),
     'createTrait' : IDL.Func([IDL.Text, NewTrait], [Result_1], []),
     'deleteLink' : IDL.Func([IDL.Text, IDL.Text], [Result], []),
+    'disputePeerReview' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [Result], []),
     'evaluatePolicy' : IDL.Func([IDL.Text, IDL.Text], [Result_3], ['query']),
     'getActivityRecord' : IDL.Func(
         [RecordId],
@@ -419,10 +534,16 @@ export const idlFactory = ({ IDL }) => {
     'getMyFavorites' : IDL.Func([], [IDL.Vec(Favorite)], ['query']),
     'getMyProfile' : IDL.Func([], [IDL.Opt(Profile)], ['query']),
     'getOipProvider' : IDL.Func([IDL.Text], [IDL.Opt(OipProvider)], ['query']),
+    'getPeerReview' : IDL.Func([IDL.Text], [IDL.Opt(PeerReview)], ['query']),
     'getProfile' : IDL.Func([IDL.Text], [IDL.Opt(Profile)], ['query']),
     'getProfileByPrincipal' : IDL.Func(
         [IDL.Text],
         [IDL.Opt(Profile)],
+        ['query'],
+      ),
+    'getProfileClaim' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(ProfileClaim)],
         ['query'],
       ),
     'getProfileCount' : IDL.Func([], [IDL.Nat], ['query']),
@@ -439,12 +560,19 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'listOipProviders' : IDL.Func([], [IDL.Vec(OipProvider)], ['query']),
+    'listPeerReviews' : IDL.Func([IDL.Text], [IDL.Vec(PeerReview)], ['query']),
+    'listProfileClaims' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(ProfileClaim)],
+        ['query'],
+      ),
     'recomputeScores' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [Result_2], []),
     'registerActivityType' : IDL.Func([NewActivityType], [Result_1], []),
     'registerApp' : IDL.Func([NewIntegrationApp], [Result_1], []),
     'registerOipProvider' : IDL.Func([NewOipProvider], [Result], []),
     'removeFeaturedProfile' : IDL.Func([IDL.Text], [Result], []),
     'reserveid' : IDL.Func([IDL.Text], [Result], []),
+    'respondToPeerReview' : IDL.Func([IDL.Text, IDL.Text], [Result], []),
     'revokeConnection' : IDL.Func([AppId], [Result], []),
     'runDecaySweep' : IDL.Func([], [IDL.Nat], []),
     'searchProfilesByName' : IDL.Func(
@@ -460,6 +588,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'updateProfile' : IDL.Func([IDL.Text, UpdateProfile], [Result], []),
+    'withdrawPeerReview' : IDL.Func([IDL.Text], [Result], []),
   });
 };
 export const init = ({ IDL }) => { return []; };

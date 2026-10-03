@@ -13,6 +13,7 @@ import Order "mo:base/Order";
 import Float "mo:base/Float";
 
 import Types "types";
+import ProfileGraph "profile_graph";
 
 persistent actor {
     type Profile = Types.Profile;
@@ -52,6 +53,10 @@ persistent actor {
     type OipProvider = Types.OipProvider;
     type NewOipProvider = Types.NewOipProvider;
     type ProviderFactorSubmission = Types.ProviderFactorSubmission;
+    type ProfileClaim = ProfileGraph.ProfileClaim;
+    type NewSelfClaim = ProfileGraph.NewSelfClaim;
+    type PeerReview = ProfileGraph.PeerReview;
+    type NewPeerReview = ProfileGraph.NewPeerReview;
 
     var stableProfiles : [(Text, Profile)] = [];
     var stableFeaturedProfiles : [Profile] = [];
@@ -67,7 +72,15 @@ persistent actor {
     var stableIntegrationApps : [(Text, IntegrationApp)] = [];
     var stableActivityTypes : [(Text, ActivityType)] = [];
     var stableConnections : [(Text, IntegrationConnection)] = [];
+    // Immutable ownership metadata for connection epochs. This is kept
+    // separately to avoid rewriting the legacy IntegrationConnection type.
+    var stableConnectionSubjects : [(Text, Principal)] = [];
+    var stableConnectionEpochStarts : [(Text, Int)] = [];
     var stableActivityRecords : [(Text, ActivityRecord)] = [];
+    // Immutable subject binding for external activity evidence. Legacy records
+    // without a binding are intentionally not projected until ownership can be
+    // established safely.
+    var stableActivityRecordSubjects : [(Text, Principal)] = [];
     var stableIdempotencyKeys : [(Text, Text)] = []; // idempotency_key -> record_id
     var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]
     var stableDerivedSummaries : [(Text, DerivedSummary)] = [];
@@ -75,6 +88,14 @@ persistent actor {
     var stableContextPolicies : [(Text, ContextPolicy)] = [];
     var stableTrustEdges : [(Text, TrustEdge)] = [];
     var stableOipProviders : [(Text, OipProvider)] = [];
+
+    // Additive profile graph state. Kept separate from legacy Profile/Block
+    // storage so this can be deployed without rewriting existing stable data.
+    var stableProfileClaims : [(Text, ProfileClaim)] = [];
+    var stableProfileClaimIndex : [(Text, [Text])] = [];
+    var stablePeerReviews : [(Text, PeerReview)] = [];
+    var stableProfileReviewIndex : [(Text, [Text])] = [];
+    var stableHistoricalProfileOwners : [(Text, Principal)] = [];
 
     var reserveIds : [Text] = ["oneblock", "block", "about", "admin", "status", "update"];
 
@@ -84,6 +105,8 @@ persistent actor {
     var traitIdCounter : Nat = 0;
     var activityRecordCounter : Nat = 0;
     var factorIdCounter : Nat = 0;
+    var profileClaimCounter : Nat = 0;
+    var peerReviewCounter : Nat = 0;
 
     transient var profiles = TrieMap.TrieMap<Text, Profile>(Text.equal, Text.hash);
     profiles := TrieMap.fromEntries<Text, Profile>(Iter.fromArray(stableProfiles), Text.equal, Text.hash);
@@ -120,8 +143,16 @@ persistent actor {
     transient var connections = TrieMap.TrieMap<Text, IntegrationConnection>(Text.equal, Text.hash);
     connections := TrieMap.fromEntries<Text, IntegrationConnection>(Iter.fromArray(stableConnections), Text.equal, Text.hash);
 
+    transient var connectionSubjects = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
+    connectionSubjects := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableConnectionSubjects), Text.equal, Text.hash);
+    transient var connectionEpochStarts = TrieMap.TrieMap<Text, Int>(Text.equal, Text.hash);
+    connectionEpochStarts := TrieMap.fromEntries<Text, Int>(Iter.fromArray(stableConnectionEpochStarts), Text.equal, Text.hash);
+
     transient var activityRecordsMap = TrieMap.TrieMap<Text, ActivityRecord>(Text.equal, Text.hash);
     activityRecordsMap := TrieMap.fromEntries<Text, ActivityRecord>(Iter.fromArray(stableActivityRecords), Text.equal, Text.hash);
+
+    transient var activityRecordSubjects = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
+    activityRecordSubjects := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableActivityRecordSubjects), Text.equal, Text.hash);
 
     transient var idempotencyKeys = TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);
     idempotencyKeys := TrieMap.fromEntries<Text, Text>(Iter.fromArray(stableIdempotencyKeys), Text.equal, Text.hash);
@@ -140,6 +171,108 @@ persistent actor {
     transient var oipProviders = TrieMap.TrieMap<Text, OipProvider>(Text.equal, Text.hash);
     oipProviders := TrieMap.fromEntries<Text, OipProvider>(Iter.fromArray(stableOipProviders), Text.equal, Text.hash);
 
+    transient var profileClaims = TrieMap.TrieMap<Text, ProfileClaim>(Text.equal, Text.hash);
+    profileClaims := TrieMap.fromEntries<Text, ProfileClaim>(Iter.fromArray(stableProfileClaims), Text.equal, Text.hash);
+    transient var profileClaimIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
+    profileClaimIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileClaimIndex), Text.equal, Text.hash);
+    transient var peerReviews = TrieMap.TrieMap<Text, PeerReview>(Text.equal, Text.hash);
+    peerReviews := TrieMap.fromEntries<Text, PeerReview>(Iter.fromArray(stablePeerReviews), Text.equal, Text.hash);
+    transient var profileReviewIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
+    profileReviewIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileReviewIndex), Text.equal, Text.hash);
+    transient var historicalProfileOwners = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
+    historicalProfileOwners := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableHistoricalProfileOwners), Text.equal, Text.hash);
+
+    private func backfillLegacyConnectionOwnership() {
+        // For pre-upgrade state, only a connection created during the current
+        // Profile instance can be attributed safely. Reconnects after this
+        // release preserve the earliest epoch start instead of overwriting it.
+        for ((key, connection) in connections.entries()) {
+            if (connectionSubjects.get(key) == null) {
+                switch (profiles.get(connection.profile_id)) {
+                    case (?profile) {
+                        if (connection.created_at >= profile.createtime) {
+                            connectionSubjects.put(key, profile.owner);
+                            connectionEpochStarts.put(key, connection.created_at)
+                        }
+                    };
+                    case null {};
+                }
+            }
+        }
+    };
+
+    private func backfillLegacyActivitySubjects() {
+        // Precompute per-profile reuse once so upgrade work stays linear.
+        let reusedProfiles = TrieMap.TrieMap<Text, Bool>(Text.equal, Text.hash);
+        for ((profileId, recordIds) in profileActivityIndex.entries()) {
+            switch (profiles.get(profileId)) {
+                case null {};
+                case (?profile) {
+                    var reused = false;
+                    label scan for (recordId in recordIds.vals()) {
+                        switch (activityRecordsMap.get(recordId)) {
+                            case (?record) {
+                                if (record.ingest_timestamp < profile.createtime) {
+                                    reused := true;
+                                    break scan
+                                }
+                            };
+                            case null {};
+                        }
+                    };
+                    reusedProfiles.put(profileId, reused)
+                };
+            }
+        };
+        for ((_, connection) in connections.entries()) {
+            switch (profiles.get(connection.profile_id)) {
+                case (?profile) {
+                    if (connection.created_at < profile.createtime) {
+                        reusedProfiles.put(profile.id, true)
+                    }
+                };
+                case null {};
+            }
+        };
+
+        for ((recordId, record) in activityRecordsMap.entries()) {
+            if (activityRecordSubjects.get(recordId) == null) {
+                switch (profiles.get(record.profile_id)) {
+                    case null {};
+                    case (?profile) {
+                        let key = connectionKey(record.profile_id, record.app_id);
+                        switch (
+                            connectionSubjects.get(key),
+                            connectionEpochStarts.get(key)
+                        ) {
+                            case (?subject, ?epochStart) {
+                                if (subject == profile.owner) {
+                                    let reused = switch (reusedProfiles.get(profile.id)) {
+                                        case (?value) value;
+                                        case null false;
+                                    };
+                                    let belongsToCurrentInstance =
+                                        record.ingest_timestamp >= profile.createtime;
+                                    // For reused IDs, only the verified current-owner
+                                    // connection epoch is safe. Records before that
+                                    // boundary are irrecoverably ambiguous in legacy
+                                    // state and remain quarantined.
+                                    if (
+                                        belongsToCurrentInstance and
+                                        (not reused or record.ingest_timestamp >= epochStart)
+                                    ) {
+                                        activityRecordSubjects.put(recordId, profile.owner)
+                                    }
+                                }
+                            };
+                            case _ {};
+                        }
+                    };
+                }
+            }
+        }
+    };
+
     system func preupgrade() {
         stableProfiles := Iter.toArray(profiles.entries());
         stableBlocks := Iter.toArray(blocks.entries());
@@ -153,17 +286,29 @@ persistent actor {
         stableIntegrationApps := Iter.toArray(integrationApps.entries());
         stableActivityTypes := Iter.toArray(activityTypesMap.entries());
         stableConnections := Iter.toArray(connections.entries());
+        stableConnectionSubjects := Iter.toArray(connectionSubjects.entries());
+        stableConnectionEpochStarts := Iter.toArray(connectionEpochStarts.entries());
         stableActivityRecords := Iter.toArray(activityRecordsMap.entries());
+        stableActivityRecordSubjects := Iter.toArray(activityRecordSubjects.entries());
         stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());
         stableProfileActivityIndex := Iter.toArray(profileActivityIndex.entries());
         stableDerivedSummaries := Iter.toArray(derivedSummaries.entries());
         stableIdentityGraphs := Iter.toArray(identityGraphs.entries());
         stableContextPolicies := Iter.toArray(contextPolicies.entries());
         stableTrustEdges := Iter.toArray(trustEdges.entries());
-        stableOipProviders := Iter.toArray(oipProviders.entries())
+        stableOipProviders := Iter.toArray(oipProviders.entries());
+        stableProfileClaims := Iter.toArray(profileClaims.entries());
+        stableProfileClaimIndex := Iter.toArray(profileClaimIndex.entries());
+        stablePeerReviews := Iter.toArray(peerReviews.entries());
+        stableProfileReviewIndex := Iter.toArray(profileReviewIndex.entries());
+        stableHistoricalProfileOwners := Iter.toArray(historicalProfileOwners.entries())
     };
 
     system func postupgrade() {
+        // Restore safe provenance bindings for legacy records before clearing
+        // upgrade arrays. Ambiguous records remain unbound and unprojected.
+        backfillLegacyConnectionOwnership();
+        backfillLegacyActivitySubjects();
         stableProfiles := [];
         stableBlocks := [];
         stableTraits := [];
@@ -176,14 +321,22 @@ persistent actor {
         stableIntegrationApps := [];
         stableActivityTypes := [];
         stableConnections := [];
+        stableConnectionSubjects := [];
+        stableConnectionEpochStarts := [];
         stableActivityRecords := [];
+        stableActivityRecordSubjects := [];
         stableIdempotencyKeys := [];
         stableProfileActivityIndex := [];
         stableDerivedSummaries := [];
         stableIdentityGraphs := [];
         stableContextPolicies := [];
         stableTrustEdges := [];
-        stableOipProviders := []
+        stableOipProviders := [];
+        stableProfileClaims := [];
+        stableProfileClaimIndex := [];
+        stablePeerReviews := [];
+        stableProfileReviewIndex := [];
+        stableHistoricalProfileOwners := []
     };
     private func clamp01(v : Float) : Float {
         if (v < 0.0) { 0.0 } else if (v > 1.0) { 1.0 } else { v }
@@ -259,6 +412,10 @@ persistent actor {
                             #err("the id is taken!")
                         };
                         case (_) {
+                            switch (historicalProfileOwners.get(newProfile.id)) {
+                                case (?_) { return #err("the id was previously used and is reserved") };
+                                case null {};
+                            };
 
                             if (Text.size(newProfile.id) < 4) {
                                 #err("profile id length must be greater than 3")
@@ -365,6 +522,85 @@ persistent actor {
         }
     };
 
+    private func migrateTextIndex(index : TrieMap.TrieMap<Text, [Text]>, oldId : Text, newId : Text) {
+        switch (index.get(oldId)) {
+            case null {};
+            case (?ids) {
+                index.put(newId, ids);
+                ignore index.remove(oldId);
+            };
+        }
+    };
+
+    private func migrateDerivedSummaries(oldId : Text, newId : Text) {
+        let keys = Buffer.Buffer<(Text, Text, Text)>(0);
+        for ((key, summary) in derivedSummaries.entries()) {
+            if (summary.profile_id == oldId) {
+                keys.add((key, summary.app_id, summary.activity_type))
+            }
+        };
+        for ((oldKey, appId, activityType) in keys.vals()) {
+            switch (derivedSummaries.get(oldKey)) {
+                case null {};
+                case (?summary) {
+                    let newKey = summaryKey(newId, appId, activityType);
+                    derivedSummaries.put(newKey, {
+                        profile_id = newId;
+                        app_id = summary.app_id;
+                        activity_type = summary.activity_type;
+                        record_count = summary.record_count;
+                        total_amount = summary.total_amount;
+                        currency = summary.currency;
+                        last_updated = summary.last_updated;
+                    });
+                    ignore derivedSummaries.remove(oldKey);
+                };
+            }
+        }
+    };
+
+    private func migrateConnections(oldId : Text, newId : Text) {
+        let appIds = Buffer.Buffer<Text>(0);
+        for ((_, conn) in connections.entries()) {
+            if (conn.profile_id == oldId) {
+                appIds.add(conn.app_id)
+            }
+        };
+        for (appId in appIds.vals()) {
+            let oldKey = connectionKey(oldId, appId);
+            switch (connections.get(oldKey)) {
+                case null {};
+                case (?conn) {
+                    let newKey = connectionKey(newId, appId);
+                    connections.put(newKey, {
+                        profile_id = newId;
+                        app_id = conn.app_id;
+                        external_user_id = conn.external_user_id;
+                        scopes = conn.scopes;
+                        status = conn.status;
+                        created_at = conn.created_at;
+                        revoked_at = conn.revoked_at;
+                    });
+                    switch (connectionSubjects.get(oldKey)) {
+                        case (?subject) {
+                            connectionSubjects.put(newKey, subject);
+                            ignore connectionSubjects.remove(oldKey);
+                        };
+                        case null {};
+                    };
+                    switch (connectionEpochStarts.get(oldKey)) {
+                        case (?startedAt) {
+                            connectionEpochStarts.put(newKey, startedAt);
+                            ignore connectionEpochStarts.remove(oldKey);
+                        };
+                        case null {};
+                    };
+                    ignore connections.remove(oldKey);
+                };
+            }
+        }
+    };
+
     public shared ({ caller }) func changeId(oid : Text, nid : Text) : async Result.Result<Nat, Text> {
         if (Principal.isAnonymous(caller)) {
             #err("no authenticated")
@@ -380,6 +616,19 @@ persistent actor {
                                 #err("this id has been taken")
                             };
                             case (_) {
+                                switch (historicalProfileOwners.get(nid)) {
+                                    case (?_) { return #err("this id was previously used and is reserved") };
+                                    case null {};
+                                };
+                                historicalProfileOwners.put(oid, p.owner);
+                                // Keep ambiguous legacy activity records unbound.
+                                // Only pre-established immutable subject bindings move
+                                // safely with the profile's activity index.
+                                migrateConnections(oid, nid);
+                                migrateDerivedSummaries(oid, nid);
+                                migrateTextIndex(profileActivityIndex, oid, nid);
+                                migrateTextIndex(profileClaimIndex, oid, nid);
+                                migrateTextIndex(profileReviewIndex, oid, nid);
                                 profiles.put(
                                     nid,
                                     {
@@ -881,6 +1130,517 @@ persistent actor {
         };
     };
 
+    //----------------------------- Profile Provenance Graph ------------------------------------
+
+    private func generateProfileClaimId() : Text {
+        profileClaimCounter += 1;
+        "claim_" # Nat.toText(profileClaimCounter)
+    };
+
+    private func generatePeerReviewId() : Text {
+        peerReviewCounter += 1;
+        "review_" # Nat.toText(peerReviewCounter)
+    };
+
+    private func graphVisibility(v : Types.Visibility) : ProfileGraph.Visibility {
+        switch (v) {
+            case (#global) #global;
+            case (#unlisted) #unlisted;
+            case (#personal) #personal;
+        }
+    };
+
+    private func canReadGraphItem(caller : Principal, owner : Principal, visibility : ProfileGraph.Visibility) : Bool {
+        if (caller == owner) {
+            return true
+        };
+        switch (visibility) {
+            case (#global) true;
+            case (#unlisted) false;
+            case (#personal) false;
+        }
+    };
+
+    private func appendClaimIndex(profileId : Text, claimId : Text) {
+        let current = switch (profileClaimIndex.get(profileId)) {
+            case (?ids) ids;
+            case null [];
+        };
+        let buf = Buffer.fromArray<Text>(current);
+        buf.add(claimId);
+        profileClaimIndex.put(profileId, Buffer.toArray(buf))
+    };
+
+    private func appendReviewIndex(profileId : Text, reviewId : Text) {
+        let current = switch (profileReviewIndex.get(profileId)) {
+            case (?ids) ids;
+            case null [];
+        };
+        let buf = Buffer.fromArray<Text>(current);
+        buf.add(reviewId);
+        profileReviewIndex.put(profileId, Buffer.toArray(buf))
+    };
+
+    public shared ({ caller }) func createSelfClaim(input : NewSelfClaim) : async Result.Result<Text, Text> {
+        if (Principal.isAnonymous(caller)) {
+            return #err("not authenticated")
+        };
+        if (Text.size(input.predicate) == 0) {
+            return #err("predicate is required")
+        };
+        let profile = switch (profiles.get(input.profile_id)) {
+            case null { return #err("profile not found") };
+            case (?p) p;
+        };
+        if (profile.owner != caller) {
+            return #err("not authorized")
+        };
+        let now = Time.now();
+        let id = generateProfileClaimId();
+        let claim : ProfileClaim = {
+            id = id;
+            profile_id = input.profile_id;
+            subject = profile.owner;
+            predicate = input.predicate;
+            value = input.value;
+            capability = input.capability;
+            context = input.context;
+            provenance = {
+                source_kind = #self_declared;
+                issuer = ?caller;
+                issuer_id = Principal.toText(caller);
+                verification = #none;
+                evidence = input.evidence;
+                observed_at = ?now;
+                recorded_at = now;
+            };
+            valid_from = input.valid_from;
+            valid_until = input.valid_until;
+            visibility = input.visibility;
+            created_at = now;
+        };
+        profileClaims.put(id, claim);
+        appendClaimIndex(input.profile_id, id);
+        #ok(id)
+    };
+
+    private func legacyClaimId(profile : Profile, suffix : Text) : Text {
+        "legacy:profile:" # Principal.toText(profile.owner) # ":" # suffix
+    };
+
+    private func legacyTextClaimId(profile : Profile, field : Text, value : Text) : Text {
+        // Include the projected value so edits cannot silently retarget an old
+        // review reference to different profile content.
+        let versionKey = Nat.toText(Text.size(value)) # ":" # value;
+        legacyClaimId(profile, field # ":" # versionKey)
+    };
+
+    private func legacyLinkClaimId(profile : Profile, link : Types.Link) : Text {
+        // Length-prefix the mutable text fields so the identifier is deterministic
+        // and boundary-safe without relying on a short non-cryptographic hash.
+        let key = Nat.toText(Text.size(link.name)) # ":" # link.name # ":" # link.url;
+        legacyClaimId(profile, "link:" # key)
+    };
+
+    private func findProfileByOwner(owner : Principal) : ?Profile {
+        switch (userprofiles.get(owner)) {
+            case null null;
+            case (?profileId) profiles.get(profileId);
+        }
+    };
+
+    private func resolveClaim(claimId : Text) : ?ProfileClaim {
+        switch (profileClaims.get(claimId)) {
+            case (?claim) { return ?claim };
+            case null {};
+        };
+
+        // External projected IDs encode the ActivityRecord key, so resolve
+        // them directly before touching legacy profile projections.
+        switch (Text.stripStart(claimId, #text "external:activity:")) {
+            case (?recordId) {
+                switch (activityRecordsMap.get(recordId)) {
+                    case (?record) { return activityClaim(record) };
+                    case null { return null };
+                }
+            };
+            case null {};
+        };
+
+        // Legacy projections use owner-stable IDs so profile renames do not
+        // change identity or transfer authorization to a future ID holder.
+        for ((_, profile) in profiles.entries()) {
+            if (claimId == legacyTextClaimId(profile, "name", profile.name)) {
+                return ?legacyProfileClaim(profile, claimId, "profile.name", #text(profile.name))
+            };
+            if (Text.size(profile.bio) > 0 and claimId == legacyTextClaimId(profile, "bio", profile.bio)) {
+                return ?legacyProfileClaim(profile, claimId, "profile.bio", #text(profile.bio))
+            };
+            for (link in profile.links.vals()) {
+                let candidateId = legacyLinkClaimId(profile, link);
+                if (claimId == candidateId) {
+                    return ?legacyProfileClaim(profile, candidateId, "profile.link." # link.name, #reference(link.url))
+                }
+            }
+        };
+
+        null
+    };
+
+    public query ({ caller }) func getProfileClaim(claimId : Text) : async ?ProfileClaim {
+        switch (resolveClaim(claimId)) {
+            case null null;
+            case (?claim) {
+                if (caller == claim.subject or canReadGraphItem(caller, claim.subject, claim.visibility)) {
+                    ?claim
+                } else {
+                    null
+                }
+            };
+        }
+    };
+
+    private func legacyProfileClaim(
+        profile : Profile,
+        id : Text,
+        predicate : Text,
+        value : ProfileGraph.ClaimValue
+    ) : ProfileClaim {
+        {
+            id = id;
+            profile_id = profile.id;
+            subject = profile.owner;
+            predicate = predicate;
+            value = value;
+            capability = null;
+            context = ?"legacy-profile";
+            provenance = {
+                source_kind = #self_declared;
+                issuer = ?profile.owner;
+                issuer_id = Principal.toText(profile.owner);
+                verification = #none;
+                evidence = [];
+                observed_at = ?profile.last_updated;
+                recorded_at = profile.last_updated;
+            };
+            valid_from = ?profile.createtime;
+            valid_until = null;
+            visibility = graphVisibility(profile.visibility);
+            created_at = profile.createtime;
+        }
+    };
+
+    private func activityClaim(record : ActivityRecord) : ?ProfileClaim {
+        // Never infer an external record's subject from a mutable/reusable
+        // profile ID. Pre-upgrade records without an immutable binding are
+        // omitted rather than risk attributing evidence to the wrong person.
+        let subject = switch (activityRecordSubjects.get(record.id)) {
+            case null { return null };
+            case (?owner) owner;
+        };
+        let profile = switch (findProfileByOwner(subject)) {
+            case null { return null };
+            case (?p) p;
+        };
+        let issuer = switch (integrationApps.get(record.app_id)) {
+            case (?app) ?app.owner;
+            case null null;
+        };
+        let schema = record.app_id # "." # record.activity_type # ".v" # Nat.toText(record.schema_version);
+        ?{
+            id = "external:activity:" # record.id;
+            profile_id = record.profile_id;
+            subject = subject;
+            predicate = record.activity_type;
+            value = #reference("oneblock://activity/" # record.id);
+            capability = null;
+            context = ?record.app_id;
+            provenance = {
+                source_kind = #external;
+                issuer = issuer;
+                issuer_id = record.app_id;
+                verification = externalVerification(record);
+                evidence = [{
+                    schema = schema;
+                    uri = ?("oneblock://activity/" # record.id);
+                    hash = ?record.hash;
+                    external_id = ?record.idempotency_key;
+                }];
+                observed_at = ?record.event_timestamp;
+                recorded_at = record.ingest_timestamp;
+            };
+            valid_from = ?record.event_timestamp;
+            valid_until = null;
+            visibility = graphVisibility(record.visibility);
+            created_at = record.ingest_timestamp;
+        }
+    };
+
+    public query ({ caller }) func listProfileClaims(profileId : Text) : async [ProfileClaim] {
+        let profile = switch (profiles.get(profileId)) {
+            case null { return [] };
+            case (?p) p;
+        };
+        let buf = Buffer.Buffer<ProfileClaim>(0);
+
+        // Transitional adapter: existing editable profile fields are exposed as
+        // self-declared claims without copying or migrating legacy stable state.
+        let profileVisibility = graphVisibility(profile.visibility);
+        if (canReadGraphItem(caller, profile.owner, profileVisibility)) {
+            buf.add(legacyProfileClaim(profile, legacyTextClaimId(profile, "name", profile.name), "profile.name", #text(profile.name)));
+            if (Text.size(profile.bio) > 0) {
+                buf.add(legacyProfileClaim(profile, legacyTextClaimId(profile, "bio", profile.bio), "profile.bio", #text(profile.bio)))
+            };
+            for (link in profile.links.vals()) {
+                let linkId = legacyLinkClaimId(profile, link);
+                buf.add(legacyProfileClaim(profile, linkId, "profile.link." # link.name, #reference(link.url)))
+            }
+        };
+
+        // Claim indexes migrate with profile IDs; authorization remains tied to
+        // the immutable subject stored on each claim.
+        let claimIds = switch (profileClaimIndex.get(profileId)) {
+            case null { [] };
+            case (?ids) { ids };
+        };
+        for (claimId in claimIds.vals()) {
+            switch (profileClaims.get(claimId)) {
+                case null {};
+                case (?claim) {
+                    if (
+                        claim.subject == profile.owner and
+                        canReadGraphItem(caller, claim.subject, claim.visibility)
+                    ) {
+                        buf.add(claim)
+                    }
+                };
+            }
+        };
+
+        // External records stay immutable while their per-profile index migrates
+        // on rename, keeping reads bounded to this profile's activity set.
+        let activityIds = switch (profileActivityIndex.get(profileId)) {
+            case null { [] };
+            case (?ids) { ids };
+        };
+        for (recordId in activityIds.vals()) {
+            switch (activityRecordsMap.get(recordId)) {
+                case null {};
+                case (?record) {
+                    switch (activityClaim(record)) {
+                        case null {};
+                        case (?claim) {
+                            if (
+                                claim.subject == profile.owner and
+                                canReadGraphItem(caller, claim.subject, claim.visibility)
+                            ) {
+                                buf.add(claim)
+                            }
+                        };
+                    }
+                };
+            }
+        };
+
+        Buffer.toArray(buf)
+    };
+
+    public shared ({ caller }) func createPeerReview(input : NewPeerReview) : async Result.Result<Text, Text> {
+        if (Principal.isAnonymous(caller)) {
+            return #err("not authenticated")
+        };
+        if (Text.size(input.context) == 0) {
+            return #err("review context is required")
+        };
+        let profile = switch (profiles.get(input.profile_id)) {
+            case null { return #err("profile not found") };
+            case (?p) p;
+        };
+        if (profile.owner == caller) {
+            return #err("self review is not allowed; use a self-declared claim")
+        };
+        // Related references may point to native or projected claims, but the
+        // immutable subject must match the reviewed person.
+        for (claimId in input.related_claims.vals()) {
+            switch (resolveClaim(claimId)) {
+                case null { return #err("related claim unavailable") };
+                case (?claim) {
+                    // Do not reveal whether an unreadable claim exists or who
+                    // owns it. All invalid/unreadable references fail alike.
+                    if (
+                        not canReadGraphItem(caller, claim.subject, claim.visibility) or
+                        claim.subject != profile.owner
+                    ) {
+                        return #err("related claim unavailable")
+                    }
+                };
+            }
+        };
+        let now = Time.now();
+        let id = generatePeerReviewId();
+        let review : PeerReview = {
+            id = id;
+            profile_id = input.profile_id;
+            subject = profile.owner;
+            reviewer = caller;
+            relationship = input.relationship;
+            capability = input.capability;
+            context = input.context;
+            assessment_tags = input.assessment_tags;
+            narrative = input.narrative;
+            evidence = input.evidence;
+            related_claims = input.related_claims;
+            status = #active;
+            response = null;
+            visibility = input.visibility;
+            created_at = now;
+            updated_at = now;
+        };
+        peerReviews.put(id, review);
+        appendReviewIndex(input.profile_id, id);
+        #ok(id)
+    };
+
+    public query ({ caller }) func getPeerReview(reviewId : Text) : async ?PeerReview {
+        switch (peerReviews.get(reviewId)) {
+            case null null;
+            case (?review) {
+                if (
+                    caller == review.reviewer or
+                    canReadGraphItem(caller, review.subject, review.visibility)
+                ) { ?review } else { null }
+            };
+        }
+    };
+
+    public query ({ caller }) func listPeerReviews(profileId : Text) : async [PeerReview] {
+        let profile = switch (profiles.get(profileId)) {
+            case null { return [] };
+            case (?p) p;
+        };
+        let ids = switch (profileReviewIndex.get(profileId)) {
+            case null { [] };
+            case (?value) { value };
+        };
+        let buf = Buffer.Buffer<PeerReview>(ids.size());
+        for (id in ids.vals()) {
+            switch (peerReviews.get(id)) {
+                case null {};
+                case (?review) {
+                    if (
+                        review.subject == profile.owner and
+                        (
+                            caller == review.reviewer or
+                            canReadGraphItem(caller, review.subject, review.visibility)
+                        )
+                    ) {
+                        buf.add(review)
+                    }
+                };
+            }
+        };
+        Buffer.toArray(buf)
+    };
+
+    public shared ({ caller }) func respondToPeerReview(reviewId : Text, response : Text) : async Result.Result<Nat, Text> {
+        let review = switch (peerReviews.get(reviewId)) {
+            case null { return #err("review unavailable") };
+            case (?r) r;
+        };
+        if (review.subject != caller) {
+            return #err("review unavailable")
+        };
+        peerReviews.put(reviewId, {
+            id = review.id;
+            profile_id = review.profile_id;
+            subject = review.subject;
+            reviewer = review.reviewer;
+            relationship = review.relationship;
+            capability = review.capability;
+            context = review.context;
+            assessment_tags = review.assessment_tags;
+            narrative = review.narrative;
+            evidence = review.evidence;
+            related_claims = review.related_claims;
+            status = review.status;
+            response = ?response;
+            visibility = review.visibility;
+            created_at = review.created_at;
+            updated_at = Time.now();
+        });
+        #ok(1)
+    };
+
+    public shared ({ caller }) func disputePeerReview(reviewId : Text, response : ?Text) : async Result.Result<Nat, Text> {
+        let review = switch (peerReviews.get(reviewId)) {
+            case null { return #err("review unavailable") };
+            case (?r) r;
+        };
+        if (review.subject != caller) {
+            return #err("review unavailable")
+        };
+        switch (review.status) {
+            case (#withdrawn) { return #err("withdrawn reviews cannot be disputed") };
+            case (_) {};
+        };
+        peerReviews.put(reviewId, {
+            id = review.id;
+            profile_id = review.profile_id;
+            subject = review.subject;
+            reviewer = review.reviewer;
+            relationship = review.relationship;
+            capability = review.capability;
+            context = review.context;
+            assessment_tags = review.assessment_tags;
+            narrative = review.narrative;
+            evidence = review.evidence;
+            related_claims = review.related_claims;
+            status = #disputed;
+            response = response;
+            visibility = review.visibility;
+            created_at = review.created_at;
+            updated_at = Time.now();
+        });
+        #ok(1)
+    };
+
+    public shared ({ caller }) func withdrawPeerReview(reviewId : Text) : async Result.Result<Nat, Text> {
+        let review = switch (peerReviews.get(reviewId)) {
+            case null { return #err("review unavailable") };
+            case (?r) r;
+        };
+        if (review.reviewer != caller) {
+            return #err("review unavailable")
+        };
+        peerReviews.put(reviewId, {
+            id = review.id;
+            profile_id = review.profile_id;
+            subject = review.subject;
+            reviewer = review.reviewer;
+            relationship = review.relationship;
+            capability = review.capability;
+            context = review.context;
+            assessment_tags = review.assessment_tags;
+            narrative = review.narrative;
+            evidence = review.evidence;
+            related_claims = review.related_claims;
+            status = #withdrawn;
+            response = review.response;
+            visibility = review.visibility;
+            created_at = review.created_at;
+            updated_at = Time.now();
+        });
+        #ok(1)
+    };
+
+    private func externalVerification(record : ActivityRecord) : ProfileGraph.VerificationMethod {
+        // ActivityRecord.signature_status is currently supplied by the
+        // integration and is not cryptographically verified by this canister.
+        // Until policy-specific signature validation exists, external records
+        // must not be represented as #signed.
+        #imported
+    };
+
     //----------------------------- Integration System ------------------------------------
 
     private func generateActivityRecordId() : Text {
@@ -979,16 +1739,32 @@ persistent actor {
                             return #err("app is not active")
                         };
                         let key = connectionKey(profileId, appId);
+                        let now = Time.now();
+                        let epochStart = switch (connectionSubjects.get(key)) {
+                            case (?subject) {
+                                if (subject == caller) {
+                                    switch (connectionEpochStarts.get(key)) {
+                                        case (?startedAt) startedAt;
+                                        case null now;
+                                    }
+                                } else {
+                                    now
+                                }
+                            };
+                            case null now;
+                        };
                         let conn : IntegrationConnection = {
                             profile_id = profileId;
                             app_id = appId;
                             external_user_id = externalUserId;
                             scopes = scopes;
                             status = #active;
-                            created_at = Time.now();
+                            created_at = now;
                             revoked_at = null
                         };
                         connections.put(key, conn);
+                        connectionSubjects.put(key, caller);
+                        connectionEpochStarts.put(key, epochStart);
                         #ok(1)
                     }
                 }
@@ -1057,13 +1833,30 @@ persistent actor {
         if (not app.active) {
             return #err("app is not active")
         };
-        // Check an active connection exists for this profile+app
+        let targetProfile = switch (profiles.get(newRecord.profile_id)) {
+            case null { return #err("profile not found") };
+            case (?p) p;
+        };
+        // Check an active connection exists for this profile+app and that
+        // the consent belongs to the current immutable profile owner.
         let connKey = connectionKey(newRecord.profile_id, newRecord.app_id);
         switch (connections.get(connKey)) {
             case null { return #err("no active connection for this profile and app") };
             case (?c) {
                 if (c.status != #active) {
                     return #err("connection is not active")
+                };
+                switch (connectionSubjects.get(connKey)) {
+                    case (?subject) {
+                        if (subject != targetProfile.owner) {
+                            return #err("connection ownership does not match current profile owner")
+                        }
+                    };
+                    case null {
+                        // Legacy/unbound connections are intentionally
+                        // quarantined until the current owner reconnects.
+                        return #err("connection ownership is not established; reconnect app")
+                    };
                 }
             }
         };
@@ -1094,6 +1887,7 @@ persistent actor {
             hash = generateHash(content)
         };
         activityRecordsMap.put(recordId, record);
+        activityRecordSubjects.put(recordId, targetProfile.owner);
         idempotencyKeys.put(idemKey, recordId);
         // Update per-profile index
         let currentIndex = switch (profileActivityIndex.get(newRecord.profile_id)) {

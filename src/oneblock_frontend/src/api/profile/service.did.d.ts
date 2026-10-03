@@ -56,6 +56,15 @@ export interface Block {
   'profile_id' : ProfileId,
 }
 export type BlockId = string;
+export interface CapabilityRef {
+  'path' : string,
+  'display_label' : [] | [string],
+}
+export type ClaimId = string;
+export type ClaimValue = { 'text' : string } |
+  { 'reference' : string } |
+  { 'boolean' : boolean } |
+  { 'number' : number };
 export type ConnectionStatus = { 'active' : null } |
   { 'revoked' : null } |
   { 'pending' : null };
@@ -72,6 +81,12 @@ export type EntityKind = { 'human' : null } |
   { 'hybrid' : null } |
   { 'organization' : null } |
   { 'ai_agent' : null };
+export interface EvidenceRef {
+  'uri' : [] | [string],
+  'schema' : string,
+  'hash' : [] | [string],
+  'external_id' : [] | [string],
+}
 export type FactorCategory = { 'existence' : null } |
   { 'social' : null } |
   { 'human' : null } |
@@ -183,11 +198,33 @@ export interface NewOipProvider {
   'reliability' : number,
   'verification' : ProviderVerification,
 }
+export interface NewPeerReview {
+  'assessment_tags' : Array<string>,
+  'context' : string,
+  'relationship' : ReviewRelationship,
+  'evidence' : Array<EvidenceRef>,
+  'narrative' : [] | [string],
+  'visibility' : Visibility,
+  'profile_id' : string,
+  'related_claims' : Array<ClaimId>,
+  'capability' : [] | [CapabilityRef],
+}
 export interface NewProfile {
   'id' : string,
   'bio' : string,
   'pfp' : string,
   'name' : string,
+}
+export interface NewSelfClaim {
+  'context' : [] | [string],
+  'value' : ClaimValue,
+  'evidence' : Array<EvidenceRef>,
+  'valid_until' : [] | [Timestamp],
+  'valid_from' : [] | [Timestamp],
+  'visibility' : Visibility,
+  'profile_id' : string,
+  'predicate' : string,
+  'capability' : [] | [CapabilityRef],
 }
 export interface NewTrait {
   'explanation' : string,
@@ -207,6 +244,24 @@ export interface OipProvider {
   'reliability' : number,
   'created_at' : Timestamp,
   'verification' : ProviderVerification,
+}
+export interface PeerReview {
+  'id' : ReviewId,
+  'status' : ReviewStatus,
+  'updated_at' : Timestamp,
+  'assessment_tags' : Array<string>,
+  'context' : string,
+  'relationship' : ReviewRelationship,
+  'subject' : Principal,
+  'created_at' : Timestamp,
+  'evidence' : Array<EvidenceRef>,
+  'narrative' : [] | [string],
+  'response' : [] | [string],
+  'reviewer' : Principal,
+  'visibility' : Visibility,
+  'profile_id' : string,
+  'related_claims' : Array<ClaimId>,
+  'capability' : [] | [CapabilityRef],
 }
 export interface PolicyEvaluation {
   'principal' : IdentityPrincipal,
@@ -260,7 +315,30 @@ export interface Profile {
   'blocks' : Array<BlockId>,
   'visibility' : Visibility,
 }
+export interface ProfileClaim {
+  'id' : ClaimId,
+  'provenance' : Provenance,
+  'context' : [] | [string],
+  'subject' : Principal,
+  'value' : ClaimValue,
+  'created_at' : Timestamp,
+  'valid_until' : [] | [Timestamp],
+  'valid_from' : [] | [Timestamp],
+  'visibility' : Visibility,
+  'profile_id' : string,
+  'predicate' : string,
+  'capability' : [] | [CapabilityRef],
+}
 export type ProfileId = string;
+export interface Provenance {
+  'issuer_id' : string,
+  'issuer' : [] | [Principal],
+  'recorded_at' : Timestamp,
+  'evidence' : Array<EvidenceRef>,
+  'source_kind' : SourceKind,
+  'verification' : VerificationMethod,
+  'observed_at' : [] | [Timestamp],
+}
 export type ProviderCapability = { 'risk' : null } |
   { 'reputation' : null } |
   { 'factor' : null };
@@ -293,9 +371,25 @@ export type Result_3 = { 'ok' : PolicyEvaluation } |
   { 'err' : string };
 export type Result_4 = { 'ok' : Favorite } |
   { 'err' : string };
+export type ReviewId = string;
+export type ReviewRelationship = { 'manager' : null } |
+  { 'provider' : null } |
+  { 'customer' : null } |
+  { 'other' : string } |
+  { 'collaborator' : null } |
+  { 'peer' : null } |
+  { 'participant' : null } |
+  { 'coworker' : null };
+export type ReviewStatus = { 'active' : null } |
+  { 'disputed' : null } |
+  { 'withdrawn' : null };
 export type SignatureStatus = { 'verified' : null } |
   { 'invalid' : null } |
   { 'unverified' : null };
+export type SourceKind = { 'peer' : null } |
+  { 'self_declared' : null } |
+  { 'derived' : null } |
+  { 'external' : null };
 export type Strength = { 'low' : null } |
   { 'high' : null } |
   { 'medium' : null };
@@ -330,6 +424,14 @@ export type VerificationLevel = { 'self' : null } |
   { 'platform' : null } |
   { 'third_party' : null } |
   { 'verifiable' : null };
+export type VerificationMethod = { 'imported' : null } |
+  { 'oauth' : null } |
+  { 'custom' : string } |
+  { 'onchain' : null } |
+  { 'none' : null } |
+  { 'institutional' : null } |
+  { 'signed' : null } |
+  { 'system_derived' : null };
 export type VerificationPolicy = { 'none' : null } |
   { 'signed_payload' : null } |
   { 'idempotency_only' : null };
@@ -356,10 +458,13 @@ export interface _SERVICE {
   'connectApp' : ActorMethod<[AppId, string, Array<string>], Result>,
   'createBlock' : ActorMethod<[NewBlock], Result_1>,
   'createIdentityGraph' : ActorMethod<[NewIdentityGraph], Result>,
+  'createPeerReview' : ActorMethod<[NewPeerReview], Result_1>,
   'createPolicy' : ActorMethod<[NewContextPolicy], Result>,
   'createProfile' : ActorMethod<[NewProfile], Result>,
+  'createSelfClaim' : ActorMethod<[NewSelfClaim], Result_1>,
   'createTrait' : ActorMethod<[string, NewTrait], Result_1>,
   'deleteLink' : ActorMethod<[string, string], Result>,
+  'disputePeerReview' : ActorMethod<[string, [] | [string]], Result>,
   'evaluatePolicy' : ActorMethod<[string, string], Result_3>,
   'getActivityRecord' : ActorMethod<[RecordId], [] | [ActivityRecord]>,
   'getActivityRecords' : ActorMethod<
@@ -386,8 +491,10 @@ export interface _SERVICE {
   'getMyFavorites' : ActorMethod<[], Array<Favorite>>,
   'getMyProfile' : ActorMethod<[], [] | [Profile]>,
   'getOipProvider' : ActorMethod<[string], [] | [OipProvider]>,
+  'getPeerReview' : ActorMethod<[string], [] | [PeerReview]>,
   'getProfile' : ActorMethod<[string], [] | [Profile]>,
   'getProfileByPrincipal' : ActorMethod<[string], [] | [Profile]>,
+  'getProfileClaim' : ActorMethod<[string], [] | [ProfileClaim]>,
   'getProfileCount' : ActorMethod<[], bigint>,
   'getProfiles' : ActorMethod<[bigint, bigint], Array<Profile>>,
   'getScores' : ActorMethod<[string], [] | [ProbabilityScores]>,
@@ -398,12 +505,15 @@ export interface _SERVICE {
   'listBlocks' : ActorMethod<[string], Array<Block>>,
   'listConnections' : ActorMethod<[ProfileId], Array<IntegrationConnection>>,
   'listOipProviders' : ActorMethod<[], Array<OipProvider>>,
+  'listPeerReviews' : ActorMethod<[string], Array<PeerReview>>,
+  'listProfileClaims' : ActorMethod<[string], Array<ProfileClaim>>,
   'recomputeScores' : ActorMethod<[string, [] | [string]], Result_2>,
   'registerActivityType' : ActorMethod<[NewActivityType], Result_1>,
   'registerApp' : ActorMethod<[NewIntegrationApp], Result_1>,
   'registerOipProvider' : ActorMethod<[NewOipProvider], Result>,
   'removeFeaturedProfile' : ActorMethod<[string], Result>,
   'reserveid' : ActorMethod<[string], Result>,
+  'respondToPeerReview' : ActorMethod<[string, string], Result>,
   'revokeConnection' : ActorMethod<[AppId], Result>,
   'runDecaySweep' : ActorMethod<[], bigint>,
   'searchProfilesByName' : ActorMethod<[string], Array<Profile>>,
@@ -411,6 +521,7 @@ export interface _SERVICE {
   'submitActivityRecord' : ActorMethod<[NewActivityRecord], Result_1>,
   'submitProviderFactor' : ActorMethod<[ProviderFactorSubmission], Result_1>,
   'updateProfile' : ActorMethod<[string, UpdateProfile], Result>,
+  'withdrawPeerReview' : ActorMethod<[string], Result>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

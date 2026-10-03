@@ -194,3 +194,21 @@ Recommended migration sequence:
 8. Keep existing traits, probability scores, and OIP identity models as derived intelligence above the immutable evidence layer.
 
 This separation makes the immutable activity/evidence layer the source of truth while allowing identity models and agents to evolve independently.
+
+## Profile provenance projection
+
+Protocol V1 blocks remain the immutable activity/evidence substrate. Profile presentation is a projection above that substrate and distinguishes four source classes:
+
+- **self-declared** — claims authored by the profile owner;
+- **external** — claims imported or attested by applications, institutions, devices, or on-chain sources;
+- **peer** — contextual attestations by other OneBlock identities;
+- **derived** — rebuildable interpretations computed from claims and reviews.
+
+These classes describe **where a statement came from**, not how trustworthy it is. Verification strength is modeled separately (for example imported, OAuth-bound, signed, institutional, or on-chain).
+
+Structured peer reviews should reference context, capability paths, and evidence when available. OneBlock should not turn peer reviews into a universal star rating.
+
+Derived signals must remain outside immutable protocol consensus and retain references to the source claims/reviews and the method/version that produced them.
+
+See `PROFILE_PROVENANCE.md` for the migration model and shared data structures.
+
