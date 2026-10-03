@@ -1544,11 +1544,11 @@ persistent actor {
 
     public shared ({ caller }) func respondToPeerReview(reviewId : Text, response : Text) : async Result.Result<Nat, Text> {
         let review = switch (peerReviews.get(reviewId)) {
-            case null { return #err("review not found") };
+            case null { return #err("review unavailable") };
             case (?r) r;
         };
         if (review.subject != caller) {
-            return #err("only the reviewed subject can respond")
+            return #err("review unavailable")
         };
         peerReviews.put(reviewId, {
             id = review.id;
@@ -1573,11 +1573,11 @@ persistent actor {
 
     public shared ({ caller }) func disputePeerReview(reviewId : Text, response : ?Text) : async Result.Result<Nat, Text> {
         let review = switch (peerReviews.get(reviewId)) {
-            case null { return #err("review not found") };
+            case null { return #err("review unavailable") };
             case (?r) r;
         };
         if (review.subject != caller) {
-            return #err("only the reviewed subject can dispute")
+            return #err("review unavailable")
         };
         switch (review.status) {
             case (#withdrawn) { return #err("withdrawn reviews cannot be disputed") };
@@ -1606,11 +1606,11 @@ persistent actor {
 
     public shared ({ caller }) func withdrawPeerReview(reviewId : Text) : async Result.Result<Nat, Text> {
         let review = switch (peerReviews.get(reviewId)) {
-            case null { return #err("review not found") };
+            case null { return #err("review unavailable") };
             case (?r) r;
         };
         if (review.reviewer != caller) {
-            return #err("only the reviewer can withdraw")
+            return #err("review unavailable")
         };
         peerReviews.put(reviewId, {
             id = review.id;
