@@ -1,5 +1,6 @@
 import Cycles "mo:base/ExperimentalCycles";
 import Nat "mo:base/Nat";
+import Nat32 "mo:base/Nat32";
 import Int "mo:base/Int";
 import Text "mo:base/Text";
 import TrieMap "mo:base/TrieMap";
@@ -405,6 +406,43 @@ persistent actor {
         }
     };
 
+    private func migrateTextIndex(index : TrieMap.TrieMap<Text, [Text]>, oldId : Text, newId : Text) {
+        switch (index.get(oldId)) {
+            case null {};
+            case (?ids) {
+                index.put(newId, ids);
+                ignore index.remove(oldId);
+            };
+        }
+    };
+
+    private func migrateConnections(oldId : Text, newId : Text) {
+        let appIds = Buffer.Buffer<Text>(0);
+        for ((_, conn) in connections.entries()) {
+            if (conn.profile_id == oldId) {
+                appIds.add(conn.app_id)
+            }
+        };
+        for (appId in appIds.vals()) {
+            let oldKey = connectionKey(oldId, appId);
+            switch (connections.get(oldKey)) {
+                case null {};
+                case (?conn) {
+                    connections.put(connectionKey(newId, appId), {
+                        profile_id = newId;
+                        app_id = conn.app_id;
+                        external_user_id = conn.external_user_id;
+                        scopes = conn.scopes;
+                        status = conn.status;
+                        created_at = conn.created_at;
+                        revoked_at = conn.revoked_at;
+                    });
+                    ignore connections.remove(oldKey);
+                };
+            }
+        }
+    };
+
     public shared ({ caller }) func changeId(oid : Text, nid : Text) : async Result.Result<Nat, Text> {
         if (Principal.isAnonymous(caller)) {
             #err("no authenticated")
@@ -425,6 +463,10 @@ persistent actor {
                                     case null {};
                                 };
                                 historicalProfileOwners.put(oid, p.owner);
+                                migrateConnections(oid, nid);
+                                migrateTextIndex(profileActivityIndex, oid, nid);
+                                migrateTextIndex(profileClaimIndex, oid, nid);
+                                migrateTextIndex(profileReviewIndex, oid, nid);
                                 profiles.put(
                                     nid,
                                     {
@@ -1024,6 +1066,11 @@ persistent actor {
         "legacy:profile:" # Principal.toText(profile.owner) # ":" # suffix
     };
 
+    private func legacyLinkClaimId(profile : Profile, link : Types.Link) : Text {
+        let contentHash = Nat32.toNat(Text.hash(link.name # "\u{1f}" # link.url));
+        legacyClaimId(profile, "link:" # Nat.toText(contentHash))
+    };
+
     private func findProfileByOwner(owner : Principal) : ?Profile {
         switch (userprofiles.get(owner)) {
             case null null;
@@ -1046,13 +1093,11 @@ persistent actor {
             if (Text.size(profile.bio) > 0 and claimId == legacyClaimId(profile, "bio")) {
                 return ?legacyProfileClaim(profile, claimId, "profile.bio", #text(profile.bio))
             };
-            var linkIndex : Nat = 0;
             for (link in profile.links.vals()) {
-                let candidateId = legacyClaimId(profile, "link:" # Nat.toText(linkIndex));
+                let candidateId = legacyLinkClaimId(profile, link);
                 if (claimId == candidateId) {
                     return ?legacyProfileClaim(profile, candidateId, "profile.link." # link.name, #reference(link.url))
-                };
-                linkIndex += 1
+                }
             }
         };
 
@@ -1170,29 +1215,20 @@ persistent actor {
             if (Text.size(profile.bio) > 0) {
                 buf.add(legacyProfileClaim(profile, legacyClaimId(profile, "bio"), "profile.bio", #text(profile.bio)))
             };
-            var linkIndex : Nat = 0;
             for (link in profile.links.vals()) {
-                let linkId = legacyClaimId(profile, "link:" # Nat.toText(linkIndex));
-                buf.add(legacyProfileClaim(profile, linkId, "profile.link." # link.name, #reference(link.url)));
-                linkIndex += 1
+                let linkId = legacyLinkClaimId(profile, link);
+                buf.add(legacyProfileClaim(profile, linkId, "profile.link." # link.name, #reference(link.url)))
             }
         };
 
-        // Native user-defined claims are selected by immutable subject rather
-        // than mutable profile ID. This keeps them attached across changeId().
-        for ((_, claim) in profileClaims.entries()) {
-            if (
-                claim.subject == profile.owner and
-                canReadGraphItem(caller, claim.subject, claim.visibility)
-            ) {
-                buf.add(claim)
-            }
+        // Claim indexes migrate with profile IDs; authorization remains tied to
+        // the immutable subject stored on each claim.
+        let claimIds = switch (profileClaimIndex.get(profileId)) {
+            case null { [] };
+            case (?ids) { ids };
         };
-
-        // External integrations remain the system of record. Select by immutable
-        // subject so records survive profile ID changes without rewriting history.
-        for ((_, record) in activityRecordsMap.entries()) {
-            switch (activityClaim(record)) {
+        for (claimId in claimIds.vals()) {
+            switch (profileClaims.get(claimId)) {
                 case null {};
                 case (?claim) {
                     if (
@@ -1200,6 +1236,31 @@ persistent actor {
                         canReadGraphItem(caller, claim.subject, claim.visibility)
                     ) {
                         buf.add(claim)
+                    }
+                };
+            }
+        };
+
+        // External records stay immutable while their per-profile index migrates
+        // on rename, keeping reads bounded to this profile's activity set.
+        let activityIds = switch (profileActivityIndex.get(profileId)) {
+            case null { [] };
+            case (?ids) { ids };
+        };
+        for (recordId in activityIds.vals()) {
+            switch (activityRecordsMap.get(recordId)) {
+                case null {};
+                case (?record) {
+                    switch (activityClaim(record)) {
+                        case null {};
+                        case (?claim) {
+                            if (
+                                claim.subject == profile.owner and
+                                canReadGraphItem(caller, claim.subject, claim.visibility)
+                            ) {
+                                buf.add(claim)
+                            }
+                        };
                     }
                 };
             }
@@ -1276,16 +1337,25 @@ persistent actor {
             case null { return [] };
             case (?p) p;
         };
-        let buf = Buffer.Buffer<PeerReview>(0);
-        for ((_, review) in peerReviews.entries()) {
-            if (
-                review.subject == profile.owner and
-                (
-                    caller == review.reviewer or
-                    canReadGraphItem(caller, review.subject, review.visibility)
-                )
-            ) {
-                buf.add(review)
+        let ids = switch (profileReviewIndex.get(profileId)) {
+            case null { [] };
+            case (?value) { value };
+        };
+        let buf = Buffer.Buffer<PeerReview>(ids.size());
+        for (id in ids.vals()) {
+            switch (peerReviews.get(id)) {
+                case null {};
+                case (?review) {
+                    if (
+                        review.subject == profile.owner and
+                        (
+                            caller == review.reviewer or
+                            canReadGraphItem(caller, review.subject, review.visibility)
+                        )
+                    ) {
+                        buf.add(review)
+                    }
+                };
             }
         };
         Buffer.toArray(buf)
