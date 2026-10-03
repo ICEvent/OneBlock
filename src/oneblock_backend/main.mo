@@ -67,10 +67,23 @@ persistent actor {
     var stableIntegrationApps : [(Text, IntegrationApp)] = [];
     var stableActivityTypes : [(Text, ActivityType)] = [];
     var stableConnections : [(Text, IntegrationConnection)] = [];
+    var stableProfileLifecycleIds : [(Text, Nat)] = []; // profileId -> lifecycle token
+    var stableConnectionLifecycleIds : [(Text, Nat)] = []; // connectionKey -> profile lifecycle token
     var stableActivityRecords : [(Text, ActivityRecord)] = [];
-    var stableIdempotencyKeys : [(Text, Text)] = []; // idempotency_key -> record_id
+    var stableActivityConnectionEpochs : [(Text, Int)] = []; // recordId -> connection.created_at (audit provenance)
+    var stableActivityLifecycleIds : [(Text, Nat)] = []; // recordId -> profile lifecycle token
+    var stableActivityCurrentProfiles : [(Text, Text)] = []; // recordId -> current profileId
+    var stableIdempotencyKeys : [(Text, Text)] = []; // namespaced idempotency key -> record/factor id
     var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]
+    var stableOrphanedProfileIntegrationState : [(Text, Bool)] = []; // reusable profile IDs with legacy orphaned state
     var stableDerivedSummaries : [(Text, DerivedSummary)] = [];
+    var stablePublicDerivedSummaries : [(Text, DerivedSummary)] = [];
+    var integrationCompositeKeysMigratedV1 : Bool = false;
+    var idempotencyCompositeKeysMigratedV1 : Bool = false;
+    var idempotencyNamespacesMigratedV2 : Bool = false;
+    var orphanedProfileStateIndexMigratedV1 : Bool = false;
+    var profileLifecycleTokensMigratedV1 : Bool = false;
+    var summaryCachesMigratedV1 : Bool = false;
     var stableIdentityGraphs : [(Text, IdentityGraph)] = [];
     var stableContextPolicies : [(Text, ContextPolicy)] = [];
     var stableTrustEdges : [(Text, TrustEdge)] = [];
@@ -83,6 +96,7 @@ persistent actor {
     var blockIdCounter : Nat = 0;
     var traitIdCounter : Nat = 0;
     var activityRecordCounter : Nat = 0;
+    var profileLifecycleCounter : Nat = 0;
     var factorIdCounter : Nat = 0;
 
     transient var profiles = TrieMap.TrieMap<Text, Profile>(Text.equal, Text.hash);
@@ -120,8 +134,23 @@ persistent actor {
     transient var connections = TrieMap.TrieMap<Text, IntegrationConnection>(Text.equal, Text.hash);
     connections := TrieMap.fromEntries<Text, IntegrationConnection>(Iter.fromArray(stableConnections), Text.equal, Text.hash);
 
+    transient var profileLifecycleIds = TrieMap.TrieMap<Text, Nat>(Text.equal, Text.hash);
+    profileLifecycleIds := TrieMap.fromEntries<Text, Nat>(Iter.fromArray(stableProfileLifecycleIds), Text.equal, Text.hash);
+
+    transient var connectionLifecycleIds = TrieMap.TrieMap<Text, Nat>(Text.equal, Text.hash);
+    connectionLifecycleIds := TrieMap.fromEntries<Text, Nat>(Iter.fromArray(stableConnectionLifecycleIds), Text.equal, Text.hash);
+
     transient var activityRecordsMap = TrieMap.TrieMap<Text, ActivityRecord>(Text.equal, Text.hash);
     activityRecordsMap := TrieMap.fromEntries<Text, ActivityRecord>(Iter.fromArray(stableActivityRecords), Text.equal, Text.hash);
+
+    transient var activityConnectionEpochs = TrieMap.TrieMap<Text, Int>(Text.equal, Text.hash);
+    activityConnectionEpochs := TrieMap.fromEntries<Text, Int>(Iter.fromArray(stableActivityConnectionEpochs), Text.equal, Text.hash);
+
+    transient var activityLifecycleIds = TrieMap.TrieMap<Text, Nat>(Text.equal, Text.hash);
+    activityLifecycleIds := TrieMap.fromEntries<Text, Nat>(Iter.fromArray(stableActivityLifecycleIds), Text.equal, Text.hash);
+
+    transient var activityCurrentProfiles = TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);
+    activityCurrentProfiles := TrieMap.fromEntries<Text, Text>(Iter.fromArray(stableActivityCurrentProfiles), Text.equal, Text.hash);
 
     transient var idempotencyKeys = TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);
     idempotencyKeys := TrieMap.fromEntries<Text, Text>(Iter.fromArray(stableIdempotencyKeys), Text.equal, Text.hash);
@@ -129,8 +158,13 @@ persistent actor {
     transient var profileActivityIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
     profileActivityIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileActivityIndex), Text.equal, Text.hash);
 
+    transient var orphanedProfileIntegrationState = TrieMap.TrieMap<Text, Bool>(Text.equal, Text.hash);
+    orphanedProfileIntegrationState := TrieMap.fromEntries<Text, Bool>(Iter.fromArray(stableOrphanedProfileIntegrationState), Text.equal, Text.hash);
+
     transient var derivedSummaries = TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
     derivedSummaries := TrieMap.fromEntries<Text, DerivedSummary>(Iter.fromArray(stableDerivedSummaries), Text.equal, Text.hash);
+    transient var publicDerivedSummaries = TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
+    publicDerivedSummaries := TrieMap.fromEntries<Text, DerivedSummary>(Iter.fromArray(stablePublicDerivedSummaries), Text.equal, Text.hash);
     transient var identityGraphs = TrieMap.TrieMap<Text, IdentityGraph>(Text.equal, Text.hash);
     identityGraphs := TrieMap.fromEntries<Text, IdentityGraph>(Iter.fromArray(stableIdentityGraphs), Text.equal, Text.hash);
     transient var contextPolicies = TrieMap.TrieMap<Text, ContextPolicy>(Text.equal, Text.hash);
@@ -153,10 +187,17 @@ persistent actor {
         stableIntegrationApps := Iter.toArray(integrationApps.entries());
         stableActivityTypes := Iter.toArray(activityTypesMap.entries());
         stableConnections := Iter.toArray(connections.entries());
+        stableProfileLifecycleIds := Iter.toArray(profileLifecycleIds.entries());
+        stableConnectionLifecycleIds := Iter.toArray(connectionLifecycleIds.entries());
         stableActivityRecords := Iter.toArray(activityRecordsMap.entries());
+        stableActivityConnectionEpochs := Iter.toArray(activityConnectionEpochs.entries());
+        stableActivityLifecycleIds := Iter.toArray(activityLifecycleIds.entries());
+        stableActivityCurrentProfiles := Iter.toArray(activityCurrentProfiles.entries());
         stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());
         stableProfileActivityIndex := Iter.toArray(profileActivityIndex.entries());
+        stableOrphanedProfileIntegrationState := Iter.toArray(orphanedProfileIntegrationState.entries());
         stableDerivedSummaries := Iter.toArray(derivedSummaries.entries());
+        stablePublicDerivedSummaries := Iter.toArray(publicDerivedSummaries.entries());
         stableIdentityGraphs := Iter.toArray(identityGraphs.entries());
         stableContextPolicies := Iter.toArray(contextPolicies.entries());
         stableTrustEdges := Iter.toArray(trustEdges.entries());
@@ -176,10 +217,206 @@ persistent actor {
         stableIntegrationApps := [];
         stableActivityTypes := [];
         stableConnections := [];
+        stableProfileLifecycleIds := [];
+        stableConnectionLifecycleIds := [];
         stableActivityRecords := [];
+        stableActivityConnectionEpochs := [];
+        stableActivityLifecycleIds := [];
+        stableActivityCurrentProfiles := [];
         stableIdempotencyKeys := [];
         stableProfileActivityIndex := [];
+        stableOrphanedProfileIntegrationState := [];
         stableDerivedSummaries := [];
+
+        // Give every current profile a distinct internal lifecycle token once.
+        // Legacy connections/records intentionally receive no token and must be
+        // re-authorized or fail closed; timestamps are not unique incarnation IDs.
+        // Rebuild summary caches under this stricter provenance boundary even when
+        // an intermediate deployment had already marked the old cache migration done.
+        if (not profileLifecycleTokensMigratedV1) {
+            for ((profileId, _) in profiles.entries()) {
+                switch (profileLifecycleIds.get(profileId)) {
+                    case (?_) {};
+                    case null {
+                        let lifecycleId = nextProfileLifecycleId();
+                        profileLifecycleIds.put(profileId, lifecycleId)
+                    };
+                }
+            };
+            summaryCachesMigratedV1 := false;
+            profileLifecycleTokensMigratedV1 := true
+        };
+
+        // Migrate delimiter-based integration keys to collision-free length-prefixed
+        // keys. Re-key from stored identities rather than trusting the old key text.
+        if (not integrationCompositeKeysMigratedV1) {
+            let connectionValues = Iter.toArray(connections.vals());
+            connections := TrieMap.TrieMap<Text, IntegrationConnection>(Text.equal, Text.hash);
+            for (connection in connectionValues.vals()) {
+                connections.put(connectionKey(connection.profile_id, connection.app_id), connection)
+            };
+
+            let activityTypeValues = Iter.toArray(activityTypesMap.vals());
+            activityTypesMap := TrieMap.TrieMap<Text, ActivityType>(Text.equal, Text.hash);
+            for (activityType in activityTypeValues.vals()) {
+                activityTypesMap.put(activityTypeKey(activityType.app_id, activityType.type_key), activityType)
+            };
+
+            // Summary keys used the same ambiguous delimiter scheme. Force the
+            // record-by-record rebuild below so mixed/collided legacy aggregates
+            // are never carried forward under the new key format.
+            summaryCachesMigratedV1 := false;
+            integrationCompositeKeysMigratedV1 := true
+        };
+
+        // Rebuild both idempotency namespaces from durable source records. Activity
+        // entries come from ActivityRecord; provider entries come from internal
+        // provider_submission history events, whose metadata stores provider_id and
+        // idempotency_key. This preserves replay protection across the V1->V2 key
+        // migration instead of resetting the provider namespace.
+        if (not idempotencyNamespacesMigratedV2) {
+            idempotencyKeys := TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);
+            for (record in activityRecordsMap.vals()) {
+                idempotencyKeys.put(idempotencyKey(record.app_id, record.idempotency_key), record.id)
+            };
+            for (graph in identityGraphs.vals()) {
+                for (event in graph.history.vals()) {
+                    switch (event.reason) {
+                        case (?reason) {
+                            if (reason == "provider_submission") {
+                                switch (event.factor_id) {
+                                    case (?factorId) {
+                                        switch (metadataValue(event.metadata, "provider_id")) {
+                                            case (?providerId) {
+                                                switch (metadataValue(event.metadata, "idempotency_key")) {
+                                                    case (?idem) {
+                                                        idempotencyKeys.put(providerIdemKey(providerId, idem), factorId)
+                                                    };
+                                                    case null {};
+                                                }
+                                            };
+                                            case null {};
+                                        }
+                                    };
+                                    case null {};
+                                }
+                            }
+                        };
+                        case null {};
+                    }
+                }
+            };
+            idempotencyCompositeKeysMigratedV1 := true;
+            idempotencyNamespacesMigratedV2 := true
+        };
+
+        // Discover reusable IDs that actually carry orphaned legacy integration
+        // state once during upgrade. Normal profile creation then performs only an
+        // O(1) marker lookup; global cleanup scans are reserved for flagged IDs.
+        if (not orphanedProfileStateIndexMigratedV1) {
+            orphanedProfileIntegrationState := TrieMap.TrieMap<Text, Bool>(Text.equal, Text.hash);
+            for ((profileId, _) in profileActivityIndex.entries()) {
+                if (profiles.get(profileId) == null) { orphanedProfileIntegrationState.put(profileId, true) }
+            };
+            for ((_, currentProfileId) in activityCurrentProfiles.entries()) {
+                if (profiles.get(currentProfileId) == null) { orphanedProfileIntegrationState.put(currentProfileId, true) }
+            };
+            for ((_, connection) in connections.entries()) {
+                if (profiles.get(connection.profile_id) == null) { orphanedProfileIntegrationState.put(connection.profile_id, true) }
+            };
+            for ((_, summary) in derivedSummaries.entries()) {
+                if (profiles.get(summary.profile_id) == null) { orphanedProfileIntegrationState.put(summary.profile_id, true) }
+            };
+            for ((_, summary) in publicDerivedSummaries.entries()) {
+                if (profiles.get(summary.profile_id) == null) { orphanedProfileIntegrationState.put(summary.profile_id, true) }
+            };
+            for ((profileId, _) in profileLifecycleIds.entries()) {
+                if (profiles.get(profileId) == null) { orphanedProfileIntegrationState.put(profileId, true) }
+            };
+            orphanedProfileStateIndexMigratedV1 := true
+        };
+
+        // One-time compatibility migration for deployments created before the
+        // visibility-separated summary caches existed. Rebuild both owner/full
+        // and public/global caches from each current profile's append-only activity
+        // index. The index preserves submission order, so currency selection remains
+        // deterministic even when multiple records share an ingest timestamp.
+        if (not summaryCachesMigratedV1) {
+            derivedSummaries := TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
+            publicDerivedSummaries := TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
+
+            for ((profileId, profile) in profiles.entries()) {
+                switch (profileActivityIndex.get(profileId)) {
+                    case null {};
+                    case (?recordIds) {
+                        for (recordId in recordIds.vals()) {
+                            switch (activityRecordsMap.get(recordId)) {
+                                case null {};
+                                case (?record) {
+                                    // Fail closed across reusable profile IDs and legacy
+                                    // connections. A record must be attributable to a connection
+                                    // epoch belonging to the current profile incarnation.
+                                    if (recordBelongsToProfileIncarnation(profile, record)) {
+                                        let key = summaryKey(profileId, record.app_id, record.activity_type);
+                                        let existing = derivedSummaries.get(key);
+                                        let (prevCount, prevTotal, prevCurrency) = switch (existing) {
+                                            case null { (0, null, record.currency) };
+                                            case (?summary) { (summary.record_count, summary.total_amount, summary.currency) };
+                                        };
+                                        let nextTotal : ?Float = switch (record.amount) {
+                                            case null { prevTotal };
+                                            case (?amount) {
+                                                switch (prevTotal) {
+                                                    case null { ?amount };
+                                                    case (?total) { ?(total + amount) };
+                                                }
+                                            };
+                                        };
+                                        derivedSummaries.put(key, {
+                                            profile_id = profileId;
+                                            app_id = record.app_id;
+                                            activity_type = record.activity_type;
+                                            record_count = prevCount + 1;
+                                            total_amount = nextTotal;
+                                            currency = prevCurrency;
+                                            last_updated = record.ingest_timestamp;
+                                        });
+
+                                        if (record.visibility == #global) {
+                                            let publicExisting = publicDerivedSummaries.get(key);
+                                            let (publicPrevCount, publicPrevTotal, publicPrevCurrency) = switch (publicExisting) {
+                                                case null { (0, null, record.currency) };
+                                                case (?summary) { (summary.record_count, summary.total_amount, summary.currency) };
+                                            };
+                                            let publicNextTotal : ?Float = switch (record.amount) {
+                                                case null { publicPrevTotal };
+                                                case (?amount) {
+                                                    switch (publicPrevTotal) {
+                                                        case null { ?amount };
+                                                        case (?total) { ?(total + amount) };
+                                                    }
+                                                };
+                                            };
+                                            publicDerivedSummaries.put(key, {
+                                                profile_id = profileId;
+                                                app_id = record.app_id;
+                                                activity_type = record.activity_type;
+                                                record_count = publicPrevCount + 1;
+                                                total_amount = publicNextTotal;
+                                                currency = publicPrevCurrency;
+                                                last_updated = record.ingest_timestamp;
+                                            })
+                                        }
+                                    }
+                                };
+                            }
+                        }
+                    };
+                }
+            };
+            summaryCachesMigratedV1 := true
+        };
+        stablePublicDerivedSummaries := [];
         stableIdentityGraphs := [];
         stableContextPolicies := [];
         stableTrustEdges := [];
@@ -202,7 +439,15 @@ persistent actor {
         "factor_" # Nat.toText(factorIdCounter)
     };
     private func edgeKey(fromP : Text, toP : Text, context : Text) : Text { fromP # "->" # toP # ":" # context };
-    private func providerIdemKey(providerId : Text, idem : Text) : Text { "provider:" # providerId # ":" # idem };
+    private func providerIdemKey(providerId : Text, idem : Text) : Text {
+        "provider-idempotency:" # keyPart(providerId) # keyPart(idem)
+    };
+    private func metadataValue(metadata : [MetadataEntry], key : Text) : ?Text {
+        for (entry in metadata.vals()) {
+            if (entry.key == key) { return ?entry.value }
+        };
+        null
+    };
     private func scoreForCategory(weights : PolicyWeights, c : Types.FactorCategory) : Float {
         switch (c) { case (#existence) weights.existence; case (#continuity) weights.continuity; case (#human) weights.human; case (#social) weights.social; case (#economic) weights.economic; case (#reputation) weights.reputation }
     };
@@ -243,6 +488,47 @@ persistent actor {
         }
     };
 
+    private func nextProfileLifecycleId() : Nat {
+        profileLifecycleCounter := profileLifecycleCounter + 1;
+        profileLifecycleCounter
+    };
+
+    // Public profile IDs are reusable identifiers. A newly claimed ID must not
+    // inherit integration/index/cache state left by an earlier incarnation.
+    private func purgeReusableProfileIntegrationState(profileId : ProfileId) {
+        ignore profileLifecycleIds.remove(profileId);
+        ignore profileActivityIndex.remove(profileId);
+        for ((recordId, currentProfileId) in Iter.toArray(activityCurrentProfiles.entries()).vals()) {
+            if (currentProfileId == profileId) {
+                ignore activityCurrentProfiles.remove(recordId)
+            }
+        };
+        for ((connectionKeyToRemove, connection) in Iter.toArray(connections.entries()).vals()) {
+            if (connection.profile_id == profileId) {
+                ignore connectionLifecycleIds.remove(connectionKeyToRemove);
+                ignore connections.remove(connectionKeyToRemove)
+            }
+        };
+        for ((summaryKeyToRemove, summary) in Iter.toArray(derivedSummaries.entries()).vals()) {
+            if (summary.profile_id == profileId) {
+                ignore derivedSummaries.remove(summaryKeyToRemove)
+            }
+        };
+        for ((summaryKeyToRemove, summary) in Iter.toArray(publicDerivedSummaries.entries()).vals()) {
+            if (summary.profile_id == profileId) {
+                ignore publicDerivedSummaries.remove(summaryKeyToRemove)
+            }
+        };
+        ignore orphanedProfileIntegrationState.remove(profileId)
+    };
+
+    private func purgeReusableProfileIntegrationStateIfNeeded(profileId : ProfileId) {
+        switch (orphanedProfileIntegrationState.get(profileId)) {
+            case (?true) { purgeReusableProfileIntegrationState(profileId) };
+            case _ {};
+        }
+    };
+
     public shared ({ caller }) func createProfile(newProfile : Types.NewProfile) : async Result.Result<Nat, Text> {
         if (Principal.isAnonymous(caller)) {
             #err("no authenticated")
@@ -265,6 +551,11 @@ persistent actor {
                             } else if (Array.find(reserveIds, func(id : Text) : Bool { id == newProfile.id }) != null) {
                                 #err("the id is reserved")
                             } else {
+                                // Claiming an unused public ID starts a new lifecycle. Purge any
+                                // orphaned state before exposing the new profile incarnation.
+                                purgeReusableProfileIntegrationStateIfNeeded(newProfile.id);
+                                let lifecycleId = nextProfileLifecycleId();
+                                profileLifecycleIds.put(newProfile.id, lifecycleId);
                                 profiles.put(
                                     newProfile.id,
                                     {
@@ -380,6 +671,14 @@ persistent actor {
                                 #err("this id has been taken")
                             };
                             case (_) {
+                                let sourceLifecycleId = switch (profileLifecycleIds.get(oid)) {
+                                    case (?lifecycleId) { lifecycleId };
+                                    case null {
+                                        let lifecycleId = nextProfileLifecycleId();
+                                        profileLifecycleIds.put(oid, lifecycleId);
+                                        lifecycleId
+                                    };
+                                };
                                 profiles.put(
                                     nid,
                                     {
@@ -396,6 +695,53 @@ persistent actor {
                                         last_updated = Time.now()
                                     }
                                 );
+                                // A public profile ID is reusable. Purge any destination-only
+                                // state left by an earlier incarnation before moving source state.
+                                purgeReusableProfileIntegrationStateIfNeeded(nid);
+                                profileLifecycleIds.put(nid, sourceLifecycleId);
+                                ignore profileLifecycleIds.remove(oid);
+
+                                // Keep integration ownership/indexes attached to the profile when its public id changes.
+                                switch (profileActivityIndex.get(oid)) {
+                                    case (?recordIds) {
+                                        profileActivityIndex.put(nid, recordIds);
+                                        for (recordId in recordIds.vals()) {
+                                            activityCurrentProfiles.put(recordId, nid)
+                                        };
+                                        ignore profileActivityIndex.remove(oid);
+                                    };
+                                    case null {};
+                                };
+                                for ((oldConnectionKey, connection) in Iter.toArray(connections.entries()).vals()) {
+                                    if (connection.profile_id == oid) {
+                                        let lifecycleOpt = connectionLifecycleIds.remove(oldConnectionKey);
+                                        ignore connections.remove(oldConnectionKey);
+                                        let newConnectionKey = connectionKey(nid, connection.app_id);
+                                        connections.put(
+                                            newConnectionKey,
+                                            { connection with profile_id = nid }
+                                        );
+                                        switch (lifecycleOpt) {
+                                            case (?lifecycleId) { connectionLifecycleIds.put(newConnectionKey, lifecycleId) };
+                                            case null {};
+                                        }
+                                    }
+                                };
+                                for ((oldSummaryKey, summary) in Iter.toArray(derivedSummaries.entries()).vals()) {
+                                    if (summary.profile_id == oid) {
+                                        let newSummaryKey = summaryKey(nid, summary.app_id, summary.activity_type);
+                                        derivedSummaries.put(newSummaryKey, { summary with profile_id = nid });
+                                        ignore derivedSummaries.remove(oldSummaryKey);
+                                    }
+                                };
+                                for ((oldSummaryKey, summary) in Iter.toArray(publicDerivedSummaries.entries()).vals()) {
+                                    if (summary.profile_id == oid) {
+                                        let newSummaryKey = summaryKey(nid, summary.app_id, summary.activity_type);
+                                        publicDerivedSummaries.put(newSummaryKey, { summary with profile_id = nid });
+                                        ignore publicDerivedSummaries.remove(oldSummaryKey);
+                                    }
+                                };
+
                                 ignore profiles.remove(oid);
                                 userprofiles.put(p.owner, nid);
                                 #ok(1)
@@ -416,24 +762,63 @@ persistent actor {
         }
     };
 
-    public query func getProfiles(pageSize : Nat, pageNumber : Nat) : async [Profile] {
+    // Public profile reads expose only public evidence indexes. The owner keeps
+    // the full block/trait index through caller-aware reads and getMyProfile.
+    private func sanitizeProfileEvidence(caller : Principal, profile : Profile) : Profile {
+        if (caller == profile.owner) {
+            return profile
+        };
+
+        let publicBlocks = Buffer.Buffer<Text>(0);
+        for (blockId in profile.blocks.vals()) {
+            switch (blocks.get(blockId)) {
+                case (?block) {
+                    if (block.visibility == #global) {
+                        publicBlocks.add(blockId)
+                    }
+                };
+                case null {};
+            }
+        };
+
+        let publicTraits = Buffer.Buffer<Text>(0);
+        for (traitId in profile.traits.vals()) {
+            switch (traits.get(traitId)) {
+                case (?trait) {
+                    if (trait.visibility == #global) {
+                        publicTraits.add(traitId)
+                    }
+                };
+                case null {};
+            }
+        };
+
+        {
+            profile with
+            blocks = Buffer.toArray(publicBlocks);
+            traits = Buffer.toArray(publicTraits);
+        }
+    };
+
+    public query ({ caller }) func getProfiles(pageSize : Nat, pageNumber : Nat) : async [Profile] {
         let profileEntries = Iter.toArray(profiles.entries());
         let totalProfiles = profileEntries.size();
         let startIndex = pageNumber * pageSize;
-        let endIndex = startIndex + pageSize;
+        if (startIndex >= totalProfiles) {
+            return []
+        };
+        let resultSize = Nat.min(pageSize, totalProfiles - startIndex);
 
-        let slicedProfiles = Array.tabulate<Profile>(
-            Nat.min(endIndex - startIndex, totalProfiles - startIndex),
+        Array.tabulate<Profile>(
+            resultSize,
             func(i) {
                 let (_, profile) = profileEntries[startIndex + i];
-                profile
+                sanitizeProfileEvidence(caller, profile)
             },
-        );
-
-        slicedProfiles
+        )
     };
 
-    public query func getDefaultProfiles(size : Nat) : async [Profile] {
+    public query ({ caller }) func getDefaultProfiles(size : Nat) : async [Profile] {
 
         let profileEntries = Iter.toArray(profiles.vals());
         let filteredProfiles = Array.filter<Profile>(
@@ -456,11 +841,11 @@ persistent actor {
 
         Array.tabulate<Profile>(
             Nat.min(size, sortedProfiles.size()),
-            func(i) { sortedProfiles[i] },
+            func(i) { sanitizeProfileEvidence(caller, sortedProfiles[i]) },
         )
     };
 
-    public query func searchProfilesByName(q : Text) : async [Profile] {
+    public query ({ caller }) func searchProfilesByName(q : Text) : async [Profile] {
         let profileEntries = Iter.toArray(profiles.vals());
         let filteredProfiles = Array.filter<Profile>(
             profileEntries,
@@ -485,7 +870,7 @@ persistent actor {
             Nat.min(100, sortedProfiles.size()),
             func(i) {
                 let (profile) = sortedProfiles[i];
-                profile
+                sanitizeProfileEvidence(caller, profile)
             },
         )
     };
@@ -585,15 +970,21 @@ persistent actor {
         }
     };
 
-    public query func getProfile(id : Text) : async ?Profile {
-        profiles.get(id)
+    public query ({ caller }) func getProfile(id : Text) : async ?Profile {
+        switch (profiles.get(id)) {
+            case null { null };
+            case (?profile) { ?sanitizeProfileEvidence(caller, profile) };
+        }
     };
 
-    public query func getProfileByPrincipal(principal : Text) : async ?Profile {
+    public query ({ caller }) func getProfileByPrincipal(principal : Text) : async ?Profile {
         let pt = userprofiles.get(Principal.fromText(principal));
         switch (pt) {
             case (?pt) {
-                profiles.get(pt)
+                switch (profiles.get(pt)) {
+                    case null { null };
+                    case (?profile) { ?sanitizeProfileEvidence(caller, profile) };
+                }
             };
             case (_) {
                 null
@@ -857,28 +1248,69 @@ persistent actor {
         };
     };
 
-    public query func getTrait(traitId : Text) : async ?Trait {
-        traits.get(traitId)
+    private func profileContainsTrait(profile : Profile, traitId : Text) : Bool {
+        for (candidateId in profile.traits.vals()) {
+            if (candidateId == traitId) {
+                return true
+            }
+        };
+        false
     };
 
-    public query func getTraits(profileId : Text) : async [Trait] {
-        let profile = profiles.get(profileId);
-        switch (profile) {
-            case (?p) {
+    private func callerOwnsTrait(caller : Principal, traitId : Text) : Bool {
+        switch (userprofiles.get(caller)) {
+            case null { false };
+            case (?profileId) {
+                switch (profiles.get(profileId)) {
+                    case null { false };
+                    case (?profile) { profileContainsTrait(profile, traitId) };
+                }
+            };
+        }
+    };
+
+    private func canReadTrait(caller : Principal, profile : Profile, trait : Trait) : Bool {
+        if (caller == profile.owner) {
+            return true
+        };
+        switch (trait.visibility) {
+            case (#global) { true };
+            case (#unlisted) { false };
+            case (#personal) { false };
+        }
+    };
+
+    public query ({ caller }) func getTrait(traitId : Text) : async ?Trait {
+        switch (traits.get(traitId)) {
+            case null { null };
+            case (?trait) {
+                switch (trait.visibility) {
+                    case (#global) { ?trait };
+                    case (#unlisted) { if (callerOwnsTrait(caller, traitId)) { ?trait } else { null } };
+                    case (#personal) { if (callerOwnsTrait(caller, traitId)) { ?trait } else { null } };
+                }
+            };
+        }
+    };
+
+    public query ({ caller }) func getTraits(profileId : Text) : async [Trait] {
+        switch (profiles.get(profileId)) {
+            case (?profile) {
                 let traitList = Buffer.Buffer<Trait>(0);
-                for (traitId in p.traits.vals()) {
-                    let trait = traits.get(traitId);
-                    switch (trait) {
-                        case (?t) {
-                            traitList.add(t);
+                for (traitId in profile.traits.vals()) {
+                    switch (traits.get(traitId)) {
+                        case (?trait) {
+                            if (canReadTrait(caller, profile, trait)) {
+                                traitList.add(trait)
+                            }
                         };
                         case null {};
-                    };
+                    }
                 };
                 Buffer.toArray(traitList)
             };
             case null { [] };
-        };
+        }
     };
 
     //----------------------------- Integration System ------------------------------------
@@ -888,17 +1320,39 @@ persistent actor {
         "activity_" # Nat.toText(activityRecordCounter)
     };
 
-    // Composite keys used in TrieMaps
+    // Collision-free composite keys. Length-prefixing keeps arbitrary Text IDs,
+    // including values containing ':', unambiguous without changing public APIs.
+    private func keyPart(value : Text) : Text {
+        Nat.toText(Text.size(value)) # ":" # value
+    };
+
     private func connectionKey(profileId : Text, appId : Text) : Text {
-        profileId # ":" # appId
+        "connection:" # keyPart(profileId) # keyPart(appId)
     };
 
     private func activityTypeKey(appId : Text, typeKey : Text) : Text {
-        appId # ":" # typeKey
+        "activity-type:" # keyPart(appId) # keyPart(typeKey)
     };
 
     private func summaryKey(profileId : Text, appId : Text, activityType : Text) : Text {
-        profileId # ":" # appId # ":" # activityType
+        "summary:" # keyPart(profileId) # keyPart(appId) # keyPart(activityType)
+    };
+
+    private func idempotencyKey(appId : Text, externalKey : Text) : Text {
+        "idempotency:" # keyPart(appId) # keyPart(externalKey)
+    };
+
+    private func getConnectionExact(profileId : ProfileId, appId : AppId) : ?IntegrationConnection {
+        switch (connections.get(connectionKey(profileId, appId))) {
+            case (?connection) {
+                if (connection.profile_id == profileId and connection.app_id == appId) {
+                    ?connection
+                } else {
+                    null
+                }
+            };
+            case null { null };
+        }
     };
 
     // Register a new 3rd-party app (admin only).
@@ -988,7 +1442,12 @@ persistent actor {
                             created_at = Time.now();
                             revoked_at = null
                         };
+                        let lifecycleId = switch (profileLifecycleIds.get(profileId)) {
+                            case (?lifecycleId) { lifecycleId };
+                            case null { return #err("profile lifecycle unavailable") };
+                        };
                         connections.put(key, conn);
+                        connectionLifecycleIds.put(key, lifecycleId);
                         #ok(1)
                     }
                 }
@@ -1027,7 +1486,7 @@ persistent actor {
     };
 
     public query func getConnection(profileId : ProfileId, appId : AppId) : async ?IntegrationConnection {
-        connections.get(connectionKey(profileId, appId))
+        getConnectionExact(profileId, appId)
     };
 
     public query func listConnections(profileId : ProfileId) : async [IntegrationConnection] {
@@ -1045,6 +1504,12 @@ persistent actor {
         if (Principal.isAnonymous(caller)) {
             return #err("not authenticated")
         };
+        // Resolve the current profile incarnation before trusting integration
+        // indexes keyed by a reusable public profile id.
+        let profile = switch (profiles.get(newRecord.profile_id)) {
+            case null { return #err("profile not found") };
+            case (?profile) { profile };
+        };
         // Verify caller is the registered app owner or an admin
         let appOpt = integrationApps.get(newRecord.app_id);
         let app = switch (appOpt) {
@@ -1057,18 +1522,34 @@ persistent actor {
         if (not app.active) {
             return #err("app is not active")
         };
-        // Check an active connection exists for this profile+app
-        let connKey = connectionKey(newRecord.profile_id, newRecord.app_id);
-        switch (connections.get(connKey)) {
+        let lifecycleId = switch (profileLifecycleIds.get(newRecord.profile_id)) {
+            case (?lifecycleId) { lifecycleId };
+            case null { return #err("profile lifecycle unavailable") };
+        };
+        let exactConnectionKey = connectionKey(newRecord.profile_id, newRecord.app_id);
+        // Require an explicit lifecycle binding for the exact current connection.
+        // Legacy connections have no binding and must be re-authorized by the user.
+        let connection = switch (getConnectionExact(newRecord.profile_id, newRecord.app_id)) {
             case null { return #err("no active connection for this profile and app") };
-            case (?c) {
-                if (c.status != #active) {
+            case (?connection) {
+                if (connection.status != #active) {
                     return #err("connection is not active")
-                }
-            }
+                };
+                switch (connectionLifecycleIds.get(exactConnectionKey)) {
+                    case (?connectionLifecycleId) {
+                        if (connectionLifecycleId != lifecycleId) {
+                            return #err("connection belongs to a different profile lifecycle")
+                        }
+                    };
+                    case null {
+                        return #err("connection must be re-authorized for this profile lifecycle")
+                    };
+                };
+                connection
+            };
         };
         // Enforce idempotency: reject duplicate external events
-        let idemKey = newRecord.app_id # ":" # newRecord.idempotency_key;
+        let idemKey = idempotencyKey(newRecord.app_id, newRecord.idempotency_key);
         switch (idempotencyKeys.get(idemKey)) {
             case (?existingId) { return #err("duplicate event: already recorded as " # existingId) };
             case null {}
@@ -1094,6 +1575,9 @@ persistent actor {
             hash = generateHash(content)
         };
         activityRecordsMap.put(recordId, record);
+        activityConnectionEpochs.put(recordId, connection.created_at);
+        activityLifecycleIds.put(recordId, lifecycleId);
+        activityCurrentProfiles.put(recordId, newRecord.profile_id);
         idempotencyKeys.put(idemKey, recordId);
         // Update per-profile index
         let currentIndex = switch (profileActivityIndex.get(newRecord.profile_id)) {
@@ -1105,7 +1589,12 @@ persistent actor {
         profileActivityIndex.put(newRecord.profile_id, Buffer.toArray(idxBuf));
         // Update derived summary
         let sKey = summaryKey(newRecord.profile_id, newRecord.app_id, newRecord.activity_type);
-        let existing = derivedSummaries.get(sKey);
+        let existing = switch (derivedSummaries.get(sKey)) {
+            case (?summary) {
+                if (summary.last_updated >= profile.createtime) { ?summary } else { null }
+            };
+            case null { null };
+        };
         let (prevCount, prevTotal, prevCurrency) = switch (existing) {
             case null { (0, null, newRecord.currency) };
             case (?s) { (s.record_count, s.total_amount, s.currency) }
@@ -1128,51 +1617,206 @@ persistent actor {
             currency = prevCurrency;
             last_updated = now
         });
+
+        // Maintain a second aggregate containing public evidence only. This keeps
+        // public summary reads O(1) without allowing private counts/amounts to leak.
+        if (newRecord.visibility == #global) {
+            let publicExisting = switch (publicDerivedSummaries.get(sKey)) {
+                case (?summary) {
+                    if (summary.last_updated >= profile.createtime) { ?summary } else { null }
+                };
+                case null { null };
+            };
+            let (publicPrevCount, publicPrevTotal, publicPrevCurrency) = switch (publicExisting) {
+                case null { (0, null, newRecord.currency) };
+                case (?summary) { (summary.record_count, summary.total_amount, summary.currency) };
+            };
+            let publicNewTotal : ?Float = switch (newRecord.amount) {
+                case null { publicPrevTotal };
+                case (?amount) {
+                    switch (publicPrevTotal) {
+                        case null { ?amount };
+                        case (?total) { ?(total + amount) };
+                    }
+                };
+            };
+            publicDerivedSummaries.put(sKey, {
+                profile_id = newRecord.profile_id;
+                app_id = newRecord.app_id;
+                activity_type = newRecord.activity_type;
+                record_count = publicPrevCount + 1;
+                total_amount = publicNewTotal;
+                currency = publicPrevCurrency;
+                last_updated = now
+            })
+        };
         #ok(recordId)
     };
 
-    public query func getActivityRecord(recordId : RecordId) : async ?ActivityRecord {
-        activityRecordsMap.get(recordId)
+    private func activityIndexContains(profileId : ProfileId, recordId : RecordId) : Bool {
+        switch (profileActivityIndex.get(profileId)) {
+            case null { false };
+            case (?recordIds) {
+                for (candidateId in recordIds.vals()) {
+                    if (candidateId == recordId) {
+                        return true
+                    }
+                };
+                false
+            };
+        }
+    };
+
+    private func recordBelongsToProfileIncarnation(
+        profile : Profile,
+        record : ActivityRecord
+    ) : Bool {
+        switch (profileLifecycleIds.get(profile.id)) {
+            case null { false };
+            case (?currentLifecycleId) {
+                switch (activityLifecycleIds.get(record.id)) {
+                    case (?recordLifecycleId) { recordLifecycleId == currentLifecycleId };
+                    case null {
+                        // Legacy records have no verifiable lifecycle provenance.
+                        // Fail closed rather than inferring ownership from timestamps.
+                        false
+                    };
+                }
+            };
+        }
+    };
+
+    private func callerOwnsActivityRecord(caller : Principal, recordId : RecordId) : Bool {
+        switch (userprofiles.get(caller)) {
+            case null { false };
+            case (?profileId) {
+                switch (profiles.get(profileId)) {
+                    case null { false };
+                    case (?profile) {
+                        switch (activityRecordsMap.get(recordId)) {
+                            case null { false };
+                            case (?record) {
+                                activityIndexContains(profileId, recordId) and
+                                recordBelongsToProfileIncarnation(profile, record)
+                            };
+                        }
+                    };
+                }
+            };
+        }
+    };
+
+    private func canReadActivityRecord(
+        caller : Principal,
+        profile : Profile,
+        record : ActivityRecord
+    ) : Bool {
+        if (not recordBelongsToProfileIncarnation(profile, record)) {
+            return false
+        };
+        if (caller == profile.owner) {
+            return true
+        };
+        switch (record.visibility) {
+            case (#global) { true };
+            case (#unlisted) { false };
+            case (#personal) { false };
+        }
+    };
+
+    // ActivityRecord.profile_id is historical and intentionally immutable.
+    // Resolve direct reads through the collision-safe reverse index that follows
+    // the current profile lifecycle across legitimate public-ID renames.
+    private func canReadDirectGlobalActivityRecord(record : ActivityRecord) : Bool {
+        switch (activityCurrentProfiles.get(record.id)) {
+            case null { false };
+            case (?currentProfileId) {
+                switch (profiles.get(currentProfileId)) {
+                    case null { false };
+                    case (?profile) {
+                        activityIndexContains(currentProfileId, record.id) and
+                        recordBelongsToProfileIncarnation(profile, record)
+                    };
+                }
+            };
+        }
+    };
+
+    public query ({ caller }) func getActivityRecord(recordId : RecordId) : async ?ActivityRecord {
+        switch (activityRecordsMap.get(recordId)) {
+            case null { null };
+            case (?record) {
+                switch (record.visibility) {
+                    case (#global) {
+                        if (canReadDirectGlobalActivityRecord(record)) { ?record } else { null }
+                    };
+                    case (#unlisted) { if (callerOwnsActivityRecord(caller, recordId)) { ?record } else { null } };
+                    case (#personal) { if (callerOwnsActivityRecord(caller, recordId)) { ?record } else { null } };
+                }
+            };
+        }
     };
 
     // List activity records for a profile, optionally filtered by app and/or activity type.
-    public query func getActivityRecords(
+    public query ({ caller }) func getActivityRecords(
         profileId : ProfileId,
         appId : ?AppId,
         activityType : ?ActivityTypeKey
     ) : async [ActivityRecord] {
+        let profile = switch (profiles.get(profileId)) {
+            case null { return [] };
+            case (?profile) { profile };
+        };
         let ids = switch (profileActivityIndex.get(profileId)) {
             case null { return [] };
-            case (?ids) { ids }
+            case (?ids) { ids };
         };
         let buf = Buffer.Buffer<ActivityRecord>(0);
         for (rid in ids.vals()) {
             switch (activityRecordsMap.get(rid)) {
                 case null {};
-                case (?r) {
+                case (?record) {
                     let appMatch = switch (appId) {
                         case null { true };
-                        case (?aid) { r.app_id == aid }
+                        case (?aid) { record.app_id == aid };
                     };
                     let typeMatch = switch (activityType) {
                         case null { true };
-                        case (?at) { r.activity_type == at }
+                        case (?at) { record.activity_type == at };
                     };
-                    if (appMatch and typeMatch) {
-                        buf.add(r)
+                    if (appMatch and typeMatch and canReadActivityRecord(caller, profile, record)) {
+                        buf.add(record)
                     }
-                }
+                };
             }
         };
         Buffer.toArray(buf)
     };
 
-    public query func getDerivedSummary(
+    // Keep summary reads O(1) while preserving visibility: owners read the full
+    // aggregate; everyone else reads the global-only aggregate.
+    public query ({ caller }) func getDerivedSummary(
         profileId : ProfileId,
         appId : AppId,
         activityType : ActivityTypeKey
     ) : async ?DerivedSummary {
-        derivedSummaries.get(summaryKey(profileId, appId, activityType))
+        switch (profiles.get(profileId)) {
+            case null { null };
+            case (?profile) {
+                let key = summaryKey(profileId, appId, activityType);
+                let summary = if (caller == profile.owner) {
+                    derivedSummaries.get(key)
+                } else {
+                    publicDerivedSummaries.get(key)
+                };
+                switch (summary) {
+                    case (?value) {
+                        if (value.last_updated >= profile.createtime) { ?value } else { null }
+                    };
+                    case null { null };
+                }
+            };
+        }
     };
 
     public query func getApp(appId : AppId) : async ?IntegrationApp {
