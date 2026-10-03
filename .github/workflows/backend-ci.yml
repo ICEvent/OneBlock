@@ -29,6 +29,7 @@ jobs:
       - name: Install dfx
         env:
           DFX_VERSION: 0.30.1
+          DFXVM_INIT_YES: "true"
         run: |
           sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
           echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
