@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { Link as NavLink, useParams } from "react-router-dom";
 import { Profile } from "../api/profile/service.did.d";
+import type { PeerReview, ProfileClaim } from "../api/profile/service.did.d";
 import type { Block } from "../types/block";
 import { useGlobalContext, useOneblock } from "../components/Store";
 import Navbar from "../components/Navbar";
@@ -9,6 +10,7 @@ import ProfileLayout from "../layouts/ProfileLayout";
 import ProfileSidebar from "../components/ProfileSidebar";
 import ScoresOIP from "../components/ScoresOIP";
 import TrustReputation from "../components/TrustReputation";
+import ProfileProvenance from "../components/ProfileProvenance";
 import "../styles/Profile.css";
 import "../styles/PageShell.css";
 
@@ -29,6 +31,8 @@ const ProfilePage = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [scores, setScores] = useState<any | null>(null);
   const [latestUpdate, setLatestUpdate] = useState<Block | null>(null);
+  const [claims, setClaims] = useState<ProfileClaim[]>([]);
+  const [reviews, setReviews] = useState<PeerReview[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -38,6 +42,8 @@ const ProfilePage = () => {
       setProfile(null);
       setScores(null);
       setLatestUpdate(null);
+      setClaims([]);
+      setReviews([]);
 
       try {
         if (!id) return;
@@ -58,14 +64,18 @@ const ProfilePage = () => {
           ? profileData.owner.toText()
           : profileData.owner ? String(profileData.owner) : '';
 
-        const [scoreResult, blockResult] = await Promise.all([
+        const [scoreResult, blockResult, claimResult, reviewResult] = await Promise.all([
           ownerText ? oneblock.getScores(ownerText).catch(() => []) : Promise.resolve([]),
           oneblock.listBlocks(profileData.id).catch(() => []),
+          oneblock.listProfileClaims(profileData.id).catch(() => []),
+          oneblock.listPeerReviews(profileData.id).catch(() => []),
         ]);
         if (!active) return;
 
         const [scoreData] = scoreResult;
         if (scoreData) setScores(scoreData);
+        setClaims(claimResult);
+        setReviews(reviewResult);
 
         const newestPublicNarrative = [...blockResult]
           .filter((block: Block) => 'global' in block.visibility && Boolean(block.narrative?.[0]?.trim()))
@@ -160,6 +170,8 @@ const ProfilePage = () => {
                     <NavLink to="/console">Share an update →</NavLink>
                   </section>
                 ) : null}
+
+                <ProfileProvenance claims={claims} reviews={reviews} />
 
                 {profile.owner && (
                   <TrustReputation
