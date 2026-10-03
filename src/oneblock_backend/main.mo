@@ -72,6 +72,10 @@ persistent actor {
     var stableIntegrationApps : [(Text, IntegrationApp)] = [];
     var stableActivityTypes : [(Text, ActivityType)] = [];
     var stableConnections : [(Text, IntegrationConnection)] = [];
+    // Immutable ownership metadata for connection epochs. This is kept
+    // separately to avoid rewriting the legacy IntegrationConnection type.
+    var stableConnectionSubjects : [(Text, Principal)] = [];
+    var stableConnectionEpochStarts : [(Text, Int)] = [];
     var stableActivityRecords : [(Text, ActivityRecord)] = [];
     // Immutable subject binding for external activity evidence. Legacy records
     // without a binding are intentionally not projected until ownership can be
@@ -139,6 +143,11 @@ persistent actor {
     transient var connections = TrieMap.TrieMap<Text, IntegrationConnection>(Text.equal, Text.hash);
     connections := TrieMap.fromEntries<Text, IntegrationConnection>(Iter.fromArray(stableConnections), Text.equal, Text.hash);
 
+    transient var connectionSubjects = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
+    connectionSubjects := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableConnectionSubjects), Text.equal, Text.hash);
+    transient var connectionEpochStarts = TrieMap.TrieMap<Text, Int>(Text.equal, Text.hash);
+    connectionEpochStarts := TrieMap.fromEntries<Text, Int>(Iter.fromArray(stableConnectionEpochStarts), Text.equal, Text.hash);
+
     transient var activityRecordsMap = TrieMap.TrieMap<Text, ActivityRecord>(Text.equal, Text.hash);
     activityRecordsMap := TrieMap.fromEntries<Text, ActivityRecord>(Iter.fromArray(stableActivityRecords), Text.equal, Text.hash);
 
@@ -173,66 +182,93 @@ persistent actor {
     transient var historicalProfileOwners = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
     historicalProfileOwners := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableHistoricalProfileOwners), Text.equal, Text.hash);
 
-    private func profileIdShowsReuse(profile : Profile) : Bool {
-        // Evidence of reuse exists if any surviving record or connection for
-        // this ID predates the current Profile instance.
-        switch (profileActivityIndex.get(profile.id)) {
-            case null {};
-            case (?recordIds) {
-                for (recordId in recordIds.vals()) {
-                    switch (activityRecordsMap.get(recordId)) {
-                        case (?record) {
-                            if (record.ingest_timestamp < profile.createtime) {
-                                return true
-                            }
-                        };
-                        case null {};
-                    }
+    private func backfillLegacyConnectionOwnership() {
+        // For pre-upgrade state, only a connection created during the current
+        // Profile instance can be attributed safely. Reconnects after this
+        // release preserve the earliest epoch start instead of overwriting it.
+        for ((key, connection) in connections.entries()) {
+            if (connectionSubjects.get(key) == null) {
+                switch (profiles.get(connection.profile_id)) {
+                    case (?profile) {
+                        if (connection.created_at >= profile.createtime) {
+                            connectionSubjects.put(key, profile.owner);
+                            connectionEpochStarts.put(key, connection.created_at)
+                        }
+                    };
+                    case null {};
                 }
-            };
-        };
-        for ((_, connection) in connections.entries()) {
-            if (
-                connection.profile_id == profile.id and
-                connection.created_at < profile.createtime
-            ) {
-                return true
             }
-        };
-        false
+        }
     };
 
     private func backfillLegacyActivitySubjects() {
-        // Normal reconnects overwrite the current connection timestamp, so
-        // don't use that timestamp as the lower bound unless the profile ID
-        // actually shows evidence of historical reuse.
+        // Precompute per-profile reuse once so upgrade work stays linear.
+        let reusedProfiles = TrieMap.TrieMap<Text, Bool>(Text.equal, Text.hash);
+        for ((profileId, recordIds) in profileActivityIndex.entries()) {
+            switch (profiles.get(profileId)) {
+                case null {};
+                case (?profile) {
+                    var reused = false;
+                    label scan for (recordId in recordIds.vals()) {
+                        switch (activityRecordsMap.get(recordId)) {
+                            case (?record) {
+                                if (record.ingest_timestamp < profile.createtime) {
+                                    reused := true;
+                                    break scan
+                                }
+                            };
+                            case null {};
+                        }
+                    };
+                    reusedProfiles.put(profileId, reused)
+                };
+            }
+        };
+        for ((_, connection) in connections.entries()) {
+            switch (profiles.get(connection.profile_id)) {
+                case (?profile) {
+                    if (connection.created_at < profile.createtime) {
+                        reusedProfiles.put(profile.id, true)
+                    }
+                };
+                case null {};
+            }
+        };
+
         for ((recordId, record) in activityRecordsMap.entries()) {
-            switch (activityRecordSubjects.get(recordId)) {
-                case (?_) {};
-                case null {
-                    switch (profiles.get(record.profile_id)) {
-                        case null {};
-                        case (?profile) {
-                            switch (connections.get(connectionKey(record.profile_id, record.app_id))) {
-                                case null {};
-                                case (?connection) {
-                                    let reused = profileIdShowsReuse(profile);
+            if (activityRecordSubjects.get(recordId) == null) {
+                switch (profiles.get(record.profile_id)) {
+                    case null {};
+                    case (?profile) {
+                        let key = connectionKey(record.profile_id, record.app_id);
+                        switch (
+                            connectionSubjects.get(key),
+                            connectionEpochStarts.get(key)
+                        ) {
+                            case (?subject, ?epochStart) {
+                                if (subject == profile.owner) {
+                                    let reused = switch (reusedProfiles.get(profile.id)) {
+                                        case (?value) value;
+                                        case null false;
+                                    };
                                     let belongsToCurrentInstance =
                                         record.ingest_timestamp >= profile.createtime;
-                                    let safelyAfterCurrentConnection =
-                                        connection.created_at >= profile.createtime and
-                                        record.ingest_timestamp >= connection.created_at;
+                                    // For reused IDs, only the verified current-owner
+                                    // connection epoch is safe. Records before that
+                                    // boundary are irrecoverably ambiguous in legacy
+                                    // state and remain quarantined.
                                     if (
                                         belongsToCurrentInstance and
-                                        (not reused or safelyAfterCurrentConnection)
+                                        (not reused or record.ingest_timestamp >= epochStart)
                                     ) {
                                         activityRecordSubjects.put(recordId, profile.owner)
                                     }
-                                };
-                            }
-                        };
-                    }
-                };
+                                }
+                            };
+                            case _ {};
+                        }
+                    };
+                }
             }
         }
     };
@@ -250,6 +286,8 @@ persistent actor {
         stableIntegrationApps := Iter.toArray(integrationApps.entries());
         stableActivityTypes := Iter.toArray(activityTypesMap.entries());
         stableConnections := Iter.toArray(connections.entries());
+        stableConnectionSubjects := Iter.toArray(connectionSubjects.entries());
+        stableConnectionEpochStarts := Iter.toArray(connectionEpochStarts.entries());
         stableActivityRecords := Iter.toArray(activityRecordsMap.entries());
         stableActivityRecordSubjects := Iter.toArray(activityRecordSubjects.entries());
         stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());
@@ -269,6 +307,7 @@ persistent actor {
     system func postupgrade() {
         // Restore safe provenance bindings for legacy records before clearing
         // upgrade arrays. Ambiguous records remain unbound and unprojected.
+        backfillLegacyConnectionOwnership();
         backfillLegacyActivitySubjects();
         stableProfiles := [];
         stableBlocks := [];
@@ -282,6 +321,8 @@ persistent actor {
         stableIntegrationApps := [];
         stableActivityTypes := [];
         stableConnections := [];
+        stableConnectionSubjects := [];
+        stableConnectionEpochStarts := [];
         stableActivityRecords := [];
         stableActivityRecordSubjects := [];
         stableIdempotencyKeys := [];
@@ -518,20 +559,6 @@ persistent actor {
         }
     };
 
-    private func bindUnboundActivitySubjects(profileId : Text, owner : Principal) {
-        switch (profileActivityIndex.get(profileId)) {
-            case null {};
-            case (?recordIds) {
-                for (recordId in recordIds.vals()) {
-                    switch (activityRecordSubjects.get(recordId)) {
-                        case null { activityRecordSubjects.put(recordId, owner) };
-                        case (?_) {};
-                    }
-                }
-            };
-        }
-    };
-
     private func migrateConnections(oldId : Text, newId : Text) {
         let appIds = Buffer.Buffer<Text>(0);
         for ((_, conn) in connections.entries()) {
@@ -544,7 +571,8 @@ persistent actor {
             switch (connections.get(oldKey)) {
                 case null {};
                 case (?conn) {
-                    connections.put(connectionKey(newId, appId), {
+                    let newKey = connectionKey(newId, appId);
+                    connections.put(newKey, {
                         profile_id = newId;
                         app_id = conn.app_id;
                         external_user_id = conn.external_user_id;
@@ -553,6 +581,20 @@ persistent actor {
                         created_at = conn.created_at;
                         revoked_at = conn.revoked_at;
                     });
+                    switch (connectionSubjects.get(oldKey)) {
+                        case (?subject) {
+                            connectionSubjects.put(newKey, subject);
+                            ignore connectionSubjects.remove(oldKey);
+                        };
+                        case null {};
+                    };
+                    switch (connectionEpochStarts.get(oldKey)) {
+                        case (?startedAt) {
+                            connectionEpochStarts.put(newKey, startedAt);
+                            ignore connectionEpochStarts.remove(oldKey);
+                        };
+                        case null {};
+                    };
                     ignore connections.remove(oldKey);
                 };
             }
@@ -579,9 +621,9 @@ persistent actor {
                                     case null {};
                                 };
                                 historicalProfileOwners.put(oid, p.owner);
-                                // At this moment oid is still owned by p.owner, so any
-                                // legacy records indexed there can be bound safely.
-                                bindUnboundActivitySubjects(oid, p.owner);
+                                // Keep ambiguous legacy activity records unbound.
+                                // Only pre-established immutable subject bindings move
+                                // safely with the profile's activity index.
                                 migrateConnections(oid, nid);
                                 migrateDerivedSummaries(oid, nid);
                                 migrateTextIndex(profileActivityIndex, oid, nid);
@@ -1697,16 +1739,32 @@ persistent actor {
                             return #err("app is not active")
                         };
                         let key = connectionKey(profileId, appId);
+                        let now = Time.now();
+                        let epochStart = switch (connectionSubjects.get(key)) {
+                            case (?subject) {
+                                if (subject == caller) {
+                                    switch (connectionEpochStarts.get(key)) {
+                                        case (?startedAt) startedAt;
+                                        case null now;
+                                    }
+                                } else {
+                                    now
+                                }
+                            };
+                            case null now;
+                        };
                         let conn : IntegrationConnection = {
                             profile_id = profileId;
                             app_id = appId;
                             external_user_id = externalUserId;
                             scopes = scopes;
                             status = #active;
-                            created_at = Time.now();
+                            created_at = now;
                             revoked_at = null
                         };
                         connections.put(key, conn);
+                        connectionSubjects.put(key, caller);
+                        connectionEpochStarts.put(key, epochStart);
                         #ok(1)
                     }
                 }
