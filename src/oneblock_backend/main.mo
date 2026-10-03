@@ -13,6 +13,7 @@ import Order "mo:base/Order";
 import Float "mo:base/Float";
 
 import Types "types";
+import ProfileGraph "profile_graph";
 
 persistent actor {
     type Profile = Types.Profile;
@@ -52,6 +53,10 @@ persistent actor {
     type OipProvider = Types.OipProvider;
     type NewOipProvider = Types.NewOipProvider;
     type ProviderFactorSubmission = Types.ProviderFactorSubmission;
+    type ProfileClaim = ProfileGraph.ProfileClaim;
+    type NewSelfClaim = ProfileGraph.NewSelfClaim;
+    type PeerReview = ProfileGraph.PeerReview;
+    type NewPeerReview = ProfileGraph.NewPeerReview;
 
     var stableProfiles : [(Text, Profile)] = [];
     var stableFeaturedProfiles : [Profile] = [];
@@ -76,6 +81,13 @@ persistent actor {
     var stableTrustEdges : [(Text, TrustEdge)] = [];
     var stableOipProviders : [(Text, OipProvider)] = [];
 
+    // Additive profile graph state. Kept separate from legacy Profile/Block
+    // storage so this can be deployed without rewriting existing stable data.
+    var stableProfileClaims : [(Text, ProfileClaim)] = [];
+    var stableProfileClaimIndex : [(Text, [Text])] = [];
+    var stablePeerReviews : [(Text, PeerReview)] = [];
+    var stableProfileReviewIndex : [(Text, [Text])] = [];
+
     var reserveIds : [Text] = ["oneblock", "block", "about", "admin", "status", "update"];
 
     var _admins : [Text] = ["3z4ue-dry77-pvwdh-4ugn3-lu2wi-sbfp6-7xzaf-jupqw-vqiit-zi7m7-gae"];
@@ -84,6 +96,8 @@ persistent actor {
     var traitIdCounter : Nat = 0;
     var activityRecordCounter : Nat = 0;
     var factorIdCounter : Nat = 0;
+    var profileClaimCounter : Nat = 0;
+    var peerReviewCounter : Nat = 0;
 
     transient var profiles = TrieMap.TrieMap<Text, Profile>(Text.equal, Text.hash);
     profiles := TrieMap.fromEntries<Text, Profile>(Iter.fromArray(stableProfiles), Text.equal, Text.hash);
@@ -140,6 +154,15 @@ persistent actor {
     transient var oipProviders = TrieMap.TrieMap<Text, OipProvider>(Text.equal, Text.hash);
     oipProviders := TrieMap.fromEntries<Text, OipProvider>(Iter.fromArray(stableOipProviders), Text.equal, Text.hash);
 
+    transient var profileClaims = TrieMap.TrieMap<Text, ProfileClaim>(Text.equal, Text.hash);
+    profileClaims := TrieMap.fromEntries<Text, ProfileClaim>(Iter.fromArray(stableProfileClaims), Text.equal, Text.hash);
+    transient var profileClaimIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
+    profileClaimIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileClaimIndex), Text.equal, Text.hash);
+    transient var peerReviews = TrieMap.TrieMap<Text, PeerReview>(Text.equal, Text.hash);
+    peerReviews := TrieMap.fromEntries<Text, PeerReview>(Iter.fromArray(stablePeerReviews), Text.equal, Text.hash);
+    transient var profileReviewIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
+    profileReviewIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileReviewIndex), Text.equal, Text.hash);
+
     system func preupgrade() {
         stableProfiles := Iter.toArray(profiles.entries());
         stableBlocks := Iter.toArray(blocks.entries());
@@ -160,7 +183,11 @@ persistent actor {
         stableIdentityGraphs := Iter.toArray(identityGraphs.entries());
         stableContextPolicies := Iter.toArray(contextPolicies.entries());
         stableTrustEdges := Iter.toArray(trustEdges.entries());
-        stableOipProviders := Iter.toArray(oipProviders.entries())
+        stableOipProviders := Iter.toArray(oipProviders.entries());
+        stableProfileClaims := Iter.toArray(profileClaims.entries());
+        stableProfileClaimIndex := Iter.toArray(profileClaimIndex.entries());
+        stablePeerReviews := Iter.toArray(peerReviews.entries());
+        stableProfileReviewIndex := Iter.toArray(profileReviewIndex.entries())
     };
 
     system func postupgrade() {
@@ -183,7 +210,11 @@ persistent actor {
         stableIdentityGraphs := [];
         stableContextPolicies := [];
         stableTrustEdges := [];
-        stableOipProviders := []
+        stableOipProviders := [];
+        stableProfileClaims := [];
+        stableProfileClaimIndex := [];
+        stablePeerReviews := [];
+        stableProfileReviewIndex := []
     };
     private func clamp01(v : Float) : Float {
         if (v < 0.0) { 0.0 } else if (v > 1.0) { 1.0 } else { v }
@@ -881,6 +912,376 @@ persistent actor {
         };
     };
 
+    //----------------------------- Profile Provenance Graph ------------------------------------
+
+    private func generateProfileClaimId() : Text {
+        profileClaimCounter += 1;
+        "claim_" # Nat.toText(profileClaimCounter)
+    };
+
+    private func generatePeerReviewId() : Text {
+        peerReviewCounter += 1;
+        "review_" # Nat.toText(peerReviewCounter)
+    };
+
+    private func graphVisibility(v : Types.Visibility) : ProfileGraph.Visibility {
+        switch (v) {
+            case (#global) #global;
+            case (#unlisted) #unlisted;
+            case (#personal) #personal;
+        }
+    };
+
+    private func canReadGraphItem(caller : Principal, owner : Principal, visibility : ProfileGraph.Visibility) : Bool {
+        if (caller == owner) {
+            return true
+        };
+        switch (visibility) {
+            case (#global) true;
+            case (#unlisted) false;
+            case (#personal) false;
+        }
+    };
+
+    private func appendClaimIndex(profileId : Text, claimId : Text) {
+        let current = switch (profileClaimIndex.get(profileId)) {
+            case (?ids) ids;
+            case null [];
+        };
+        let buf = Buffer.fromArray<Text>(current);
+        buf.add(claimId);
+        profileClaimIndex.put(profileId, Buffer.toArray(buf))
+    };
+
+    private func appendReviewIndex(profileId : Text, reviewId : Text) {
+        let current = switch (profileReviewIndex.get(profileId)) {
+            case (?ids) ids;
+            case null [];
+        };
+        let buf = Buffer.fromArray<Text>(current);
+        buf.add(reviewId);
+        profileReviewIndex.put(profileId, Buffer.toArray(buf))
+    };
+
+    public shared ({ caller }) func createSelfClaim(input : NewSelfClaim) : async Result.Result<Text, Text> {
+        if (Principal.isAnonymous(caller)) {
+            return #err("not authenticated")
+        };
+        if (Text.size(input.predicate) == 0) {
+            return #err("predicate is required")
+        };
+        let profile = switch (profiles.get(input.profile_id)) {
+            case null { return #err("profile not found") };
+            case (?p) p;
+        };
+        if (profile.owner != caller) {
+            return #err("not authorized")
+        };
+        let now = Time.now();
+        let id = generateProfileClaimId();
+        let claim : ProfileClaim = {
+            id;
+            profile_id = input.profile_id;
+            subject = profile.owner;
+            predicate = input.predicate;
+            value = input.value;
+            capability = input.capability;
+            context = input.context;
+            provenance = {
+                source_kind = #self_declared;
+                issuer = ?caller;
+                issuer_id = null;
+                verification = #none;
+                evidence = input.evidence;
+                observed_at = ?now;
+                recorded_at = now;
+            };
+            valid_from = input.valid_from;
+            valid_until = input.valid_until;
+            visibility = input.visibility;
+            created_at = now;
+        };
+        profileClaims.put(id, claim);
+        appendClaimIndex(input.profile_id, id);
+        #ok(id)
+    };
+
+    public query ({ caller }) func getProfileClaim(claimId : Text) : async ?ProfileClaim {
+        switch (profileClaims.get(claimId)) {
+            case null null;
+            case (?claim) {
+                switch (profiles.get(claim.profile_id)) {
+                    case null null;
+                    case (?profile) {
+                        if (canReadGraphItem(caller, profile.owner, claim.visibility)) { ?claim } else { null }
+                    };
+                }
+            };
+        }
+    };
+
+    public query ({ caller }) func listProfileClaims(profileId : Text) : async [ProfileClaim] {
+        let profile = switch (profiles.get(profileId)) {
+            case null { return [] };
+            case (?p) p;
+        };
+        let ids = switch (profileClaimIndex.get(profileId)) {
+            case null [];
+            case (?value) value;
+        };
+        let buf = Buffer.Buffer<ProfileClaim>(ids.size());
+        for (id in ids.vals()) {
+            switch (profileClaims.get(id)) {
+                case (?claim) {
+                    if (canReadGraphItem(caller, profile.owner, claim.visibility)) {
+                        buf.add(claim)
+                    }
+                };
+                case null {};
+            }
+        };
+        Buffer.toArray(buf)
+    };
+
+    public shared ({ caller }) func createPeerReview(input : NewPeerReview) : async Result.Result<Text, Text> {
+        if (Principal.isAnonymous(caller)) {
+            return #err("not authenticated")
+        };
+        if (Text.size(input.context) == 0) {
+            return #err("review context is required")
+        };
+        let profile = switch (profiles.get(input.profile_id)) {
+            case null { return #err("profile not found") };
+            case (?p) p;
+        };
+        if (profile.owner == caller) {
+            return #err("self review is not allowed; use a self-declared claim")
+        };
+        // Related claim references must belong to the reviewed profile.
+        for (claimId in input.related_claims.vals()) {
+            switch (profileClaims.get(claimId)) {
+                case null { return #err("related claim not found: " # claimId) };
+                case (?claim) {
+                    if (claim.profile_id != input.profile_id) {
+                        return #err("related claim belongs to another profile")
+                    }
+                };
+            }
+        };
+        let now = Time.now();
+        let id = generatePeerReviewId();
+        let review : PeerReview = {
+            id;
+            profile_id = input.profile_id;
+            subject = profile.owner;
+            reviewer = caller;
+            relationship = input.relationship;
+            capability = input.capability;
+            context = input.context;
+            assessment_tags = input.assessment_tags;
+            narrative = input.narrative;
+            evidence = input.evidence;
+            related_claims = input.related_claims;
+            status = #active;
+            response = null;
+            visibility = input.visibility;
+            created_at = now;
+            updated_at = now;
+        };
+        peerReviews.put(id, review);
+        appendReviewIndex(input.profile_id, id);
+        #ok(id)
+    };
+
+    public query ({ caller }) func getPeerReview(reviewId : Text) : async ?PeerReview {
+        switch (peerReviews.get(reviewId)) {
+            case null null;
+            case (?review) {
+                switch (profiles.get(review.profile_id)) {
+                    case null null;
+                    case (?profile) {
+                        if (
+                            caller == review.reviewer or
+                            canReadGraphItem(caller, profile.owner, review.visibility)
+                        ) { ?review } else { null }
+                    };
+                }
+            };
+        }
+    };
+
+    public query ({ caller }) func listPeerReviews(profileId : Text) : async [PeerReview] {
+        let profile = switch (profiles.get(profileId)) {
+            case null { return [] };
+            case (?p) p;
+        };
+        let ids = switch (profileReviewIndex.get(profileId)) {
+            case null [];
+            case (?value) value;
+        };
+        let buf = Buffer.Buffer<PeerReview>(ids.size());
+        for (id in ids.vals()) {
+            switch (peerReviews.get(id)) {
+                case (?review) {
+                    if (
+                        caller == review.reviewer or
+                        canReadGraphItem(caller, profile.owner, review.visibility)
+                    ) {
+                        buf.add(review)
+                    }
+                };
+                case null {};
+            }
+        };
+        Buffer.toArray(buf)
+    };
+
+    public shared ({ caller }) func respondToPeerReview(reviewId : Text, response : Text) : async Result.Result<Nat, Text> {
+        let review = switch (peerReviews.get(reviewId)) {
+            case null { return #err("review not found") };
+            case (?r) r;
+        };
+        let profile = switch (profiles.get(review.profile_id)) {
+            case null { return #err("profile not found") };
+            case (?p) p;
+        };
+        if (profile.owner != caller) {
+            return #err("only the reviewed profile owner can respond")
+        };
+        peerReviews.put(reviewId, {
+            id = review.id;
+            profile_id = review.profile_id;
+            subject = review.subject;
+            reviewer = review.reviewer;
+            relationship = review.relationship;
+            capability = review.capability;
+            context = review.context;
+            assessment_tags = review.assessment_tags;
+            narrative = review.narrative;
+            evidence = review.evidence;
+            related_claims = review.related_claims;
+            status = review.status;
+            response = ?response;
+            visibility = review.visibility;
+            created_at = review.created_at;
+            updated_at = Time.now();
+        });
+        #ok(1)
+    };
+
+    public shared ({ caller }) func disputePeerReview(reviewId : Text, response : ?Text) : async Result.Result<Nat, Text> {
+        let review = switch (peerReviews.get(reviewId)) {
+            case null { return #err("review not found") };
+            case (?r) r;
+        };
+        let profile = switch (profiles.get(review.profile_id)) {
+            case null { return #err("profile not found") };
+            case (?p) p;
+        };
+        if (profile.owner != caller) {
+            return #err("only the reviewed profile owner can dispute")
+        };
+        peerReviews.put(reviewId, {
+            id = review.id;
+            profile_id = review.profile_id;
+            subject = review.subject;
+            reviewer = review.reviewer;
+            relationship = review.relationship;
+            capability = review.capability;
+            context = review.context;
+            assessment_tags = review.assessment_tags;
+            narrative = review.narrative;
+            evidence = review.evidence;
+            related_claims = review.related_claims;
+            status = #disputed;
+            response;
+            visibility = review.visibility;
+            created_at = review.created_at;
+            updated_at = Time.now();
+        });
+        #ok(1)
+    };
+
+    public shared ({ caller }) func withdrawPeerReview(reviewId : Text) : async Result.Result<Nat, Text> {
+        let review = switch (peerReviews.get(reviewId)) {
+            case null { return #err("review not found") };
+            case (?r) r;
+        };
+        if (review.reviewer != caller) {
+            return #err("only the reviewer can withdraw")
+        };
+        peerReviews.put(reviewId, {
+            id = review.id;
+            profile_id = review.profile_id;
+            subject = review.subject;
+            reviewer = review.reviewer;
+            relationship = review.relationship;
+            capability = review.capability;
+            context = review.context;
+            assessment_tags = review.assessment_tags;
+            narrative = review.narrative;
+            evidence = review.evidence;
+            related_claims = review.related_claims;
+            status = #withdrawn;
+            response = review.response;
+            visibility = review.visibility;
+            created_at = review.created_at;
+            updated_at = Time.now();
+        });
+        #ok(1)
+    };
+
+    private func externalVerification(record : ActivityRecord) : ProfileGraph.VerificationMethod {
+        switch (record.attestation) {
+            case (?attestation) {
+                switch (attestation.signature_status) {
+                    case (#verified) #signed;
+                    case (#unverified) #imported;
+                    case (#invalid) #imported;
+                }
+            };
+            case null #imported;
+        }
+    };
+
+    private func addExternalClaimFromActivity(record : ActivityRecord, issuer : Principal) {
+        let profile = switch (profiles.get(record.profile_id)) {
+            case null { return };
+            case (?p) p;
+        };
+        let id = generateProfileClaimId();
+        let schema = record.app_id # "." # record.activity_type # ".v" # Nat.toText(record.schema_version);
+        let claim : ProfileClaim = {
+            id;
+            profile_id = record.profile_id;
+            subject = profile.owner;
+            predicate = record.activity_type;
+            value = #reference("oneblock://activity/" # record.id);
+            capability = null;
+            context = ?record.app_id;
+            provenance = {
+                source_kind = #external;
+                issuer = ?issuer;
+                issuer_id = ?record.app_id;
+                verification = externalVerification(record);
+                evidence = [{
+                    schema;
+                    uri = ?"oneblock://activity/" # record.id;
+                    hash = ?record.hash;
+                    external_id = ?record.idempotency_key;
+                }];
+                observed_at = ?record.event_timestamp;
+                recorded_at = record.ingest_timestamp;
+            };
+            valid_from = ?record.event_timestamp;
+            valid_until = null;
+            visibility = graphVisibility(record.visibility);
+            created_at = record.ingest_timestamp;
+        };
+        profileClaims.put(id, claim);
+        appendClaimIndex(record.profile_id, id)
+    };
+
     //----------------------------- Integration System ------------------------------------
 
     private func generateActivityRecordId() : Text {
@@ -1095,6 +1496,7 @@ persistent actor {
         };
         activityRecordsMap.put(recordId, record);
         idempotencyKeys.put(idemKey, recordId);
+        addExternalClaimFromActivity(record, caller);
         // Update per-profile index
         let currentIndex = switch (profileActivityIndex.get(newRecord.profile_id)) {
             case (?ids) { ids };
