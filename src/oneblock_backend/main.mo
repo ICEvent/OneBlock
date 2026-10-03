@@ -173,10 +173,39 @@ persistent actor {
     transient var historicalProfileOwners = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
     historicalProfileOwners := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableHistoricalProfileOwners), Text.equal, Text.hash);
 
+    private func profileIdShowsReuse(profile : Profile) : Bool {
+        // Evidence of reuse exists if any surviving record or connection for
+        // this ID predates the current Profile instance.
+        switch (profileActivityIndex.get(profile.id)) {
+            case null {};
+            case (?recordIds) {
+                for (recordId in recordIds.vals()) {
+                    switch (activityRecordsMap.get(recordId)) {
+                        case (?record) {
+                            if (record.ingest_timestamp < profile.createtime) {
+                                return true
+                            }
+                        };
+                        case null {};
+                    }
+                }
+            };
+        };
+        for ((_, connection) in connections.entries()) {
+            if (
+                connection.profile_id == profile.id and
+                connection.created_at < profile.createtime
+            ) {
+                return true
+            }
+        };
+        false
+    };
+
     private func backfillLegacyActivitySubjects() {
-        // Backfill only when legacy state proves the record belongs to the
-        // current profile owner. A reused profile ID will have a profile
-        // creation time newer than the old connection, so it is excluded.
+        // Normal reconnects overwrite the current connection timestamp, so
+        // don't use that timestamp as the lower bound unless the profile ID
+        // actually shows evidence of historical reuse.
         for ((recordId, record) in activityRecordsMap.entries()) {
             switch (activityRecordSubjects.get(recordId)) {
                 case (?_) {};
@@ -187,9 +216,15 @@ persistent actor {
                             switch (connections.get(connectionKey(record.profile_id, record.app_id))) {
                                 case null {};
                                 case (?connection) {
-                                    if (
+                                    let reused = profileIdShowsReuse(profile);
+                                    let belongsToCurrentInstance =
+                                        record.ingest_timestamp >= profile.createtime;
+                                    let safelyAfterCurrentConnection =
                                         connection.created_at >= profile.createtime and
-                                        record.ingest_timestamp >= connection.created_at
+                                        record.ingest_timestamp >= connection.created_at;
+                                    if (
+                                        belongsToCurrentInstance and
+                                        (not reused or safelyAfterCurrentConnection)
                                     ) {
                                         activityRecordSubjects.put(recordId, profile.owner)
                                     }
