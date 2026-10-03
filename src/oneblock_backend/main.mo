@@ -990,7 +990,7 @@ persistent actor {
             provenance = {
                 source_kind = #self_declared;
                 issuer = ?caller;
-                issuer_id = null;
+                issuer_id = Principal.toText(caller);
                 verification = #none;
                 evidence = input.evidence;
                 observed_at = ?now;
@@ -1037,7 +1037,7 @@ persistent actor {
             provenance = {
                 source_kind = #self_declared;
                 issuer = ?profile.owner;
-                issuer_id = null;
+                issuer_id = Principal.toText(profile.owner);
                 verification = #none;
                 evidence = [];
                 observed_at = ?profile.last_updated;
@@ -1071,7 +1071,7 @@ persistent actor {
             provenance = {
                 source_kind = #external;
                 issuer;
-                issuer_id = ?record.app_id;
+                issuer_id = record.app_id;
                 verification = externalVerification(record);
                 evidence = [{
                     schema;
