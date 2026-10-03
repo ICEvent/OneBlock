@@ -1215,7 +1215,7 @@ persistent actor {
                 verification = externalVerification(record);
                 evidence = [{
                     schema = schema;
-                    uri = ?"oneblock://activity/" # record.id;
+                    uri = ?("oneblock://activity/" # record.id);
                     hash = ?record.hash;
                     external_id = ?record.idempotency_key;
                 }];
