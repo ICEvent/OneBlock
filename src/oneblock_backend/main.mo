@@ -1020,16 +1020,103 @@ persistent actor {
         }
     };
 
+    private func legacyProfileClaim(
+        profile : Profile,
+        id : Text,
+        predicate : Text,
+        value : ProfileGraph.ClaimValue
+    ) : ProfileClaim {
+        {
+            id;
+            profile_id = profile.id;
+            subject = profile.owner;
+            predicate;
+            value;
+            capability = null;
+            context = ?"legacy-profile";
+            provenance = {
+                source_kind = #self_declared;
+                issuer = ?profile.owner;
+                issuer_id = null;
+                verification = #none;
+                evidence = [];
+                observed_at = ?profile.last_updated;
+                recorded_at = profile.last_updated;
+            };
+            valid_from = ?profile.createtime;
+            valid_until = null;
+            visibility = graphVisibility(profile.visibility);
+            created_at = profile.createtime;
+        }
+    };
+
+    private func activityClaim(record : ActivityRecord) : ?ProfileClaim {
+        let profile = switch (profiles.get(record.profile_id)) {
+            case null { return null };
+            case (?p) p;
+        };
+        let issuer = switch (integrationApps.get(record.app_id)) {
+            case (?app) ?app.owner;
+            case null null;
+        };
+        let schema = record.app_id # "." # record.activity_type # ".v" # Nat.toText(record.schema_version);
+        ?{
+            id = "external:activity:" # record.id;
+            profile_id = record.profile_id;
+            subject = profile.owner;
+            predicate = record.activity_type;
+            value = #reference("oneblock://activity/" # record.id);
+            capability = null;
+            context = ?record.app_id;
+            provenance = {
+                source_kind = #external;
+                issuer;
+                issuer_id = ?record.app_id;
+                verification = externalVerification(record);
+                evidence = [{
+                    schema;
+                    uri = ?"oneblock://activity/" # record.id;
+                    hash = ?record.hash;
+                    external_id = ?record.idempotency_key;
+                }];
+                observed_at = ?record.event_timestamp;
+                recorded_at = record.ingest_timestamp;
+            };
+            valid_from = ?record.event_timestamp;
+            valid_until = null;
+            visibility = graphVisibility(record.visibility);
+            created_at = record.ingest_timestamp;
+        }
+    };
+
     public query ({ caller }) func listProfileClaims(profileId : Text) : async [ProfileClaim] {
         let profile = switch (profiles.get(profileId)) {
             case null { return [] };
             case (?p) p;
         };
-        let ids = switch (profileClaimIndex.get(profileId)) {
-            case null [];
-            case (?value) value;
+        let buf = Buffer.Buffer<ProfileClaim>(0);
+
+        // Transitional adapter: existing editable profile fields are exposed as
+        // self-declared claims without copying or migrating legacy stable state.
+        let profileVisibility = graphVisibility(profile.visibility);
+        if (canReadGraphItem(caller, profile.owner, profileVisibility)) {
+            buf.add(legacyProfileClaim(profile, "legacy:profile:name", "profile.name", #text(profile.name)));
+            if (Text.size(profile.bio) > 0) {
+                buf.add(legacyProfileClaim(profile, "legacy:profile:bio", "profile.bio", #text(profile.bio)))
+            };
+            var linkIndex : Nat = 0;
+            for (link in profile.links.vals()) {
+                let linkId = "legacy:profile:link:" # Nat.toText(linkIndex);
+                buf.add(legacyProfileClaim(profile, linkId, "profile.link." # link.name, #reference(link.url)));
+                linkIndex += 1
+            }
         };
-        let buf = Buffer.Buffer<ProfileClaim>(ids.size());
+
+        // Native user-defined claims.
+        let ids = switch (profileClaimIndex.get(profileId)) {
+            case null { [] };
+            case (?value) { value };
+        };
         for (id in ids.vals()) {
             switch (profileClaims.get(id)) {
                 case (?claim) {
@@ -1040,6 +1127,29 @@ persistent actor {
                 case null {};
             }
         };
+
+        // External integrations remain the system of record. ActivityRecord is
+        // projected as a claim at read time instead of being duplicated.
+        let activityIds = switch (profileActivityIndex.get(profileId)) {
+            case null { [] };
+            case (?value) { value };
+        };
+        for (recordId in activityIds.vals()) {
+            switch (activityRecordsMap.get(recordId)) {
+                case null {};
+                case (?record) {
+                    switch (activityClaim(record)) {
+                        case null {};
+                        case (?claim) {
+                            if (canReadGraphItem(caller, profile.owner, claim.visibility)) {
+                                buf.add(claim)
+                            }
+                        };
+                    }
+                };
+            }
+        };
+
         Buffer.toArray(buf)
     };
 
@@ -1242,44 +1352,6 @@ persistent actor {
             };
             case null #imported;
         }
-    };
-
-    private func addExternalClaimFromActivity(record : ActivityRecord, issuer : Principal) {
-        let profile = switch (profiles.get(record.profile_id)) {
-            case null { return };
-            case (?p) p;
-        };
-        let id = generateProfileClaimId();
-        let schema = record.app_id # "." # record.activity_type # ".v" # Nat.toText(record.schema_version);
-        let claim : ProfileClaim = {
-            id;
-            profile_id = record.profile_id;
-            subject = profile.owner;
-            predicate = record.activity_type;
-            value = #reference("oneblock://activity/" # record.id);
-            capability = null;
-            context = ?record.app_id;
-            provenance = {
-                source_kind = #external;
-                issuer = ?issuer;
-                issuer_id = ?record.app_id;
-                verification = externalVerification(record);
-                evidence = [{
-                    schema;
-                    uri = ?"oneblock://activity/" # record.id;
-                    hash = ?record.hash;
-                    external_id = ?record.idempotency_key;
-                }];
-                observed_at = ?record.event_timestamp;
-                recorded_at = record.ingest_timestamp;
-            };
-            valid_from = ?record.event_timestamp;
-            valid_until = null;
-            visibility = graphVisibility(record.visibility);
-            created_at = record.ingest_timestamp;
-        };
-        profileClaims.put(id, claim);
-        appendClaimIndex(record.profile_id, id)
     };
 
     //----------------------------- Integration System ------------------------------------
@@ -1496,7 +1568,6 @@ persistent actor {
         };
         activityRecordsMap.put(recordId, record);
         idempotencyKeys.put(idemKey, recordId);
-        addExternalClaimFromActivity(record, caller);
         // Update per-profile index
         let currentIndex = switch (profileActivityIndex.get(newRecord.profile_id)) {
             case (?ids) { ids };
