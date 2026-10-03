@@ -53,7 +53,7 @@ module {
   // "landscaping.hedge_trimming", "coding.react", "hiking.long_distance".
   public type CapabilityRef = {
     path : Text;
-    label : ?Text;
+    display_label : ?Text;
   };
 
   public type ClaimValue = {
