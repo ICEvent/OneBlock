@@ -1120,6 +1120,18 @@ persistent actor {
             case null {};
         };
 
+        // External projected IDs encode the ActivityRecord key, so resolve
+        // them directly before touching legacy profile projections.
+        switch (Text.stripStart(claimId, #text "external:activity:")) {
+            case (?recordId) {
+                switch (activityRecordsMap.get(recordId)) {
+                    case (?record) { return activityClaim(record) };
+                    case null { return null };
+                }
+            };
+            case null {};
+        };
+
         // Legacy projections use owner-stable IDs so profile renames do not
         // change identity or transfer authorization to a future ID holder.
         for ((_, profile) in profiles.entries()) {
@@ -1137,15 +1149,6 @@ persistent actor {
             }
         };
 
-        switch (Text.stripStart(claimId, #text "external:activity:")) {
-            case (?recordId) {
-                switch (activityRecordsMap.get(recordId)) {
-                    case (?record) { return activityClaim(record) };
-                    case null {};
-                }
-            };
-            case null {};
-        };
         null
     };
 
@@ -1327,13 +1330,15 @@ persistent actor {
         // immutable subject must match the reviewed person.
         for (claimId in input.related_claims.vals()) {
             switch (resolveClaim(claimId)) {
-                case null { return #err("related claim not found: " # claimId) };
+                case null { return #err("related claim unavailable") };
                 case (?claim) {
-                    if (claim.subject != profile.owner) {
-                        return #err("related claim belongs to another subject")
-                    };
-                    if (not canReadGraphItem(caller, claim.subject, claim.visibility)) {
-                        return #err("related claim is not visible to reviewer")
+                    // Do not reveal whether an unreadable claim exists or who
+                    // owns it. All invalid/unreadable references fail alike.
+                    if (
+                        not canReadGraphItem(caller, claim.subject, claim.visibility) or
+                        claim.subject != profile.owner
+                    ) {
+                        return #err("related claim unavailable")
                     }
                 };
             }
@@ -1441,6 +1446,10 @@ persistent actor {
         if (review.subject != caller) {
             return #err("only the reviewed subject can dispute")
         };
+        switch (review.status) {
+            case (#withdrawn) { return #err("withdrawn reviews cannot be disputed") };
+            case (_) {};
+        };
         peerReviews.put(reviewId, {
             id = review.id;
             profile_id = review.profile_id;
@@ -1492,16 +1501,11 @@ persistent actor {
     };
 
     private func externalVerification(record : ActivityRecord) : ProfileGraph.VerificationMethod {
-        switch (record.attestation) {
-            case (?attestation) {
-                switch (attestation.signature_status) {
-                    case (#verified) #signed;
-                    case (#unverified) #imported;
-                    case (#invalid) #imported;
-                }
-            };
-            case null #imported;
-        }
+        // ActivityRecord.signature_status is currently supplied by the
+        // integration and is not cryptographically verified by this canister.
+        // Until policy-specific signature validation exists, external records
+        // must not be represented as #signed.
+        #imported
     };
 
     //----------------------------- Integration System ------------------------------------
