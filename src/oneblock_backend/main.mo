@@ -1006,15 +1006,58 @@ persistent actor {
         #ok(id)
     };
 
-    public query ({ caller }) func getProfileClaim(claimId : Text) : async ?ProfileClaim {
+    private func legacyClaimId(profile : Profile, suffix : Text) : Text {
+        "legacy:profile:" # Principal.toText(profile.owner) # ":" # suffix
+    };
+
+    private func findProfileByOwner(owner : Principal) : ?Profile {
+        switch (userprofiles.get(owner)) {
+            case null null;
+            case (?profileId) profiles.get(profileId);
+        }
+    };
+
+    private func resolveClaim(claimId : Text) : ?ProfileClaim {
         switch (profileClaims.get(claimId)) {
+            case (?claim) { return ?claim };
+            case null {};
+        };
+
+        // Legacy projections use owner-stable IDs so profile renames do not
+        // change identity or transfer authorization to a future ID holder.
+        for ((_, profile) in profiles.entries()) {
+            if (claimId == legacyClaimId(profile, "name")) {
+                return ?legacyProfileClaim(profile, claimId, "profile.name", #text(profile.name))
+            };
+            if (Text.size(profile.bio) > 0 and claimId == legacyClaimId(profile, "bio")) {
+                return ?legacyProfileClaim(profile, claimId, "profile.bio", #text(profile.bio))
+            };
+            var linkIndex : Nat = 0;
+            for (link in profile.links.vals()) {
+                let candidateId = legacyClaimId(profile, "link:" # Nat.toText(linkIndex));
+                if (claimId == candidateId) {
+                    return ?legacyProfileClaim(profile, candidateId, "profile.link." # link.name, #reference(link.url))
+                };
+                linkIndex += 1
+            }
+        };
+
+        for ((_, record) in activityRecordsMap.entries()) {
+            if (claimId == "external:activity:" # record.id) {
+                return activityClaim(record)
+            }
+        };
+        null
+    };
+
+    public query ({ caller }) func getProfileClaim(claimId : Text) : async ?ProfileClaim {
+        switch (resolveClaim(claimId)) {
             case null null;
             case (?claim) {
-                switch (profiles.get(claim.profile_id)) {
-                    case null null;
-                    case (?profile) {
-                        if (canReadGraphItem(caller, profile.owner, claim.visibility)) { ?claim } else { null }
-                    };
+                if (caller == claim.subject or canReadGraphItem(caller, claim.subject, claim.visibility)) {
+                    ?claim
+                } else {
+                    null
                 }
             };
         }
@@ -1100,31 +1143,26 @@ persistent actor {
         // self-declared claims without copying or migrating legacy stable state.
         let profileVisibility = graphVisibility(profile.visibility);
         if (canReadGraphItem(caller, profile.owner, profileVisibility)) {
-            buf.add(legacyProfileClaim(profile, "legacy:profile:name", "profile.name", #text(profile.name)));
+            buf.add(legacyProfileClaim(profile, legacyClaimId(profile, "name"), "profile.name", #text(profile.name)));
             if (Text.size(profile.bio) > 0) {
-                buf.add(legacyProfileClaim(profile, "legacy:profile:bio", "profile.bio", #text(profile.bio)))
+                buf.add(legacyProfileClaim(profile, legacyClaimId(profile, "bio"), "profile.bio", #text(profile.bio)))
             };
             var linkIndex : Nat = 0;
             for (link in profile.links.vals()) {
-                let linkId = "legacy:profile:link:" # Nat.toText(linkIndex);
+                let linkId = legacyClaimId(profile, "link:" # Nat.toText(linkIndex));
                 buf.add(legacyProfileClaim(profile, linkId, "profile.link." # link.name, #reference(link.url)));
                 linkIndex += 1
             }
         };
 
-        // Native user-defined claims.
-        let ids = switch (profileClaimIndex.get(profileId)) {
-            case null { [] };
-            case (?value) { value };
-        };
-        for (id in ids.vals()) {
-            switch (profileClaims.get(id)) {
-                case (?claim) {
-                    if (canReadGraphItem(caller, profile.owner, claim.visibility)) {
-                        buf.add(claim)
-                    }
-                };
-                case null {};
+        // Native user-defined claims are selected by immutable subject rather
+        // than mutable profile ID. This keeps them attached across changeId().
+        for ((_, claim) in profileClaims.entries()) {
+            if (
+                claim.subject == profile.owner and
+                canReadGraphItem(caller, claim.subject, claim.visibility)
+            ) {
+                buf.add(claim)
             }
         };
 
@@ -1167,13 +1205,14 @@ persistent actor {
         if (profile.owner == caller) {
             return #err("self review is not allowed; use a self-declared claim")
         };
-        // Related claim references must belong to the reviewed profile.
+        // Related references may point to native or projected claims, but the
+        // immutable subject must match the reviewed person.
         for (claimId in input.related_claims.vals()) {
-            switch (profileClaims.get(claimId)) {
+            switch (resolveClaim(claimId)) {
                 case null { return #err("related claim not found: " # claimId) };
                 case (?claim) {
-                    if (claim.profile_id != input.profile_id) {
-                        return #err("related claim belongs to another profile")
+                    if (claim.subject != profile.owner) {
+                        return #err("related claim belongs to another subject")
                     }
                 };
             }
@@ -1207,15 +1246,10 @@ persistent actor {
         switch (peerReviews.get(reviewId)) {
             case null null;
             case (?review) {
-                switch (profiles.get(review.profile_id)) {
-                    case null null;
-                    case (?profile) {
-                        if (
-                            caller == review.reviewer or
-                            canReadGraphItem(caller, profile.owner, review.visibility)
-                        ) { ?review } else { null }
-                    };
-                }
+                if (
+                    caller == review.reviewer or
+                    canReadGraphItem(caller, review.subject, review.visibility)
+                ) { ?review } else { null }
             };
         }
     };
@@ -1225,22 +1259,16 @@ persistent actor {
             case null { return [] };
             case (?p) p;
         };
-        let ids = switch (profileReviewIndex.get(profileId)) {
-            case null [];
-            case (?value) value;
-        };
-        let buf = Buffer.Buffer<PeerReview>(ids.size());
-        for (id in ids.vals()) {
-            switch (peerReviews.get(id)) {
-                case (?review) {
-                    if (
-                        caller == review.reviewer or
-                        canReadGraphItem(caller, profile.owner, review.visibility)
-                    ) {
-                        buf.add(review)
-                    }
-                };
-                case null {};
+        let buf = Buffer.Buffer<PeerReview>(0);
+        for ((_, review) in peerReviews.entries()) {
+            if (
+                review.subject == profile.owner and
+                (
+                    caller == review.reviewer or
+                    canReadGraphItem(caller, review.subject, review.visibility)
+                )
+            ) {
+                buf.add(review)
             }
         };
         Buffer.toArray(buf)
@@ -1251,12 +1279,8 @@ persistent actor {
             case null { return #err("review not found") };
             case (?r) r;
         };
-        let profile = switch (profiles.get(review.profile_id)) {
-            case null { return #err("profile not found") };
-            case (?p) p;
-        };
-        if (profile.owner != caller) {
-            return #err("only the reviewed profile owner can respond")
+        if (review.subject != caller) {
+            return #err("only the reviewed subject can respond")
         };
         peerReviews.put(reviewId, {
             id = review.id;
@@ -1284,12 +1308,8 @@ persistent actor {
             case null { return #err("review not found") };
             case (?r) r;
         };
-        let profile = switch (profiles.get(review.profile_id)) {
-            case null { return #err("profile not found") };
-            case (?p) p;
-        };
-        if (profile.owner != caller) {
-            return #err("only the reviewed profile owner can dispute")
+        if (review.subject != caller) {
+            return #err("only the reviewed subject can dispute")
         };
         peerReviews.put(reviewId, {
             id = review.id;
