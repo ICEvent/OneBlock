@@ -56,6 +56,11 @@ jobs:
           dfx build profile
           dfx generate profile
 
+      - name: Verify frontend actor declarations are current
+        run: |
+          cmp src/declarations/profile/profile.did.js src/oneblock_frontend/src/api/profile/service.did.js
+          cmp src/declarations/profile/profile.did.d.ts src/oneblock_frontend/src/api/profile/service.did.d.ts
+
       - name: Upload generated declarations
         uses: actions/upload-artifact@v4
         with:
