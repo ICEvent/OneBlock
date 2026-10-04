@@ -1642,6 +1642,31 @@ persistent actor {
         if (profile.owner == caller) {
             return #err("self review is not allowed; use a self-declared claim")
         };
+
+        // Bound victim-controlled review indexes against spam. The total
+        // subject cap keeps listPeerReviews work bounded; the per-reviewer cap
+        // prevents one principal from consuming the entire allowance.
+        let existingReviewIds = switch (profileReviewIndex.get(input.profile_id)) {
+            case (?ids) ids;
+            case null [];
+        };
+        if (existingReviewIds.size() >= 1000) {
+            return #err("review limit reached for this profile")
+        };
+        var reviewerReviewCount : Nat = 0;
+        label reviewCount for (existingId in existingReviewIds.vals()) {
+            switch (peerReviews.get(existingId)) {
+                case (?existingReview) {
+                    if (existingReview.reviewer == caller) {
+                        reviewerReviewCount += 1;
+                        if (reviewerReviewCount >= 20) {
+                            return #err("review limit reached for this reviewer and profile")
+                        }
+                    }
+                };
+                case null {};
+            }
+        };
         // Related references may point to native or projected claims, but the
         // immutable subject must match the reviewed person.
         for (claimId in input.related_claims.vals()) {
