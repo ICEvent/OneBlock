@@ -510,6 +510,10 @@ export interface _SERVICE {
   'recomputeScores' : ActorMethod<[string, [] | [string]], Result_2>,
   'registerActivityType' : ActorMethod<[NewActivityType], Result_1>,
   'registerApp' : ActorMethod<[NewIntegrationApp], Result_1>,
+  'registerLegacyOwnershipEpoch' : ActorMethod<
+    [string, string, bigint, [] | [bigint]],
+    Result
+  >,
   'registerOipProvider' : ActorMethod<[NewOipProvider], Result>,
   'removeFeaturedProfile' : ActorMethod<[string], Result>,
   'reserveid' : ActorMethod<[string], Result>,
