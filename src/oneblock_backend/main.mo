@@ -182,6 +182,71 @@ persistent actor {
     transient var historicalProfileOwners = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
     historicalProfileOwners := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableHistoricalProfileOwners), Text.equal, Text.hash);
 
+    private func mergeTextIndex(index : TrieMap.TrieMap<Text, [Text]>, fromId : Text, toId : Text) {
+        switch (index.get(fromId)) {
+            case null {};
+            case (?fromIds) {
+                let existing = switch (index.get(toId)) {
+                    case (?ids) ids;
+                    case null [];
+                };
+                let merged = Buffer.fromArray<Text>(existing);
+                for (candidate in fromIds.vals()) {
+                    if (Array.find<Text>(existing, func(id : Text) : Bool { id == candidate }) == null) {
+                        merged.add(candidate)
+                    }
+                };
+                index.put(toId, Buffer.toArray(merged))
+            };
+        }
+    };
+
+    private func recoverLegacyRenameLineage() {
+        // The current Profile retains its block IDs across changeId, while each
+        // historical Block keeps the profile_id it was created under. That is
+        // a durable lineage anchor for pre-upgrade renames.
+        for ((currentId, profile) in profiles.entries()) {
+            let seenLegacyIds = TrieMap.TrieMap<Text, Bool>(Text.equal, Text.hash);
+            for (blockId in profile.blocks.vals()) {
+                switch (blocks.get(blockId)) {
+                    case null {};
+                    case (?block) {
+                        let legacyId = block.profile_id;
+                        if (
+                            legacyId != currentId and
+                            seenLegacyIds.get(legacyId) == null and
+                            profiles.get(legacyId) == null
+                        ) {
+                            seenLegacyIds.put(legacyId, true);
+                            historicalProfileOwners.put(legacyId, profile.owner);
+                            switch (profileActivityIndex.get(legacyId)) {
+                                case null {};
+                                case (?recordIds) {
+                                    for (recordId in recordIds.vals()) {
+                                        switch (activityRecordSubjects.get(recordId)) {
+                                            case (?_) {};
+                                            case null {
+                                                switch (activityRecordsMap.get(recordId)) {
+                                                    case (?record) {
+                                                        if (record.profile_id == legacyId) {
+                                                            activityRecordSubjects.put(recordId, profile.owner)
+                                                        }
+                                                    };
+                                                    case null {};
+                                                }
+                                            };
+                                        }
+                                    }
+                                };
+                            };
+                            mergeTextIndex(profileActivityIndex, legacyId, currentId)
+                        }
+                    };
+                }
+            }
+        }
+    };
+
     private func backfillLegacyConnectionOwnership() {
         // For pre-upgrade state, only a connection created during the current
         // Profile instance can be attributed safely. Reconnects after this
@@ -306,7 +371,9 @@ persistent actor {
 
     system func postupgrade() {
         // Restore safe provenance bindings for legacy records before clearing
-        // upgrade arrays. Ambiguous records remain unbound and unprojected.
+        // upgrade arrays. First reconstruct pre-upgrade rename lineage from
+        // historical Blocks, then backfill only ownership that can be proven.
+        recoverLegacyRenameLineage();
         backfillLegacyConnectionOwnership();
         backfillLegacyActivitySubjects();
         stableProfiles := [];
