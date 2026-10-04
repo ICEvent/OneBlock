@@ -57,6 +57,13 @@ persistent actor {
     type NewSelfClaim = ProfileGraph.NewSelfClaim;
     type PeerReview = ProfileGraph.PeerReview;
     type NewPeerReview = ProfileGraph.NewPeerReview;
+    type LegacyOwnershipEpoch = {
+        legacy_profile_id : Text;
+        current_profile_id : Text;
+        subject : Principal;
+        from_timestamp : Int;
+        to_timestamp : ?Int;
+    };
 
     var stableProfiles : [(Text, Profile)] = [];
     var stableFeaturedProfiles : [Profile] = [];
@@ -96,6 +103,7 @@ persistent actor {
     var stablePeerReviews : [(Text, PeerReview)] = [];
     var stableProfileReviewIndex : [(Text, [Text])] = [];
     var stableHistoricalProfileOwners : [(Text, Principal)] = [];
+    var stableLegacyOwnershipEpochs : [LegacyOwnershipEpoch] = [];
 
     var reserveIds : [Text] = ["oneblock", "block", "about", "admin", "status", "update"];
 
@@ -181,6 +189,7 @@ persistent actor {
     profileReviewIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileReviewIndex), Text.equal, Text.hash);
     transient var historicalProfileOwners = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
     historicalProfileOwners := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableHistoricalProfileOwners), Text.equal, Text.hash);
+    transient var legacyOwnershipEpochs = Buffer.fromArray<LegacyOwnershipEpoch>(stableLegacyOwnershipEpochs);
 
     private func mergeTextIndex(index : TrieMap.TrieMap<Text, [Text]>, fromId : Text, toId : Text) {
         switch (index.get(fromId)) {
@@ -201,49 +210,56 @@ persistent actor {
         }
     };
 
-    private func recoverLegacyRenameLineage() {
-        // The current Profile retains its block IDs across changeId, while each
-        // historical Block keeps the profile_id it was created under. That is
-        // a durable lineage anchor for pre-upgrade renames.
-        for ((currentId, profile) in profiles.entries()) {
-            let seenLegacyIds = TrieMap.TrieMap<Text, Bool>(Text.equal, Text.hash);
-            for (blockId in profile.blocks.vals()) {
-                switch (blocks.get(blockId)) {
+    private func timestampInEpoch(ts : Int, epoch : LegacyOwnershipEpoch) : Bool {
+        if (ts < epoch.from_timestamp) { return false };
+        switch (epoch.to_timestamp) {
+            case null true;
+            case (?until) ts <= until;
+        }
+    };
+
+    private func applyLegacyOwnershipEpoch(epoch : LegacyOwnershipEpoch) {
+        switch (profiles.get(epoch.current_profile_id)) {
+            case null {};
+            case (?profile) {
+                if (profile.owner != epoch.subject) { return };
+                // Never apply an epoch while the historical ID is active again.
+                if (profiles.get(epoch.legacy_profile_id) != null) { return };
+                historicalProfileOwners.put(epoch.legacy_profile_id, epoch.subject);
+                switch (profileActivityIndex.get(epoch.legacy_profile_id)) {
                     case null {};
-                    case (?block) {
-                        let legacyId = block.profile_id;
-                        if (
-                            legacyId != currentId and
-                            seenLegacyIds.get(legacyId) == null and
-                            profiles.get(legacyId) == null
-                        ) {
-                            seenLegacyIds.put(legacyId, true);
-                            historicalProfileOwners.put(legacyId, profile.owner);
-                            switch (profileActivityIndex.get(legacyId)) {
+                    case (?recordIds) {
+                        for (recordId in recordIds.vals()) {
+                            switch (activityRecordsMap.get(recordId)) {
                                 case null {};
-                                case (?recordIds) {
-                                    for (recordId in recordIds.vals()) {
+                                case (?record) {
+                                    if (
+                                        record.profile_id == epoch.legacy_profile_id and
+                                        timestampInEpoch(record.ingest_timestamp, epoch)
+                                    ) {
                                         switch (activityRecordSubjects.get(recordId)) {
-                                            case (?_) {};
-                                            case null {
-                                                switch (activityRecordsMap.get(recordId)) {
-                                                    case (?record) {
-                                                        if (record.profile_id == legacyId) {
-                                                            activityRecordSubjects.put(recordId, profile.owner)
-                                                        }
-                                                    };
-                                                    case null {};
+                                            case null { activityRecordSubjects.put(recordId, epoch.subject) };
+                                            case (?existing) {
+                                                if (existing != epoch.subject) {
+                                                    // Conflicting historical evidence stays quarantined.
+                                                    ignore activityRecordSubjects.remove(recordId)
                                                 }
                                             };
                                         }
                                     }
                                 };
-                            };
-                            mergeTextIndex(profileActivityIndex, legacyId, currentId)
+                            }
                         }
                     };
-                }
-            }
+                };
+                mergeTextIndex(profileActivityIndex, epoch.legacy_profile_id, epoch.current_profile_id)
+            };
+        }
+    };
+
+    private func applyLegacyOwnershipEpochs() {
+        for (epoch in legacyOwnershipEpochs.vals()) {
+            applyLegacyOwnershipEpoch(epoch)
         }
     };
 
@@ -366,14 +382,14 @@ persistent actor {
         stableProfileClaimIndex := Iter.toArray(profileClaimIndex.entries());
         stablePeerReviews := Iter.toArray(peerReviews.entries());
         stableProfileReviewIndex := Iter.toArray(profileReviewIndex.entries());
-        stableHistoricalProfileOwners := Iter.toArray(historicalProfileOwners.entries())
+        stableHistoricalProfileOwners := Iter.toArray(historicalProfileOwners.entries());
+        stableLegacyOwnershipEpochs := Buffer.toArray(legacyOwnershipEpochs)
     };
 
     system func postupgrade() {
-        // Restore safe provenance bindings for legacy records before clearing
-        // upgrade arrays. First reconstruct pre-upgrade rename lineage from
-        // historical Blocks, then backfill only ownership that can be proven.
-        recoverLegacyRenameLineage();
+        // Restore only provenance that can be proven. Explicit ownership
+        // epochs handle pre-upgrade renames, including profiles with no blocks.
+        applyLegacyOwnershipEpochs();
         backfillLegacyConnectionOwnership();
         backfillLegacyActivitySubjects();
         stableProfiles := [];
@@ -403,7 +419,8 @@ persistent actor {
         stableProfileClaimIndex := [];
         stablePeerReviews := [];
         stableProfileReviewIndex := [];
-        stableHistoricalProfileOwners := []
+        stableHistoricalProfileOwners := [];
+        stableLegacyOwnershipEpochs := []
     };
     private func clamp01(v : Float) : Float {
         if (v < 0.0) { 0.0 } else if (v > 1.0) { 1.0 } else { v }
@@ -461,6 +478,45 @@ persistent actor {
             updated_at = now;
             model_version = "oip-v0.2-m2";
         }
+    };
+
+    public shared ({ caller }) func registerLegacyOwnershipEpoch(
+        legacyProfileId : Text,
+        currentProfileId : Text,
+        fromTimestamp : Int,
+        toTimestamp : ?Int
+    ) : async Result.Result<Nat, Text> {
+        if (not isAdmin(caller)) {
+            return #err("admin only")
+        };
+        if (legacyProfileId == currentProfileId) {
+            return #err("legacy and current profile ids must differ")
+        };
+        if (profiles.get(legacyProfileId) != null) {
+            return #err("legacy profile id is currently active")
+        };
+        let current = switch (profiles.get(currentProfileId)) {
+            case null { return #err("current profile not found") };
+            case (?profile) profile;
+        };
+        switch (toTimestamp) {
+            case (?until) {
+                if (until < fromTimestamp) {
+                    return #err("invalid ownership epoch")
+                }
+            };
+            case null {};
+        };
+        let epoch : LegacyOwnershipEpoch = {
+            legacy_profile_id = legacyProfileId;
+            current_profile_id = currentProfileId;
+            subject = current.owner;
+            from_timestamp = fromTimestamp;
+            to_timestamp = toTimestamp;
+        };
+        legacyOwnershipEpochs.add(epoch);
+        applyLegacyOwnershipEpoch(epoch);
+        #ok(1)
     };
 
     public shared ({ caller }) func createProfile(newProfile : Types.NewProfile) : async Result.Result<Nat, Text> {
@@ -668,6 +724,65 @@ persistent actor {
         }
     };
 
+    private func migrateGraphLocators(oldId : Text, newId : Text) {
+        switch (profileClaimIndex.get(oldId)) {
+            case null {};
+            case (?ids) {
+                for (id in ids.vals()) {
+                    switch (profileClaims.get(id)) {
+                        case null {};
+                        case (?claim) {
+                            profileClaims.put(id, {
+                                id = claim.id;
+                                profile_id = newId;
+                                subject = claim.subject;
+                                predicate = claim.predicate;
+                                value = claim.value;
+                                capability = claim.capability;
+                                context = claim.context;
+                                provenance = claim.provenance;
+                                valid_from = claim.valid_from;
+                                valid_until = claim.valid_until;
+                                visibility = claim.visibility;
+                                created_at = claim.created_at;
+                            })
+                        };
+                    }
+                }
+            };
+        };
+        switch (profileReviewIndex.get(oldId)) {
+            case null {};
+            case (?ids) {
+                for (id in ids.vals()) {
+                    switch (peerReviews.get(id)) {
+                        case null {};
+                        case (?review) {
+                            peerReviews.put(id, {
+                                id = review.id;
+                                profile_id = newId;
+                                subject = review.subject;
+                                reviewer = review.reviewer;
+                                relationship = review.relationship;
+                                capability = review.capability;
+                                context = review.context;
+                                assessment_tags = review.assessment_tags;
+                                narrative = review.narrative;
+                                evidence = review.evidence;
+                                related_claims = review.related_claims;
+                                status = review.status;
+                                response = review.response;
+                                visibility = review.visibility;
+                                created_at = review.created_at;
+                                updated_at = review.updated_at;
+                            })
+                        };
+                    }
+                }
+            };
+        }
+    };
+
     public shared ({ caller }) func changeId(oid : Text, nid : Text) : async Result.Result<Nat, Text> {
         if (Principal.isAnonymous(caller)) {
             #err("no authenticated")
@@ -693,6 +808,7 @@ persistent actor {
                                 // safely with the profile's activity index.
                                 migrateConnections(oid, nid);
                                 migrateDerivedSummaries(oid, nid);
+                                migrateGraphLocators(oid, nid);
                                 migrateTextIndex(profileActivityIndex, oid, nid);
                                 migrateTextIndex(profileClaimIndex, oid, nid);
                                 migrateTextIndex(profileReviewIndex, oid, nid);
@@ -1416,7 +1532,7 @@ persistent actor {
         let schema = record.app_id # "." # record.activity_type # ".v" # Nat.toText(record.schema_version);
         ?{
             id = "external:activity:" # record.id;
-            profile_id = record.profile_id;
+            profile_id = profile.id;
             subject = subject;
             predicate = record.activity_type;
             value = #reference("oneblock://activity/" # record.id);
