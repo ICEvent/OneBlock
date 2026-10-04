@@ -569,6 +569,11 @@ export const idlFactory = ({ IDL }) => {
     'recomputeScores' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [Result_2], []),
     'registerActivityType' : IDL.Func([NewActivityType], [Result_1], []),
     'registerApp' : IDL.Func([NewIntegrationApp], [Result_1], []),
+    'registerLegacyOwnershipEpoch' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Int, IDL.Opt(IDL.Int)],
+        [Result],
+        [],
+      ),
     'registerOipProvider' : IDL.Func([NewOipProvider], [Result], []),
     'removeFeaturedProfile' : IDL.Func([IDL.Text], [Result], []),
     'reserveid' : IDL.Func([IDL.Text], [Result], []),
