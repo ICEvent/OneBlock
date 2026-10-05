@@ -1,6 +1,7 @@
 import Prim "mo:prim";
 import Cycles "mo:base/ExperimentalCycles";
 import Nat "mo:base/Nat";
+import Nat32 "mo:base/Nat32";
 import Int "mo:base/Int";
 import Text "mo:base/Text";
 import TrieMap "mo:base/TrieMap";
@@ -12,8 +13,10 @@ import Buffer "mo:base/Buffer";
 import Array "mo:base/Array";
 import Order "mo:base/Order";
 import Float "mo:base/Float";
+import Blob "mo:base/Blob";
 
 import Types "types";
+import ProfileGraph "profile_graph";
 
 persistent actor {
     type Profile = Types.Profile;
@@ -53,6 +56,19 @@ persistent actor {
     type OipProvider = Types.OipProvider;
     type NewOipProvider = Types.NewOipProvider;
     type ProviderFactorSubmission = Types.ProviderFactorSubmission;
+    type ProfileClaim = ProfileGraph.ProfileClaim;
+    type NewSelfClaim = ProfileGraph.NewSelfClaim;
+    type PeerReview = ProfileGraph.PeerReview;
+    type NewPeerReview = ProfileGraph.NewPeerReview;
+    type ProfileClaimPage = { items : [ProfileClaim]; next_cursor : ?Nat };
+    type PeerReviewPage = { items : [PeerReview]; next_cursor : ?Nat };
+    type LegacyOwnershipEpoch = {
+        legacy_profile_id : Text;
+        current_profile_id : Text;
+        subject : Principal;
+        from_timestamp : Int;
+        to_timestamp : ?Int;
+    };
 
     var stableProfiles : [(Text, Profile)] = [];
     var stableFeaturedProfiles : [Profile] = [];
@@ -68,14 +84,33 @@ persistent actor {
     var stableIntegrationApps : [(Text, IntegrationApp)] = [];
     var stableActivityTypes : [(Text, ActivityType)] = [];
     var stableConnections : [(Text, IntegrationConnection)] = [];
+    var stableProfileConnectionIndex : [(Text, [Text])] = []; // profileId -> appIds
+    // Immutable ownership metadata for connection epochs. This is kept
+    // separately to avoid rewriting the legacy IntegrationConnection type.
+    var stableConnectionSubjects : [(Text, Principal)] = [];
+    var stableConnectionEpochStarts : [(Text, Int)] = [];
     var stableActivityRecords : [(Text, ActivityRecord)] = [];
+    // Immutable subject binding for external activity evidence. Legacy records
+    // without a binding are intentionally not projected until ownership can be
+    // established safely.
+    var stableActivityRecordSubjects : [(Text, Principal)] = [];
     var stableIdempotencyKeys : [(Text, Text)] = []; // idempotency_key -> record_id
     var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]
     var stableDerivedSummaries : [(Text, DerivedSummary)] = [];
+    var stableProfileSummaryIndex : [(Text, [Text])] = []; // profileId -> summary keys
     var stableIdentityGraphs : [(Text, IdentityGraph)] = [];
     var stableContextPolicies : [(Text, ContextPolicy)] = [];
     var stableTrustEdges : [(Text, TrustEdge)] = [];
     var stableOipProviders : [(Text, OipProvider)] = [];
+
+    // Additive profile graph state. Kept separate from legacy Profile/Block
+    // storage so this can be deployed without rewriting existing stable data.
+    var stableProfileClaims : [(Text, ProfileClaim)] = [];
+    var stableProfileClaimIndex : [(Text, [Text])] = [];
+    var stablePeerReviews : [(Text, PeerReview)] = [];
+    var stableProfileReviewIndex : [(Text, [Text])] = [];
+    var stableHistoricalProfileOwners : [(Text, Principal)] = [];
+    var stableLegacyOwnershipEpochs : [LegacyOwnershipEpoch] = [];
 
     var reserveIds : [Text] = ["oneblock", "block", "about", "admin", "status", "update"];
 
@@ -85,6 +120,8 @@ persistent actor {
     var traitIdCounter : Nat = 0;
     var activityRecordCounter : Nat = 0;
     var factorIdCounter : Nat = 0;
+    var profileClaimCounter : Nat = 0;
+    var peerReviewCounter : Nat = 0;
 
     transient var profiles = TrieMap.TrieMap<Text, Profile>(Text.equal, Text.hash);
     profiles := TrieMap.fromEntries<Text, Profile>(Iter.fromArray(stableProfiles), Text.equal, Text.hash);
@@ -120,9 +157,19 @@ persistent actor {
 
     transient var connections = TrieMap.TrieMap<Text, IntegrationConnection>(Text.equal, Text.hash);
     connections := TrieMap.fromEntries<Text, IntegrationConnection>(Iter.fromArray(stableConnections), Text.equal, Text.hash);
+    transient var profileConnectionIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
+    profileConnectionIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileConnectionIndex), Text.equal, Text.hash);
+
+    transient var connectionSubjects = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
+    connectionSubjects := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableConnectionSubjects), Text.equal, Text.hash);
+    transient var connectionEpochStarts = TrieMap.TrieMap<Text, Int>(Text.equal, Text.hash);
+    connectionEpochStarts := TrieMap.fromEntries<Text, Int>(Iter.fromArray(stableConnectionEpochStarts), Text.equal, Text.hash);
 
     transient var activityRecordsMap = TrieMap.TrieMap<Text, ActivityRecord>(Text.equal, Text.hash);
     activityRecordsMap := TrieMap.fromEntries<Text, ActivityRecord>(Iter.fromArray(stableActivityRecords), Text.equal, Text.hash);
+
+    transient var activityRecordSubjects = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
+    activityRecordSubjects := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableActivityRecordSubjects), Text.equal, Text.hash);
 
     transient var idempotencyKeys = TrieMap.TrieMap<Text, Text>(Text.equal, Text.hash);
     idempotencyKeys := TrieMap.fromEntries<Text, Text>(Iter.fromArray(stableIdempotencyKeys), Text.equal, Text.hash);
@@ -132,6 +179,8 @@ persistent actor {
 
     transient var derivedSummaries = TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
     derivedSummaries := TrieMap.fromEntries<Text, DerivedSummary>(Iter.fromArray(stableDerivedSummaries), Text.equal, Text.hash);
+    transient var profileSummaryIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
+    profileSummaryIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileSummaryIndex), Text.equal, Text.hash);
     transient var identityGraphs = TrieMap.TrieMap<Text, IdentityGraph>(Text.equal, Text.hash);
     identityGraphs := TrieMap.fromEntries<Text, IdentityGraph>(Iter.fromArray(stableIdentityGraphs), Text.equal, Text.hash);
     transient var contextPolicies = TrieMap.TrieMap<Text, ContextPolicy>(Text.equal, Text.hash);
@@ -140,6 +189,234 @@ persistent actor {
     trustEdges := TrieMap.fromEntries<Text, TrustEdge>(Iter.fromArray(stableTrustEdges), Text.equal, Text.hash);
     transient var oipProviders = TrieMap.TrieMap<Text, OipProvider>(Text.equal, Text.hash);
     oipProviders := TrieMap.fromEntries<Text, OipProvider>(Iter.fromArray(stableOipProviders), Text.equal, Text.hash);
+
+    transient var profileClaims = TrieMap.TrieMap<Text, ProfileClaim>(Text.equal, Text.hash);
+    profileClaims := TrieMap.fromEntries<Text, ProfileClaim>(Iter.fromArray(stableProfileClaims), Text.equal, Text.hash);
+    transient var profileClaimIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
+    profileClaimIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileClaimIndex), Text.equal, Text.hash);
+    transient var peerReviews = TrieMap.TrieMap<Text, PeerReview>(Text.equal, Text.hash);
+    peerReviews := TrieMap.fromEntries<Text, PeerReview>(Iter.fromArray(stablePeerReviews), Text.equal, Text.hash);
+    transient var profileReviewIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
+    profileReviewIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileReviewIndex), Text.equal, Text.hash);
+    transient var historicalProfileOwners = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
+    historicalProfileOwners := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableHistoricalProfileOwners), Text.equal, Text.hash);
+    transient var legacyOwnershipEpochs = Buffer.fromArray<LegacyOwnershipEpoch>(stableLegacyOwnershipEpochs);
+
+    private func mergeTextIndex(index : TrieMap.TrieMap<Text, [Text]>, fromId : Text, toId : Text) {
+        switch (index.get(fromId)) {
+            case null {};
+            case (?fromIds) {
+                let existing = switch (index.get(toId)) {
+                    case (?ids) ids;
+                    case null [];
+                };
+                let merged = Buffer.fromArray<Text>(existing);
+                for (candidate in fromIds.vals()) {
+                    if (Array.find<Text>(existing, func(id : Text) : Bool { id == candidate }) == null) {
+                        merged.add(candidate)
+                    }
+                };
+                index.put(toId, Buffer.toArray(merged))
+            };
+        }
+    };
+
+    private func timestampInEpoch(ts : Int, epoch : LegacyOwnershipEpoch) : Bool {
+        if (ts < epoch.from_timestamp) { return false };
+        switch (epoch.to_timestamp) {
+            case null true;
+            case (?until) ts <= until;
+        }
+    };
+
+    private func applyLegacyOwnershipEpoch(epoch : LegacyOwnershipEpoch) {
+        switch (profiles.get(epoch.current_profile_id)) {
+            case null {};
+            case (?profile) {
+                if (profile.owner != epoch.subject) { return };
+                // Never apply an epoch while the historical ID is active again.
+                if (profiles.get(epoch.legacy_profile_id) != null) { return };
+                historicalProfileOwners.put(epoch.legacy_profile_id, epoch.subject);
+                let migratedIds = Buffer.Buffer<Text>(0);
+                switch (profileActivityIndex.get(epoch.legacy_profile_id)) {
+                    case null {};
+                    case (?recordIds) {
+                        for (recordId in recordIds.vals()) {
+                            switch (activityRecordsMap.get(recordId)) {
+                                case null {};
+                                case (?record) {
+                                    if (
+                                        record.profile_id == epoch.legacy_profile_id and
+                                        timestampInEpoch(record.ingest_timestamp, epoch)
+                                    ) {
+                                        let safelyBound = switch (activityRecordSubjects.get(recordId)) {
+                                            case null {
+                                                activityRecordSubjects.put(recordId, epoch.subject);
+                                                true
+                                            };
+                                            case (?existing) {
+                                                existing == epoch.subject
+                                            };
+                                        };
+                                        if (safelyBound) {
+                                            migratedIds.add(recordId)
+                                        }
+                                    }
+                                };
+                            }
+                        }
+                    };
+                };
+                if (migratedIds.size() > 0) {
+                    let existing = switch (profileActivityIndex.get(epoch.current_profile_id)) {
+                        case (?ids) ids;
+                        case null [];
+                    };
+                    let merged = Buffer.fromArray<Text>(existing);
+                    for (recordId in migratedIds.vals()) {
+                        if (Array.find<Text>(existing, func(id : Text) : Bool { id == recordId }) == null) {
+                            merged.add(recordId)
+                        }
+                    };
+                    profileActivityIndex.put(epoch.current_profile_id, Buffer.toArray(merged));
+                    rebuildDerivedSummariesForProfile(epoch.current_profile_id, epoch.subject)
+                }
+            };
+        }
+    };
+
+    private func applyLegacyOwnershipEpochs() {
+        for (epoch in legacyOwnershipEpochs.vals()) {
+            applyLegacyOwnershipEpoch(epoch)
+        }
+    };
+
+    private func rebuildIntegrationProfileIndexes() {
+        // One-time upgrade repair for legacy state. Accumulate in mutable
+        // buffers and materialize once per profile to keep this O(N).
+        let connectionBuffers = TrieMap.TrieMap<Text, Buffer.Buffer<Text>>(Text.equal, Text.hash);
+        for ((_, connection) in connections.entries()) {
+            let buf = switch (connectionBuffers.get(connection.profile_id)) {
+                case (?existing) existing;
+                case null {
+                    let created = Buffer.Buffer<Text>(1);
+                    connectionBuffers.put(connection.profile_id, created);
+                    created
+                };
+            };
+            buf.add(connection.app_id)
+        };
+        for ((profileId, buf) in connectionBuffers.entries()) {
+            profileConnectionIndex.put(profileId, Buffer.toArray(buf))
+        };
+
+        let summaryBuffers = TrieMap.TrieMap<Text, Buffer.Buffer<Text>>(Text.equal, Text.hash);
+        for ((key, summary) in derivedSummaries.entries()) {
+            let buf = switch (summaryBuffers.get(summary.profile_id)) {
+                case (?existing) existing;
+                case null {
+                    let created = Buffer.Buffer<Text>(1);
+                    summaryBuffers.put(summary.profile_id, created);
+                    created
+                };
+            };
+            buf.add(key)
+        };
+        for ((profileId, buf) in summaryBuffers.entries()) {
+            profileSummaryIndex.put(profileId, Buffer.toArray(buf))
+        }
+    };
+
+    private func backfillLegacyConnectionOwnership() {
+        // For pre-upgrade state, only a connection created during the current
+        // Profile instance can be attributed safely. Reconnects after this
+        // release preserve the earliest epoch start instead of overwriting it.
+        for ((key, connection) in connections.entries()) {
+            if (connectionSubjects.get(key) == null) {
+                switch (profiles.get(connection.profile_id)) {
+                    case (?profile) {
+                        if (connection.created_at >= profile.createtime) {
+                            connectionSubjects.put(key, profile.owner);
+                            connectionEpochStarts.put(key, connection.created_at)
+                        }
+                    };
+                    case null {};
+                }
+            }
+        }
+    };
+
+    private func backfillLegacyActivitySubjects() {
+        // Precompute per-profile reuse once so upgrade work stays linear.
+        let reusedProfiles = TrieMap.TrieMap<Text, Bool>(Text.equal, Text.hash);
+        for ((profileId, recordIds) in profileActivityIndex.entries()) {
+            switch (profiles.get(profileId)) {
+                case null {};
+                case (?profile) {
+                    var reused = false;
+                    label scan for (recordId in recordIds.vals()) {
+                        switch (activityRecordsMap.get(recordId)) {
+                            case (?record) {
+                                if (record.ingest_timestamp < profile.createtime) {
+                                    reused := true;
+                                    break scan
+                                }
+                            };
+                            case null {};
+                        }
+                    };
+                    reusedProfiles.put(profileId, reused)
+                };
+            }
+        };
+        for ((_, connection) in connections.entries()) {
+            switch (profiles.get(connection.profile_id)) {
+                case (?profile) {
+                    if (connection.created_at < profile.createtime) {
+                        reusedProfiles.put(profile.id, true)
+                    }
+                };
+                case null {};
+            }
+        };
+
+        for ((recordId, record) in activityRecordsMap.entries()) {
+            if (activityRecordSubjects.get(recordId) == null) {
+                switch (profiles.get(record.profile_id)) {
+                    case null {};
+                    case (?profile) {
+                        let key = connectionKey(record.profile_id, record.app_id);
+                        switch (
+                            connectionSubjects.get(key),
+                            connectionEpochStarts.get(key)
+                        ) {
+                            case (?subject, ?epochStart) {
+                                if (subject == profile.owner) {
+                                    let reused = switch (reusedProfiles.get(profile.id)) {
+                                        case (?value) value;
+                                        case null false;
+                                    };
+                                    let belongsToCurrentInstance =
+                                        record.ingest_timestamp >= profile.createtime;
+                                    // For reused IDs, only the verified current-owner
+                                    // connection epoch is safe. Records before that
+                                    // boundary are irrecoverably ambiguous in legacy
+                                    // state and remain quarantined.
+                                    if (
+                                        belongsToCurrentInstance and
+                                        (not reused or record.ingest_timestamp >= epochStart)
+                                    ) {
+                                        activityRecordSubjects.put(recordId, profile.owner)
+                                    }
+                                }
+                            };
+                            case _ {};
+                        }
+                    };
+                }
+            }
+        }
+    };
 
     system func preupgrade() {
         stableProfiles := Iter.toArray(profiles.entries());
@@ -154,17 +431,36 @@ persistent actor {
         stableIntegrationApps := Iter.toArray(integrationApps.entries());
         stableActivityTypes := Iter.toArray(activityTypesMap.entries());
         stableConnections := Iter.toArray(connections.entries());
+        stableProfileConnectionIndex := Iter.toArray(profileConnectionIndex.entries());
+        stableConnectionSubjects := Iter.toArray(connectionSubjects.entries());
+        stableConnectionEpochStarts := Iter.toArray(connectionEpochStarts.entries());
         stableActivityRecords := Iter.toArray(activityRecordsMap.entries());
+        stableActivityRecordSubjects := Iter.toArray(activityRecordSubjects.entries());
         stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());
         stableProfileActivityIndex := Iter.toArray(profileActivityIndex.entries());
         stableDerivedSummaries := Iter.toArray(derivedSummaries.entries());
+        stableProfileSummaryIndex := Iter.toArray(profileSummaryIndex.entries());
         stableIdentityGraphs := Iter.toArray(identityGraphs.entries());
         stableContextPolicies := Iter.toArray(contextPolicies.entries());
         stableTrustEdges := Iter.toArray(trustEdges.entries());
-        stableOipProviders := Iter.toArray(oipProviders.entries())
+        stableOipProviders := Iter.toArray(oipProviders.entries());
+        stableProfileClaims := Iter.toArray(profileClaims.entries());
+        stableProfileClaimIndex := Iter.toArray(profileClaimIndex.entries());
+        stablePeerReviews := Iter.toArray(peerReviews.entries());
+        stableProfileReviewIndex := Iter.toArray(profileReviewIndex.entries());
+        stableHistoricalProfileOwners := Iter.toArray(historicalProfileOwners.entries());
+        stableLegacyOwnershipEpochs := Buffer.toArray(legacyOwnershipEpochs)
     };
 
     system func postupgrade() {
+        // Restore only provenance that can be proven. Explicit ownership
+        // epochs handle pre-upgrade renames, including profiles with no blocks.
+        // Rebuild integration indexes once so legacy state benefits from the
+        // bounded per-profile rename path immediately after upgrade.
+        rebuildIntegrationProfileIndexes();
+        applyLegacyOwnershipEpochs();
+        backfillLegacyConnectionOwnership();
+        backfillLegacyActivitySubjects();
         stableProfiles := [];
         stableBlocks := [];
         stableTraits := [];
@@ -177,14 +473,25 @@ persistent actor {
         stableIntegrationApps := [];
         stableActivityTypes := [];
         stableConnections := [];
+        stableProfileConnectionIndex := [];
+        stableConnectionSubjects := [];
+        stableConnectionEpochStarts := [];
         stableActivityRecords := [];
+        stableActivityRecordSubjects := [];
         stableIdempotencyKeys := [];
         stableProfileActivityIndex := [];
         stableDerivedSummaries := [];
+        stableProfileSummaryIndex := [];
         stableIdentityGraphs := [];
         stableContextPolicies := [];
         stableTrustEdges := [];
-        stableOipProviders := []
+        stableOipProviders := [];
+        stableProfileClaims := [];
+        stableProfileClaimIndex := [];
+        stablePeerReviews := [];
+        stableProfileReviewIndex := [];
+        stableHistoricalProfileOwners := [];
+        stableLegacyOwnershipEpochs := []
     };
     private func clamp01(v : Float) : Float {
         if (v < 0.0) { 0.0 } else if (v > 1.0) { 1.0 } else { v }
@@ -244,6 +551,45 @@ persistent actor {
         }
     };
 
+    public shared ({ caller }) func registerLegacyOwnershipEpoch(
+        legacyProfileId : Text,
+        currentProfileId : Text,
+        fromTimestamp : Int,
+        toTimestamp : ?Int
+    ) : async Result.Result<Nat, Text> {
+        if (not isAdmin(caller)) {
+            return #err("admin only")
+        };
+        if (legacyProfileId == currentProfileId) {
+            return #err("legacy and current profile ids must differ")
+        };
+        if (profiles.get(legacyProfileId) != null) {
+            return #err("legacy profile id is currently active")
+        };
+        let current = switch (profiles.get(currentProfileId)) {
+            case null { return #err("current profile not found") };
+            case (?profile) profile;
+        };
+        switch (toTimestamp) {
+            case (?until) {
+                if (until < fromTimestamp) {
+                    return #err("invalid ownership epoch")
+                }
+            };
+            case null {};
+        };
+        let epoch : LegacyOwnershipEpoch = {
+            legacy_profile_id = legacyProfileId;
+            current_profile_id = currentProfileId;
+            subject = current.owner;
+            from_timestamp = fromTimestamp;
+            to_timestamp = toTimestamp;
+        };
+        legacyOwnershipEpochs.add(epoch);
+        applyLegacyOwnershipEpoch(epoch);
+        #ok(1)
+    };
+
     public shared ({ caller }) func createProfile(newProfile : Types.NewProfile) : async Result.Result<Nat, Text> {
         if (Principal.isAnonymous(caller)) {
             #err("no authenticated")
@@ -260,6 +606,10 @@ persistent actor {
                             #err("the id is taken!")
                         };
                         case (_) {
+                            switch (historicalProfileOwners.get(newProfile.id)) {
+                                case (?_) { return #err("the id was previously used and is reserved") };
+                                case null {};
+                            };
 
                             if (Text.size(newProfile.id) < 4) {
                                 #err("profile id length must be greater than 3")
@@ -366,6 +716,276 @@ persistent actor {
         }
     };
 
+    private func migrateTextIndex(index : TrieMap.TrieMap<Text, [Text]>, oldId : Text, newId : Text) {
+        switch (index.get(oldId)) {
+            case null {};
+            case (?ids) {
+                index.put(newId, ids);
+                ignore index.remove(oldId);
+            };
+        }
+    };
+
+    private func appendUniqueTextIndex(index : TrieMap.TrieMap<Text, [Text]>, profileId : Text, value : Text) {
+        let existing = switch (index.get(profileId)) {
+            case (?values) values;
+            case null [];
+        };
+        if (Array.find<Text>(existing, func(candidate : Text) : Bool { candidate == value }) == null) {
+            let buf = Buffer.fromArray<Text>(existing);
+            buf.add(value);
+            index.put(profileId, Buffer.toArray(buf))
+        }
+    };
+
+    private func rebuildDerivedSummariesForProfile(profileId : Text, owner : Principal) {
+        let existingKeys = switch (profileSummaryIndex.get(profileId)) {
+            case (?values) values;
+            case null [];
+        };
+        for (key in existingKeys.vals()) {
+            ignore derivedSummaries.remove(key)
+        };
+        ignore profileSummaryIndex.remove(profileId);
+
+        let rebuilt = TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
+        let recordIds = switch (profileActivityIndex.get(profileId)) {
+            case (?ids) ids;
+            case null [];
+        };
+        for (recordId in recordIds.vals()) {
+            switch (activityRecordSubjects.get(recordId), activityRecordsMap.get(recordId)) {
+                case (?subject, ?record) {
+                    if (subject == owner) {
+                        let key = summaryKey(profileId, record.app_id, record.activity_type);
+                        let previous = rebuilt.get(key);
+                        let (count, total, currency, updatedAt) = switch (previous) {
+                            case null { (0, null, record.currency, record.ingest_timestamp) };
+                            case (?summary) {
+                                (
+                                    summary.record_count,
+                                    summary.total_amount,
+                                    summary.currency,
+                                    if (record.ingest_timestamp > summary.last_updated) {
+                                        record.ingest_timestamp
+                                    } else {
+                                        summary.last_updated
+                                    }
+                                )
+                            };
+                        };
+                        let nextTotal : ?Float = switch (record.amount) {
+                            case null total;
+                            case (?amount) {
+                                switch (total) {
+                                    case null ?amount;
+                                    case (?existing) ?(existing + amount);
+                                }
+                            };
+                        };
+                        rebuilt.put(key, {
+                            profile_id = profileId;
+                            app_id = record.app_id;
+                            activity_type = record.activity_type;
+                            record_count = count + 1;
+                            total_amount = nextTotal;
+                            currency = currency;
+                            last_updated = updatedAt;
+                        })
+                    }
+                };
+                case _ {};
+            }
+        };
+        let keys = Buffer.Buffer<Text>(0);
+        for ((key, summary) in rebuilt.entries()) {
+            derivedSummaries.put(key, summary);
+            keys.add(key)
+        };
+        if (keys.size() > 0) {
+            profileSummaryIndex.put(profileId, Buffer.toArray(keys))
+        }
+    };
+
+    private func migrateDerivedSummaries(oldId : Text, newId : Text, owner : Principal) {
+        // Legacy aggregates may span multiple ownership epochs after ID reuse.
+        // Rebuild summaries exclusively from records immutably bound to owner.
+        let oldKeys = switch (profileSummaryIndex.get(oldId)) {
+            case (?values) values;
+            case null [];
+        };
+        for (oldKey in oldKeys.vals()) {
+            ignore derivedSummaries.remove(oldKey)
+        };
+        ignore profileSummaryIndex.remove(oldId);
+
+        let rebuilt = TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
+        let recordIds = switch (profileActivityIndex.get(oldId)) {
+            case (?ids) ids;
+            case null [];
+        };
+        for (recordId in recordIds.vals()) {
+            switch (activityRecordSubjects.get(recordId), activityRecordsMap.get(recordId)) {
+                case (?subject, ?record) {
+                    if (subject == owner) {
+                        let key = summaryKey(newId, record.app_id, record.activity_type);
+                        let previous = rebuilt.get(key);
+                        let (count, total, currency, updatedAt) = switch (previous) {
+                            case null {
+                                (0, null, record.currency, record.ingest_timestamp)
+                            };
+                            case (?summary) {
+                                (
+                                    summary.record_count,
+                                    summary.total_amount,
+                                    summary.currency,
+                                    if (record.ingest_timestamp > summary.last_updated) {
+                                        record.ingest_timestamp
+                                    } else {
+                                        summary.last_updated
+                                    }
+                                )
+                            };
+                        };
+                        let nextTotal : ?Float = switch (record.amount) {
+                            case null total;
+                            case (?amount) {
+                                switch (total) {
+                                    case null ?amount;
+                                    case (?existing) ?(existing + amount);
+                                }
+                            };
+                        };
+                        rebuilt.put(key, {
+                            profile_id = newId;
+                            app_id = record.app_id;
+                            activity_type = record.activity_type;
+                            record_count = count + 1;
+                            total_amount = nextTotal;
+                            currency = currency;
+                            last_updated = updatedAt;
+                        })
+                    }
+                };
+                case _ {};
+            }
+        };
+
+        let newKeys = Buffer.Buffer<Text>(0);
+        for ((key, summary) in rebuilt.entries()) {
+            derivedSummaries.put(key, summary);
+            newKeys.add(key)
+        };
+        if (newKeys.size() > 0) {
+            profileSummaryIndex.put(newId, Buffer.toArray(newKeys))
+        } else {
+            ignore profileSummaryIndex.remove(newId)
+        }
+    };
+
+    private func migrateConnections(oldId : Text, newId : Text) {
+        let appIds = switch (profileConnectionIndex.get(oldId)) {
+            case (?values) values;
+            case null [];
+        };
+        for (appId in appIds.vals()) {
+            let oldKey = connectionKey(oldId, appId);
+            switch (connections.get(oldKey)) {
+                case null {};
+                case (?conn) {
+                    let newKey = connectionKey(newId, appId);
+                    connections.put(newKey, {
+                        profile_id = newId;
+                        app_id = conn.app_id;
+                        external_user_id = conn.external_user_id;
+                        scopes = conn.scopes;
+                        status = conn.status;
+                        created_at = conn.created_at;
+                        revoked_at = conn.revoked_at;
+                    });
+                    switch (connectionSubjects.get(oldKey)) {
+                        case (?subject) {
+                            connectionSubjects.put(newKey, subject);
+                            ignore connectionSubjects.remove(oldKey);
+                        };
+                        case null {};
+                    };
+                    switch (connectionEpochStarts.get(oldKey)) {
+                        case (?startedAt) {
+                            connectionEpochStarts.put(newKey, startedAt);
+                            ignore connectionEpochStarts.remove(oldKey);
+                        };
+                        case null {};
+                    };
+                    ignore connections.remove(oldKey);
+                };
+            }
+        };
+        if (appIds.size() > 0) {
+            profileConnectionIndex.put(newId, appIds)
+        };
+        ignore profileConnectionIndex.remove(oldId)
+    };
+
+    private func migrateGraphLocators(oldId : Text, newId : Text) {
+        switch (profileClaimIndex.get(oldId)) {
+            case null {};
+            case (?ids) {
+                for (id in ids.vals()) {
+                    switch (profileClaims.get(id)) {
+                        case null {};
+                        case (?claim) {
+                            profileClaims.put(id, {
+                                id = claim.id;
+                                profile_id = newId;
+                                subject = claim.subject;
+                                predicate = claim.predicate;
+                                value = claim.value;
+                                capability = claim.capability;
+                                context = claim.context;
+                                provenance = claim.provenance;
+                                valid_from = claim.valid_from;
+                                valid_until = claim.valid_until;
+                                visibility = claim.visibility;
+                                created_at = claim.created_at;
+                            })
+                        };
+                    }
+                }
+            };
+        };
+        switch (profileReviewIndex.get(oldId)) {
+            case null {};
+            case (?ids) {
+                for (id in ids.vals()) {
+                    switch (peerReviews.get(id)) {
+                        case null {};
+                        case (?review) {
+                            peerReviews.put(id, {
+                                id = review.id;
+                                profile_id = newId;
+                                subject = review.subject;
+                                reviewer = review.reviewer;
+                                relationship = review.relationship;
+                                capability = review.capability;
+                                context = review.context;
+                                assessment_tags = review.assessment_tags;
+                                narrative = review.narrative;
+                                evidence = review.evidence;
+                                related_claims = review.related_claims;
+                                status = review.status;
+                                response = review.response;
+                                visibility = review.visibility;
+                                created_at = review.created_at;
+                                updated_at = review.updated_at;
+                            })
+                        };
+                    }
+                }
+            };
+        }
+    };
+
     public shared ({ caller }) func changeId(oid : Text, nid : Text) : async Result.Result<Nat, Text> {
         if (Principal.isAnonymous(caller)) {
             #err("no authenticated")
@@ -381,6 +1001,20 @@ persistent actor {
                                 #err("this id has been taken")
                             };
                             case (_) {
+                                switch (historicalProfileOwners.get(nid)) {
+                                    case (?_) { return #err("this id was previously used and is reserved") };
+                                    case null {};
+                                };
+                                historicalProfileOwners.put(oid, p.owner);
+                                // Keep ambiguous legacy activity records unbound.
+                                // Only pre-established immutable subject bindings move
+                                // safely with the profile's activity index.
+                                migrateConnections(oid, nid);
+                                migrateDerivedSummaries(oid, nid, p.owner);
+                                migrateGraphLocators(oid, nid);
+                                migrateTextIndex(profileActivityIndex, oid, nid);
+                                migrateTextIndex(profileClaimIndex, oid, nid);
+                                migrateTextIndex(profileReviewIndex, oid, nid);
                                 profiles.put(
                                     nid,
                                     {
@@ -882,6 +1516,843 @@ persistent actor {
         };
     };
 
+    //----------------------------- Profile Provenance Graph ------------------------------------
+
+    private func generateProfileClaimId() : Text {
+        profileClaimCounter += 1;
+        "claim_" # Nat.toText(profileClaimCounter)
+    };
+
+    private func generatePeerReviewId() : Text {
+        peerReviewCounter += 1;
+        "review_" # Nat.toText(peerReviewCounter)
+    };
+
+    private func graphVisibility(v : Types.Visibility) : ProfileGraph.Visibility {
+        switch (v) {
+            case (#global) #global;
+            case (#unlisted) #unlisted;
+            case (#personal) #personal;
+        }
+    };
+
+    private func canReadGraphItem(caller : Principal, owner : Principal, visibility : ProfileGraph.Visibility) : Bool {
+        if (caller == owner) {
+            return true
+        };
+        switch (visibility) {
+            case (#global) true;
+            case (#unlisted) false;
+            case (#personal) false;
+        }
+    };
+
+    private func appendClaimIndex(profileId : Text, claimId : Text) {
+        let current = switch (profileClaimIndex.get(profileId)) {
+            case (?ids) ids;
+            case null [];
+        };
+        let buf = Buffer.fromArray<Text>(current);
+        buf.add(claimId);
+        profileClaimIndex.put(profileId, Buffer.toArray(buf))
+    };
+
+    private func appendReviewIndex(profileId : Text, reviewId : Text) {
+        let current = switch (profileReviewIndex.get(profileId)) {
+            case (?ids) ids;
+            case null [];
+        };
+        let buf = Buffer.fromArray<Text>(current);
+        buf.add(reviewId);
+        profileReviewIndex.put(profileId, Buffer.toArray(buf))
+    };
+
+    private func textBytes(value : Text) : Nat {
+        Blob.toArray(Text.encodeUtf8(value)).size()
+    };
+
+    private func optionalTextBytes(value : ?Text) : Nat {
+        switch (value) {
+            case (?text) textBytes(text);
+            case null 0;
+        }
+    };
+
+    private func claimValueBytes(value : ProfileGraph.ClaimValue) : Nat {
+        switch (value) {
+            case (#text(text)) textBytes(text);
+            case (#reference(text)) textBytes(text);
+            case (#number(_)) 16;
+            case (#boolean(_)) 1;
+        }
+    };
+
+    private func evidenceBytes(evidence : ProfileGraph.EvidenceRef) : Nat {
+        textBytes(evidence.schema)
+        + optionalTextBytes(evidence.uri)
+        + optionalTextBytes(evidence.hash)
+        + optionalTextBytes(evidence.external_id)
+    };
+
+    private func profileClaimApproxBytes(claim : ProfileClaim) : Nat {
+        var total =
+            textBytes(claim.id)
+            + textBytes(claim.profile_id)
+            + textBytes(claim.predicate)
+            + claimValueBytes(claim.value)
+            + textBytes(claim.provenance.issuer_id)
+            + 256;
+        switch (claim.context) {
+            case (?value) { total += textBytes(value) };
+            case null {};
+        };
+        switch (claim.capability) {
+            case (?capability) {
+                total += textBytes(capability.path);
+                total += optionalTextBytes(capability.display_label)
+            };
+            case null {};
+        };
+        for (evidence in claim.provenance.evidence.vals()) {
+            total += evidenceBytes(evidence)
+        };
+        total
+    };
+
+    private func addClaimWithinBudget(
+        buf : Buffer.Buffer<ProfileClaim>,
+        usedBytes : Nat,
+        claim : ProfileClaim
+    ) : (Nat, Bool) {
+        if (buf.size() >= 200) {
+            return (usedBytes, false)
+        };
+        let claimBytes = profileClaimApproxBytes(claim);
+        if (usedBytes + claimBytes > 1_500_000) {
+            return (usedBytes, false)
+        };
+        buf.add(claim);
+        (usedBytes + claimBytes, true)
+    };
+
+    public shared ({ caller }) func createSelfClaim(input : NewSelfClaim) : async Result.Result<Text, Text> {
+        if (Principal.isAnonymous(caller)) {
+            return #err("not authenticated")
+        };
+        if (Text.size(input.predicate) == 0) {
+            return #err("predicate is required")
+        };
+        if (textBytes(input.predicate) > 256) {
+            return #err("predicate is too long")
+        };
+        var selfClaimBytes : Nat = textBytes(input.predicate) + claimValueBytes(input.value);
+        switch (input.context) {
+            case (?value) { selfClaimBytes += textBytes(value) };
+            case null {};
+        };
+        switch (input.capability) {
+            case (?capability) {
+                selfClaimBytes += textBytes(capability.path);
+                selfClaimBytes += optionalTextBytes(capability.display_label)
+            };
+            case null {};
+        };
+        if (input.evidence.size() > 16) {
+            return #err("too many evidence references")
+        };
+        for (evidence in input.evidence.vals()) {
+            selfClaimBytes += evidenceBytes(evidence)
+        };
+        if (selfClaimBytes > 16_384) {
+            return #err("claim payload is too large")
+        };
+        let profile = switch (profiles.get(input.profile_id)) {
+            case null { return #err("profile not found") };
+            case (?p) p;
+        };
+        if (profile.owner != caller) {
+            return #err("not authorized")
+        };
+        let now = Time.now();
+        let id = generateProfileClaimId();
+        let claim : ProfileClaim = {
+            id = id;
+            profile_id = input.profile_id;
+            subject = profile.owner;
+            predicate = input.predicate;
+            value = input.value;
+            capability = input.capability;
+            context = input.context;
+            provenance = {
+                source_kind = #self_declared;
+                issuer = ?caller;
+                issuer_id = Principal.toText(caller);
+                verification = #none;
+                evidence = input.evidence;
+                observed_at = ?now;
+                recorded_at = now;
+            };
+            valid_from = input.valid_from;
+            valid_until = input.valid_until;
+            visibility = input.visibility;
+            created_at = now;
+        };
+        profileClaims.put(id, claim);
+        appendClaimIndex(input.profile_id, id);
+        #ok(id)
+    };
+
+    private func legacyClaimId(profile : Profile, suffix : Text) : Text {
+        "legacy:profile:" # Principal.toText(profile.owner) # ":" # suffix
+    };
+
+    private func projectedVersionDigest(value : Text) : Text {
+        // Keep projected IDs fixed-size while still versioning mutable content.
+        // Two independently salted Text.hash values plus length make accidental
+        // collisions materially less likely than a single 32-bit hash.
+        Nat.toText(Text.size(value))
+        # "-"
+        # Nat.toText(Nat32.toNat(Text.hash("oneblock:a:" # value)))
+        # "-"
+        # Nat.toText(Nat32.toNat(Text.hash("oneblock:b:" # value)))
+    };
+
+    private func legacyTextClaimId(profile : Profile, field : Text, value : Text) : Text {
+        legacyClaimId(profile, field # ":" # projectedVersionDigest(value))
+    };
+
+    private func legacyLinkClaimId(profile : Profile, link : Types.Link) : Text {
+        let versioned = link.name # "\u{1f}" # link.url;
+        legacyClaimId(profile, "link:" # projectedVersionDigest(versioned))
+    };
+
+    private func findProfileByOwner(owner : Principal) : ?Profile {
+        switch (userprofiles.get(owner)) {
+            case null null;
+            case (?profileId) profiles.get(profileId);
+        }
+    };
+
+    private func resolveClaim(claimId : Text) : ?ProfileClaim {
+        switch (profileClaims.get(claimId)) {
+            case (?claim) {
+                switch (findProfileByOwner(claim.subject)) {
+                    case (?currentProfile) {
+                        return ?{
+                            id = claim.id;
+                            profile_id = currentProfile.id;
+                            subject = claim.subject;
+                            predicate = claim.predicate;
+                            value = claim.value;
+                            capability = claim.capability;
+                            context = claim.context;
+                            provenance = claim.provenance;
+                            valid_from = claim.valid_from;
+                            valid_until = claim.valid_until;
+                            visibility = claim.visibility;
+                            created_at = claim.created_at;
+                        }
+                    };
+                    case null { return ?claim };
+                }
+            };
+            case null {};
+        };
+
+        // External projected IDs encode the ActivityRecord key, so resolve
+        // them directly before touching legacy profile projections.
+        switch (Text.stripStart(claimId, #text "external:activity:")) {
+            case (?recordId) {
+                switch (activityRecordsMap.get(recordId)) {
+                    case (?record) { return activityClaim(record) };
+                    case null { return null };
+                }
+            };
+            case null {};
+        };
+
+        // Legacy projections use owner-stable IDs so profile renames do not
+        // change identity or transfer authorization to a future ID holder.
+        for ((_, profile) in profiles.entries()) {
+            if (claimId == legacyTextClaimId(profile, "name", profile.name)) {
+                return ?legacyProfileClaim(profile, claimId, "profile.name", #text(profile.name))
+            };
+            if (Text.size(profile.bio) > 0 and claimId == legacyTextClaimId(profile, "bio", profile.bio)) {
+                return ?legacyProfileClaim(profile, claimId, "profile.bio", #text(profile.bio))
+            };
+            for (link in profile.links.vals()) {
+                let candidateId = legacyLinkClaimId(profile, link);
+                if (claimId == candidateId) {
+                    return ?legacyProfileClaim(profile, candidateId, "profile.link." # link.name, #reference(link.url))
+                }
+            }
+        };
+
+        null
+    };
+
+    public query ({ caller }) func getProfileClaim(claimId : Text) : async ?ProfileClaim {
+        switch (resolveClaim(claimId)) {
+            case null null;
+            case (?claim) {
+                if (caller == claim.subject or canReadGraphItem(caller, claim.subject, claim.visibility)) {
+                    ?claim
+                } else {
+                    null
+                }
+            };
+        }
+    };
+
+    private func legacyProfileClaim(
+        profile : Profile,
+        id : Text,
+        predicate : Text,
+        value : ProfileGraph.ClaimValue
+    ) : ProfileClaim {
+        {
+            id = id;
+            profile_id = profile.id;
+            subject = profile.owner;
+            predicate = predicate;
+            value = value;
+            capability = null;
+            context = ?"legacy-profile";
+            provenance = {
+                source_kind = #self_declared;
+                issuer = ?profile.owner;
+                issuer_id = Principal.toText(profile.owner);
+                verification = #none;
+                evidence = [];
+                observed_at = ?profile.last_updated;
+                recorded_at = profile.last_updated;
+            };
+            valid_from = ?profile.createtime;
+            valid_until = null;
+            visibility = graphVisibility(profile.visibility);
+            created_at = profile.createtime;
+        }
+    };
+
+    private func activityClaim(record : ActivityRecord) : ?ProfileClaim {
+        // Never infer an external record's subject from a mutable/reusable
+        // profile ID. Pre-upgrade records without an immutable binding are
+        // omitted rather than risk attributing evidence to the wrong person.
+        let subject = switch (activityRecordSubjects.get(record.id)) {
+            case null { return null };
+            case (?owner) owner;
+        };
+        let profile = switch (findProfileByOwner(subject)) {
+            case null { return null };
+            case (?p) p;
+        };
+        let issuer = switch (integrationApps.get(record.app_id)) {
+            case (?app) ?app.owner;
+            case null null;
+        };
+        let schema = record.app_id # "." # record.activity_type # ".v" # Nat.toText(record.schema_version);
+        ?{
+            id = "external:activity:" # record.id;
+            profile_id = profile.id;
+            subject = subject;
+            predicate = record.activity_type;
+            value = #reference("oneblock://activity/" # record.id);
+            capability = null;
+            context = ?record.app_id;
+            provenance = {
+                source_kind = #external;
+                issuer = issuer;
+                issuer_id = record.app_id;
+                verification = externalVerification(record);
+                evidence = [{
+                    schema = schema;
+                    uri = ?("oneblock://activity/" # record.id);
+                    hash = ?record.hash;
+                    external_id = ?record.idempotency_key;
+                }];
+                observed_at = ?record.event_timestamp;
+                recorded_at = record.ingest_timestamp;
+            };
+            valid_from = ?record.event_timestamp;
+            valid_until = null;
+            visibility = graphVisibility(record.visibility);
+            created_at = record.ingest_timestamp;
+        }
+    };
+
+    private func buildProfileClaimPage(
+        caller : Principal,
+        profileId : Text,
+        cursor : Nat,
+        requestedPageSize : Nat
+    ) : ProfileClaimPage {
+        let profile = switch (profiles.get(profileId)) {
+            case null { return { items = []; next_cursor = null } };
+            case (?p) p;
+        };
+        let pageSize = if (requestedPageSize == 0) 1 else if (requestedPageSize > 50) 50 else requestedPageSize;
+        let profileVisibility = graphVisibility(profile.visibility);
+        let legacyVisible = canReadGraphItem(caller, profile.owner, profileVisibility);
+        let bioCount : Nat = if (Text.size(profile.bio) > 0) 1 else 0;
+        let legacyCount : Nat = 1 + bioCount + profile.links.size();
+        let claimIds = switch (profileClaimIndex.get(profileId)) { case (?ids) ids; case null [] };
+        let activityIds = switch (profileActivityIndex.get(profileId)) { case (?ids) ids; case null [] };
+        let total = legacyCount + claimIds.size() + activityIds.size();
+        let buf = Buffer.Buffer<ProfileClaim>(pageSize);
+        var usedBytes : Nat = 0;
+        var pos = if (cursor > total) total else cursor;
+        var scanned : Nat = 0;
+        let maxScan : Nat = pageSize * 4 + 32;
+
+        label scan while (pos < total and buf.size() < pageSize and usedBytes < 1_500_000 and scanned < maxScan) {
+            let current = pos;
+            pos += 1;
+            scanned += 1;
+            var candidate : ?ProfileClaim = null;
+            if (current < legacyCount) {
+                if (legacyVisible) {
+                    if (current == 0) {
+                        candidate := ?legacyProfileClaim(profile, legacyTextClaimId(profile, "name", profile.name), "profile.name", #text(profile.name))
+                    } else if (bioCount == 1 and current == 1) {
+                        candidate := ?legacyProfileClaim(profile, legacyTextClaimId(profile, "bio", profile.bio), "profile.bio", #text(profile.bio))
+                    } else {
+                        let linkOffset = current - 1 - bioCount;
+                        if (linkOffset < profile.links.size()) {
+                            let link = profile.links[linkOffset];
+                            candidate := ?legacyProfileClaim(profile, legacyLinkClaimId(profile, link), "profile.link." # link.name, #reference(link.url))
+                        }
+                    }
+                }
+            } else if (current < legacyCount + claimIds.size()) {
+                let claimId = claimIds[current - legacyCount];
+                switch (profileClaims.get(claimId)) {
+                    case (?claim) {
+                        if (claim.subject == profile.owner and canReadGraphItem(caller, claim.subject, claim.visibility)) {
+                            candidate := ?claim
+                        }
+                    };
+                    case null {};
+                }
+            } else {
+                let recordId = activityIds[current - legacyCount - claimIds.size()];
+                switch (activityRecordsMap.get(recordId)) {
+                    case (?record) {
+                        switch (activityClaim(record)) {
+                            case (?claim) {
+                                if (claim.subject == profile.owner and canReadGraphItem(caller, claim.subject, claim.visibility)) {
+                                    candidate := ?claim
+                                }
+                            };
+                            case null {};
+                        }
+                    };
+                    case null {};
+                }
+            };
+            switch (candidate) {
+                case (?claim) {
+                    let bytes = profileClaimApproxBytes(claim);
+                    if (usedBytes + bytes <= 1_500_000) {
+                        buf.add(claim);
+                        usedBytes += bytes
+                    } else {
+                        // Cursor already advanced past this oversized page item;
+                        // individual claims remain directly retrievable by ID.
+                    }
+                };
+                case null {};
+            }
+        };
+        { items = Buffer.toArray(buf); next_cursor = if (pos < total) ?pos else null }
+    };
+
+    public query ({ caller }) func listProfileClaimsPage(
+        profileId : Text,
+        cursor : Nat,
+        pageSize : Nat
+    ) : async ProfileClaimPage {
+        buildProfileClaimPage(caller, profileId, cursor, pageSize)
+    };
+
+    public query ({ caller }) func listProfileClaims(profileId : Text) : async [ProfileClaim] {
+        buildProfileClaimPage(caller, profileId, 0, 50).items
+    };
+
+    public shared ({ caller }) func createPeerReview(input : NewPeerReview) : async Result.Result<Text, Text> {
+        if (Principal.isAnonymous(caller)) {
+            return #err("not authenticated")
+        };
+        if (Text.size(input.context) == 0) {
+            return #err("review context is required")
+        };
+        if (textBytes(input.context) > 512) {
+            return #err("review context is too long")
+        };
+        switch (input.narrative) {
+            case (?value) {
+                if (textBytes(value) > 4000) {
+                    return #err("review narrative is too long")
+                }
+            };
+            case null {};
+        };
+        if (input.assessment_tags.size() > 16) {
+            return #err("too many assessment tags")
+        };
+        if (input.evidence.size() > 16) {
+            return #err("too many evidence references")
+        };
+        if (input.related_claims.size() > 32) {
+            return #err("too many related claims")
+        };
+
+        var reviewTextBudget : Nat = textBytes(input.context);
+        switch (input.narrative) {
+            case (?value) { reviewTextBudget += textBytes(value) };
+            case null {};
+        };
+        switch (input.capability) {
+            case (?capability) {
+                if (textBytes(capability.path) > 256) {
+                    return #err("capability path is too long")
+                };
+                reviewTextBudget += textBytes(capability.path);
+                switch (capability.display_label) {
+                    case (?displayLabel) {
+                        if (textBytes(displayLabel) > 256) {
+                            return #err("capability label is too long")
+                        };
+                        reviewTextBudget += textBytes(displayLabel)
+                    };
+                    case null {};
+                }
+            };
+            case null {};
+        };
+        switch (input.relationship) {
+            case (#other(value)) {
+                if (textBytes(value) > 128) {
+                    return #err("review relationship is too long")
+                };
+                reviewTextBudget += textBytes(value)
+            };
+            case _ {};
+        };
+        for (tag in input.assessment_tags.vals()) {
+            if (textBytes(tag) > 128) {
+                return #err("assessment tag is too long")
+            };
+            reviewTextBudget += textBytes(tag)
+        };
+        for (claimId in input.related_claims.vals()) {
+            if (textBytes(claimId) > 256) {
+                return #err("related claim id is too long")
+            };
+            reviewTextBudget += textBytes(claimId)
+        };
+        for (evidence in input.evidence.vals()) {
+            if (textBytes(evidence.schema) > 256) {
+                return #err("evidence schema is too long")
+            };
+            reviewTextBudget += textBytes(evidence.schema);
+            switch (evidence.uri) {
+                case (?value) {
+                    if (textBytes(value) > 1024) {
+                        return #err("evidence uri is too long")
+                    };
+                    reviewTextBudget += textBytes(value)
+                };
+                case null {};
+            };
+            switch (evidence.hash) {
+                case (?value) {
+                    if (textBytes(value) > 256) {
+                        return #err("evidence hash is too long")
+                    };
+                    reviewTextBudget += textBytes(value)
+                };
+                case null {};
+            };
+            switch (evidence.external_id) {
+                case (?value) {
+                    if (textBytes(value) > 256) {
+                        return #err("evidence external id is too long")
+                    };
+                    reviewTextBudget += textBytes(value)
+                };
+                case null {};
+            }
+        };
+        if (reviewTextBudget > 4096) {
+            return #err("review payload is too large")
+        };
+        let profile = switch (profiles.get(input.profile_id)) {
+            case null { return #err("profile not found") };
+            case (?p) p;
+        };
+        if (profile.owner == caller) {
+            return #err("self review is not allowed; use a self-declared claim")
+        };
+
+        // Bound victim-controlled review indexes against spam. The total
+        // subject cap keeps listPeerReviews work bounded; the per-reviewer cap
+        // prevents one principal from consuming the entire allowance.
+        let existingReviewIds = switch (profileReviewIndex.get(input.profile_id)) {
+            case (?ids) ids;
+            case null [];
+        };
+        var reviewerReviewCount : Nat = 0;
+        label reviewCount for (existingId in existingReviewIds.vals()) {
+            switch (peerReviews.get(existingId)) {
+                case (?existingReview) {
+                    if (existingReview.reviewer == caller and existingReview.status != #withdrawn) {
+                        reviewerReviewCount += 1;
+                        if (reviewerReviewCount >= 20) {
+                            return #err("review limit reached for this reviewer and profile")
+                        }
+                    }
+                };
+                case null {};
+            }
+        };
+        // Related references may point to native or projected claims, but the
+        // immutable subject must match the reviewed person. Projected claims
+        // are snapshotted once accepted so later profile edits cannot leave
+        // the review with a dangling historical reference.
+        let projectedSnapshots = Buffer.Buffer<ProfileClaim>(input.related_claims.size());
+        for (claimId in input.related_claims.vals()) {
+            switch (resolveClaim(claimId)) {
+                case null { return #err("related claim unavailable") };
+                case (?claim) {
+                    // Do not reveal whether an unreadable claim exists or who
+                    // owns it. All invalid/unreadable references fail alike.
+                    if (
+                        not canReadGraphItem(caller, claim.subject, claim.visibility) or
+                        claim.subject != profile.owner
+                    ) {
+                        return #err("related claim unavailable")
+                    };
+                    if (profileClaims.get(claimId) == null) {
+                        projectedSnapshots.add(claim)
+                    }
+                };
+            }
+        };
+        for (snapshot in projectedSnapshots.vals()) {
+            profileClaims.put(snapshot.id, snapshot)
+        };
+        let now = Time.now();
+        let id = generatePeerReviewId();
+        let review : PeerReview = {
+            id = id;
+            profile_id = input.profile_id;
+            subject = profile.owner;
+            reviewer = caller;
+            relationship = input.relationship;
+            capability = input.capability;
+            context = input.context;
+            assessment_tags = input.assessment_tags;
+            narrative = input.narrative;
+            evidence = input.evidence;
+            related_claims = input.related_claims;
+            status = #active;
+            response = null;
+            visibility = input.visibility;
+            created_at = now;
+            updated_at = now;
+        };
+        peerReviews.put(id, review);
+        appendReviewIndex(input.profile_id, id);
+        #ok(id)
+    };
+
+    public query ({ caller }) func getPeerReview(reviewId : Text) : async ?PeerReview {
+        switch (peerReviews.get(reviewId)) {
+            case null null;
+            case (?review) {
+                if (
+                    caller == review.reviewer or
+                    canReadGraphItem(caller, review.subject, review.visibility)
+                ) { ?review } else { null }
+            };
+        }
+    };
+
+    private func buildPeerReviewPage(
+        caller : Principal,
+        profileId : Text,
+        cursor : Nat,
+        requestedPageSize : Nat
+    ) : PeerReviewPage {
+        let profile = switch (profiles.get(profileId)) {
+            case null { return { items = []; next_cursor = null } };
+            case (?p) p;
+        };
+        let ids = switch (profileReviewIndex.get(profileId)) { case (?value) value; case null [] };
+        let pageSize = if (requestedPageSize == 0) 1 else if (requestedPageSize > 50) 50 else requestedPageSize;
+        let buf = Buffer.Buffer<PeerReview>(pageSize);
+        var pos = if (cursor > ids.size()) ids.size() else cursor;
+        var scanned : Nat = 0;
+        let maxScan : Nat = pageSize * 4 + 32;
+        label scan while (pos < ids.size() and buf.size() < pageSize and scanned < maxScan) {
+            let id = ids[pos];
+            pos += 1;
+            scanned += 1;
+            switch (peerReviews.get(id)) {
+                case (?review) {
+                    if (
+                        review.subject == profile.owner and
+                        (
+                            caller == review.reviewer or
+                            canReadGraphItem(caller, review.subject, review.visibility)
+                        )
+                    ) {
+                        buf.add(review)
+                    }
+                };
+                case null {};
+            }
+        };
+        { items = Buffer.toArray(buf); next_cursor = if (pos < ids.size()) ?pos else null }
+    };
+
+    public query ({ caller }) func listPeerReviewsPage(
+        profileId : Text,
+        cursor : Nat,
+        pageSize : Nat
+    ) : async PeerReviewPage {
+        buildPeerReviewPage(caller, profileId, cursor, pageSize)
+    };
+
+    public query ({ caller }) func listPeerReviews(profileId : Text) : async [PeerReview] {
+        buildPeerReviewPage(caller, profileId, 0, 50).items
+    };
+
+    public shared ({ caller }) func respondToPeerReview(reviewId : Text, response : Text) : async Result.Result<Nat, Text> {
+        if (textBytes(response) > 1024) {
+            return #err("review response is too long")
+        };
+        let review = switch (peerReviews.get(reviewId)) {
+            case null { return #err("review unavailable") };
+            case (?r) r;
+        };
+        if (review.subject != caller) {
+            return #err("review unavailable")
+        };
+        peerReviews.put(reviewId, {
+            id = review.id;
+            profile_id = review.profile_id;
+            subject = review.subject;
+            reviewer = review.reviewer;
+            relationship = review.relationship;
+            capability = review.capability;
+            context = review.context;
+            assessment_tags = review.assessment_tags;
+            narrative = review.narrative;
+            evidence = review.evidence;
+            related_claims = review.related_claims;
+            status = review.status;
+            response = ?response;
+            visibility = review.visibility;
+            created_at = review.created_at;
+            updated_at = Time.now();
+        });
+        #ok(1)
+    };
+
+    public shared ({ caller }) func disputePeerReview(reviewId : Text, response : ?Text) : async Result.Result<Nat, Text> {
+        switch (response) {
+            case (?value) {
+                if (textBytes(value) > 1024) {
+                    return #err("review response is too long")
+                }
+            };
+            case null {};
+        };
+        let review = switch (peerReviews.get(reviewId)) {
+            case null { return #err("review unavailable") };
+            case (?r) r;
+        };
+        if (review.subject != caller) {
+            return #err("review unavailable")
+        };
+        switch (review.status) {
+            case (#withdrawn) { return #err("withdrawn reviews cannot be disputed") };
+            case (_) {};
+        };
+        peerReviews.put(reviewId, {
+            id = review.id;
+            profile_id = review.profile_id;
+            subject = review.subject;
+            reviewer = review.reviewer;
+            relationship = review.relationship;
+            capability = review.capability;
+            context = review.context;
+            assessment_tags = review.assessment_tags;
+            narrative = review.narrative;
+            evidence = review.evidence;
+            related_claims = review.related_claims;
+            status = #disputed;
+            response = response;
+            visibility = review.visibility;
+            created_at = review.created_at;
+            updated_at = Time.now();
+        });
+        #ok(1)
+    };
+
+    private func removeReviewIndex(profileId : Text, reviewId : Text) {
+        switch (profileReviewIndex.get(profileId)) {
+            case null {};
+            case (?ids) {
+                let kept = Array.filter<Text>(ids, func(id : Text) : Bool { id != reviewId });
+                if (kept.size() == 0) {
+                    ignore profileReviewIndex.remove(profileId)
+                } else {
+                    profileReviewIndex.put(profileId, kept)
+                }
+            };
+        }
+    };
+
+    public shared ({ caller }) func withdrawPeerReview(reviewId : Text) : async Result.Result<Nat, Text> {
+        let review = switch (peerReviews.get(reviewId)) {
+            case null { return #err("review unavailable") };
+            case (?r) r;
+        };
+        if (review.reviewer != caller) {
+            return #err("review unavailable")
+        };
+        peerReviews.put(reviewId, {
+            id = review.id;
+            profile_id = review.profile_id;
+            subject = review.subject;
+            reviewer = review.reviewer;
+            relationship = review.relationship;
+            capability = review.capability;
+            context = review.context;
+            assessment_tags = review.assessment_tags;
+            narrative = review.narrative;
+            evidence = review.evidence;
+            related_claims = review.related_claims;
+            status = #withdrawn;
+            response = review.response;
+            visibility = review.visibility;
+            created_at = review.created_at;
+            updated_at = Time.now();
+        });
+        removeReviewIndex(review.profile_id, reviewId);
+        #ok(1)
+    };
+
+    private func externalVerification(record : ActivityRecord) : ProfileGraph.VerificationMethod {
+        // ActivityRecord.signature_status is currently supplied by the
+        // integration and is not cryptographically verified by this canister.
+        // Until policy-specific signature validation exists, external records
+        // must not be represented as #signed.
+        #imported
+    };
+
     //----------------------------- Integration System ------------------------------------
 
     private func generateActivityRecordId() : Text {
@@ -980,16 +2451,33 @@ persistent actor {
                             return #err("app is not active")
                         };
                         let key = connectionKey(profileId, appId);
+                        let now = Time.now();
+                        let epochStart = switch (connectionSubjects.get(key)) {
+                            case (?subject) {
+                                if (subject == caller) {
+                                    switch (connectionEpochStarts.get(key)) {
+                                        case (?startedAt) startedAt;
+                                        case null now;
+                                    }
+                                } else {
+                                    now
+                                }
+                            };
+                            case null now;
+                        };
                         let conn : IntegrationConnection = {
                             profile_id = profileId;
                             app_id = appId;
                             external_user_id = externalUserId;
                             scopes = scopes;
                             status = #active;
-                            created_at = Time.now();
+                            created_at = now;
                             revoked_at = null
                         };
                         connections.put(key, conn);
+                        appendUniqueTextIndex(profileConnectionIndex, profileId, appId);
+                        connectionSubjects.put(key, caller);
+                        connectionEpochStarts.put(key, epochStart);
                         #ok(1)
                     }
                 }
@@ -1032,10 +2520,15 @@ persistent actor {
     };
 
     public query func listConnections(profileId : ProfileId) : async [IntegrationConnection] {
-        let buf = Buffer.Buffer<IntegrationConnection>(0);
-        for ((_, conn) in connections.entries()) {
-            if (conn.profile_id == profileId) {
-                buf.add(conn)
+        let appIds = switch (profileConnectionIndex.get(profileId)) {
+            case (?values) values;
+            case null [];
+        };
+        let buf = Buffer.Buffer<IntegrationConnection>(appIds.size());
+        for (appId in appIds.vals()) {
+            switch (connections.get(connectionKey(profileId, appId))) {
+                case (?conn) { buf.add(conn) };
+                case null {};
             }
         };
         Buffer.toArray(buf)
@@ -1058,13 +2551,30 @@ persistent actor {
         if (not app.active) {
             return #err("app is not active")
         };
-        // Check an active connection exists for this profile+app
+        let targetProfile = switch (profiles.get(newRecord.profile_id)) {
+            case null { return #err("profile not found") };
+            case (?p) p;
+        };
+        // Check an active connection exists for this profile+app and that
+        // the consent belongs to the current immutable profile owner.
         let connKey = connectionKey(newRecord.profile_id, newRecord.app_id);
         switch (connections.get(connKey)) {
             case null { return #err("no active connection for this profile and app") };
             case (?c) {
                 if (c.status != #active) {
                     return #err("connection is not active")
+                };
+                switch (connectionSubjects.get(connKey)) {
+                    case (?subject) {
+                        if (subject != targetProfile.owner) {
+                            return #err("connection ownership does not match current profile owner")
+                        }
+                    };
+                    case null {
+                        // Legacy/unbound connections are intentionally
+                        // quarantined until the current owner reconnects.
+                        return #err("connection ownership is not established; reconnect app")
+                    };
                 }
             }
         };
@@ -1095,6 +2605,7 @@ persistent actor {
             hash = generateHash(content)
         };
         activityRecordsMap.put(recordId, record);
+        activityRecordSubjects.put(recordId, targetProfile.owner);
         idempotencyKeys.put(idemKey, recordId);
         // Update per-profile index
         let currentIndex = switch (profileActivityIndex.get(newRecord.profile_id)) {
@@ -1129,6 +2640,7 @@ persistent actor {
             currency = prevCurrency;
             last_updated = now
         });
+        appendUniqueTextIndex(profileSummaryIndex, newRecord.profile_id, sKey);
         #ok(recordId)
     };
 
@@ -1146,23 +2658,29 @@ persistent actor {
             case null { return [] };
             case (?ids) { ids }
         };
+        let profile = switch (profiles.get(profileId)) {
+            case null { return [] };
+            case (?p) p;
+        };
         let buf = Buffer.Buffer<ActivityRecord>(0);
         for (rid in ids.vals()) {
-            switch (activityRecordsMap.get(rid)) {
-                case null {};
-                case (?r) {
-                    let appMatch = switch (appId) {
-                        case null { true };
-                        case (?aid) { r.app_id == aid }
-                    };
-                    let typeMatch = switch (activityType) {
-                        case null { true };
-                        case (?at) { r.activity_type == at }
-                    };
-                    if (appMatch and typeMatch) {
-                        buf.add(r)
+            switch (activityRecordSubjects.get(rid), activityRecordsMap.get(rid)) {
+                case (?subject, ?r) {
+                    if (subject == profile.owner) {
+                        let appMatch = switch (appId) {
+                            case null { true };
+                            case (?aid) { r.app_id == aid }
+                        };
+                        let typeMatch = switch (activityType) {
+                            case null { true };
+                            case (?at) { r.activity_type == at }
+                        };
+                        if (appMatch and typeMatch) {
+                            buf.add(r)
+                        }
                     }
-                }
+                };
+                case _ {};
             }
         };
         Buffer.toArray(buf)

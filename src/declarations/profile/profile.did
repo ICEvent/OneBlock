@@ -18,6 +18,17 @@ type VerificationPolicy =
    none;
    signed_payload;
  };
+type VerificationMethod = 
+ variant {
+   custom: text;
+   imported;
+   institutional;
+   none;
+   oauth;
+   onchain;
+   signed;
+   system_derived;
+ };
 type VerificationLevel = 
  variant {
    platform;
@@ -61,12 +72,37 @@ type Strength =
    low;
    medium;
  };
+type SourceKind = 
+ variant {
+   derived;
+   external;
+   peer;
+   self_declared;
+ };
 type SignatureStatus = 
  variant {
    invalid;
    unverified;
    verified;
  };
+type ReviewStatus = 
+ variant {
+   active;
+   disputed;
+   withdrawn;
+ };
+type ReviewRelationship = 
+ variant {
+   collaborator;
+   coworker;
+   customer;
+   manager;
+   other: text;
+   participant;
+   peer;
+   provider;
+ };
+type ReviewId = text;
 type Result_4 = 
  variant {
    err: text;
@@ -124,7 +160,37 @@ type ProviderCapability =
    reputation;
    risk;
  };
+type Provenance = 
+ record {
+   evidence: vec EvidenceRef;
+   issuer: opt principal;
+   issuer_id: text;
+   observed_at: opt Timestamp;
+   recorded_at: Timestamp;
+   source_kind: SourceKind;
+   verification: VerificationMethod;
+ };
 type ProfileId = text;
+type ProfileClaimPage = 
+ record {
+   items: vec ProfileClaim;
+   next_cursor: opt nat;
+ };
+type ProfileClaim = 
+ record {
+   capability: opt CapabilityRef;
+   context: opt text;
+   created_at: Timestamp;
+   id: ClaimId;
+   predicate: text;
+   profile_id: text;
+   provenance: Provenance;
+   subject: principal;
+   valid_from: opt Timestamp;
+   valid_until: opt Timestamp;
+   value: ClaimValue;
+   visibility: Visibility;
+ };
 type Profile = 
  record {
    bio: text;
@@ -183,6 +249,30 @@ type PolicyEvaluation =
    policy_id: PolicyId;
    "principal": IdentityPrincipal;
  };
+type PeerReviewPage = 
+ record {
+   items: vec PeerReview;
+   next_cursor: opt nat;
+ };
+type PeerReview = 
+ record {
+   assessment_tags: vec text;
+   capability: opt CapabilityRef;
+   context: text;
+   created_at: Timestamp;
+   evidence: vec EvidenceRef;
+   id: ReviewId;
+   narrative: opt text;
+   profile_id: text;
+   related_claims: vec ClaimId;
+   relationship: ReviewRelationship;
+   response: opt text;
+   reviewer: principal;
+   status: ReviewStatus;
+   subject: principal;
+   updated_at: Timestamp;
+   visibility: Visibility;
+ };
 type OipProvider = 
  record {
    capabilities: vec ProviderCapability;
@@ -204,12 +294,36 @@ type NewTrait =
    tlabel: text;
    visibility: Visibility;
  };
+type NewSelfClaim = 
+ record {
+   capability: opt CapabilityRef;
+   context: opt text;
+   evidence: vec EvidenceRef;
+   predicate: text;
+   profile_id: text;
+   valid_from: opt Timestamp;
+   valid_until: opt Timestamp;
+   value: ClaimValue;
+   visibility: Visibility;
+ };
 type NewProfile = 
  record {
    bio: text;
    id: text;
    name: text;
    pfp: text;
+ };
+type NewPeerReview = 
+ record {
+   assessment_tags: vec text;
+   capability: opt CapabilityRef;
+   context: text;
+   evidence: vec EvidenceRef;
+   narrative: opt text;
+   profile_id: text;
+   related_claims: vec ClaimId;
+   relationship: ReviewRelationship;
+   visibility: Visibility;
  };
 type NewOipProvider = 
  record {
@@ -348,6 +462,13 @@ type FactorCategory =
    reputation;
    social;
  };
+type EvidenceRef = 
+ record {
+   external_id: opt text;
+   hash: opt text;
+   schema: text;
+   uri: opt text;
+ };
 type EntityKind = 
  variant {
    ai_agent;
@@ -370,6 +491,19 @@ type ConnectionStatus =
    active;
    pending;
    revoked;
+ };
+type ClaimValue = 
+ variant {
+   boolean: bool;
+   number: float64;
+   reference: text;
+   "text": text;
+ };
+type ClaimId = text;
+type CapabilityRef = 
+ record {
+   display_label: opt text;
+   path: text;
  };
 type BlockId = text;
 type Block = 
@@ -450,10 +584,13 @@ service : {
    (Result);
   createBlock: (newBlock: NewBlock) -> (Result_1);
   createIdentityGraph: (input: NewIdentityGraph) -> (Result);
+  createPeerReview: (input: NewPeerReview) -> (Result_1);
   createPolicy: (input: NewContextPolicy) -> (Result);
   createProfile: (newProfile: NewProfile) -> (Result);
+  createSelfClaim: (input: NewSelfClaim) -> (Result_1);
   createTrait: (profileId: text, newTrait: NewTrait) -> (Result_1);
   deleteLink: (id: text, name: text) -> (Result);
+  disputePeerReview: (reviewId: text, response: opt text) -> (Result);
   evaluatePolicy: ("principal": text, policyId: text) -> (Result_3) query;
   getActivityRecord: (recordId: RecordId) -> (opt ActivityRecord) query;
   getActivityRecords: (profileId: ProfileId, appId: opt AppId, activityType:
@@ -472,11 +609,18 @@ service : {
   getMyFavorites: () -> (vec Favorite) query;
   getMyProfile: () -> (opt Profile) query;
   getOipProvider: (providerId: text) -> (opt OipProvider) query;
+  getPeerReview: (reviewId: text) -> (opt PeerReview) query;
   getProfile: (id: text) -> (opt Profile) query;
   getProfileByPrincipal: ("principal": text) -> (opt Profile) query;
+  getProfileClaim: (claimId: text) -> (opt ProfileClaim) query;
   getProfileCount: () -> (nat) query;
   getProfiles: (pageSize: nat, pageNumber: nat) -> (vec Profile) query;
   getScores: ("principal": text) -> (opt ProbabilityScores) query;
+  getSystemData: () -> (record {
+                          cycles: nat;
+                          heap: nat;
+                          memory: nat;
+                        }) query;
   getTrait: (traitId: text) -> (opt Trait) query;
   getTraits: (profileId: text) -> (vec Trait) query;
   listActivityTypes: (appId: AppId) -> (vec ActivityType) query;
@@ -485,12 +629,21 @@ service : {
   listConnections: (profileId: ProfileId) ->
    (vec IntegrationConnection) query;
   listOipProviders: () -> (vec OipProvider) query;
+  listPeerReviews: (profileId: text) -> (vec PeerReview) query;
+  listPeerReviewsPage: (profileId: text, cursor: nat, pageSize: nat) ->
+   (PeerReviewPage) query;
+  listProfileClaims: (profileId: text) -> (vec ProfileClaim) query;
+  listProfileClaimsPage: (profileId: text, cursor: nat, pageSize: nat) ->
+   (ProfileClaimPage) query;
   recomputeScores: ("principal": text, policyId: opt text) -> (Result_2);
   registerActivityType: (newType: NewActivityType) -> (Result_1);
   registerApp: (newApp: NewIntegrationApp) -> (Result_1);
+  registerLegacyOwnershipEpoch: (legacyProfileId: text, currentProfileId:
+   text, fromTimestamp: int, toTimestamp: opt int) -> (Result);
   registerOipProvider: (input: NewOipProvider) -> (Result);
   removeFeaturedProfile: (id: text) -> (Result);
   reserveid: (id: text) -> (Result);
+  respondToPeerReview: (reviewId: text, response: text) -> (Result);
   revokeConnection: (appId: AppId) -> (Result);
   runDecaySweep: () -> (nat);
   searchProfilesByName: (q: text) -> (vec Profile) query;
@@ -498,4 +651,5 @@ service : {
   submitActivityRecord: (newRecord: NewActivityRecord) -> (Result_1);
   submitProviderFactor: (input: ProviderFactorSubmission) -> (Result_1);
   updateProfile: (id: text, updateProfile: UpdateProfile) -> (Result);
+  withdrawPeerReview: (reviewId: text) -> (Result);
 }
