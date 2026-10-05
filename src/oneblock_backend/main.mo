@@ -79,6 +79,7 @@ persistent actor {
     var stableIntegrationApps : [(Text, IntegrationApp)] = [];
     var stableActivityTypes : [(Text, ActivityType)] = [];
     var stableConnections : [(Text, IntegrationConnection)] = [];
+    var stableProfileConnectionIndex : [(Text, [Text])] = []; // profileId -> appIds
     // Immutable ownership metadata for connection epochs. This is kept
     // separately to avoid rewriting the legacy IntegrationConnection type.
     var stableConnectionSubjects : [(Text, Principal)] = [];
@@ -91,6 +92,7 @@ persistent actor {
     var stableIdempotencyKeys : [(Text, Text)] = []; // idempotency_key -> record_id
     var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]
     var stableDerivedSummaries : [(Text, DerivedSummary)] = [];
+    var stableProfileSummaryIndex : [(Text, [Text])] = []; // profileId -> summary keys
     var stableIdentityGraphs : [(Text, IdentityGraph)] = [];
     var stableContextPolicies : [(Text, ContextPolicy)] = [];
     var stableTrustEdges : [(Text, TrustEdge)] = [];
@@ -150,6 +152,8 @@ persistent actor {
 
     transient var connections = TrieMap.TrieMap<Text, IntegrationConnection>(Text.equal, Text.hash);
     connections := TrieMap.fromEntries<Text, IntegrationConnection>(Iter.fromArray(stableConnections), Text.equal, Text.hash);
+    transient var profileConnectionIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
+    profileConnectionIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileConnectionIndex), Text.equal, Text.hash);
 
     transient var connectionSubjects = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
     connectionSubjects := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableConnectionSubjects), Text.equal, Text.hash);
@@ -170,6 +174,8 @@ persistent actor {
 
     transient var derivedSummaries = TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
     derivedSummaries := TrieMap.fromEntries<Text, DerivedSummary>(Iter.fromArray(stableDerivedSummaries), Text.equal, Text.hash);
+    transient var profileSummaryIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
+    profileSummaryIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileSummaryIndex), Text.equal, Text.hash);
     transient var identityGraphs = TrieMap.TrieMap<Text, IdentityGraph>(Text.equal, Text.hash);
     identityGraphs := TrieMap.fromEntries<Text, IdentityGraph>(Iter.fromArray(stableIdentityGraphs), Text.equal, Text.hash);
     transient var contextPolicies = TrieMap.TrieMap<Text, ContextPolicy>(Text.equal, Text.hash);
@@ -367,6 +373,7 @@ persistent actor {
         stableIntegrationApps := Iter.toArray(integrationApps.entries());
         stableActivityTypes := Iter.toArray(activityTypesMap.entries());
         stableConnections := Iter.toArray(connections.entries());
+        stableProfileConnectionIndex := Iter.toArray(profileConnectionIndex.entries());
         stableConnectionSubjects := Iter.toArray(connectionSubjects.entries());
         stableConnectionEpochStarts := Iter.toArray(connectionEpochStarts.entries());
         stableActivityRecords := Iter.toArray(activityRecordsMap.entries());
@@ -374,6 +381,7 @@ persistent actor {
         stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());
         stableProfileActivityIndex := Iter.toArray(profileActivityIndex.entries());
         stableDerivedSummaries := Iter.toArray(derivedSummaries.entries());
+        stableProfileSummaryIndex := Iter.toArray(profileSummaryIndex.entries());
         stableIdentityGraphs := Iter.toArray(identityGraphs.entries());
         stableContextPolicies := Iter.toArray(contextPolicies.entries());
         stableTrustEdges := Iter.toArray(trustEdges.entries());
@@ -404,6 +412,7 @@ persistent actor {
         stableIntegrationApps := [];
         stableActivityTypes := [];
         stableConnections := [];
+        stableProfileConnectionIndex := [];
         stableConnectionSubjects := [];
         stableConnectionEpochStarts := [];
         stableActivityRecords := [];
@@ -411,6 +420,7 @@ persistent actor {
         stableIdempotencyKeys := [];
         stableProfileActivityIndex := [];
         stableDerivedSummaries := [];
+        stableProfileSummaryIndex := [];
         stableIdentityGraphs := [];
         stableContextPolicies := [];
         stableTrustEdges := [];
@@ -655,18 +665,29 @@ persistent actor {
         }
     };
 
-    private func migrateDerivedSummaries(oldId : Text, newId : Text) {
-        let keys = Buffer.Buffer<(Text, Text, Text)>(0);
-        for ((key, summary) in derivedSummaries.entries()) {
-            if (summary.profile_id == oldId) {
-                keys.add((key, summary.app_id, summary.activity_type))
-            }
+    private func appendUniqueTextIndex(index : TrieMap.TrieMap<Text, [Text]>, profileId : Text, value : Text) {
+        let existing = switch (index.get(profileId)) {
+            case (?values) values;
+            case null [];
         };
-        for ((oldKey, appId, activityType) in keys.vals()) {
+        if (Array.find<Text>(existing, func(candidate : Text) : Bool { candidate == value }) == null) {
+            let buf = Buffer.fromArray<Text>(existing);
+            buf.add(value);
+            index.put(profileId, Buffer.toArray(buf))
+        }
+    };
+
+    private func migrateDerivedSummaries(oldId : Text, newId : Text) {
+        let keys = switch (profileSummaryIndex.get(oldId)) {
+            case (?values) values;
+            case null [];
+        };
+        let migratedKeys = Buffer.Buffer<Text>(keys.size());
+        for (oldKey in keys.vals()) {
             switch (derivedSummaries.get(oldKey)) {
                 case null {};
                 case (?summary) {
-                    let newKey = summaryKey(newId, appId, activityType);
+                    let newKey = summaryKey(newId, summary.app_id, summary.activity_type);
                     derivedSummaries.put(newKey, {
                         profile_id = newId;
                         app_id = summary.app_id;
@@ -676,18 +697,21 @@ persistent actor {
                         currency = summary.currency;
                         last_updated = summary.last_updated;
                     });
+                    migratedKeys.add(newKey);
                     ignore derivedSummaries.remove(oldKey);
                 };
             }
-        }
+        };
+        if (migratedKeys.size() > 0) {
+            profileSummaryIndex.put(newId, Buffer.toArray(migratedKeys))
+        };
+        ignore profileSummaryIndex.remove(oldId)
     };
 
     private func migrateConnections(oldId : Text, newId : Text) {
-        let appIds = Buffer.Buffer<Text>(0);
-        for ((_, conn) in connections.entries()) {
-            if (conn.profile_id == oldId) {
-                appIds.add(conn.app_id)
-            }
+        let appIds = switch (profileConnectionIndex.get(oldId)) {
+            case (?values) values;
+            case null [];
         };
         for (appId in appIds.vals()) {
             let oldKey = connectionKey(oldId, appId);
@@ -721,7 +745,11 @@ persistent actor {
                     ignore connections.remove(oldKey);
                 };
             }
-        }
+        };
+        if (appIds.size() > 0) {
+            profileConnectionIndex.put(newId, appIds)
+        };
+        ignore profileConnectionIndex.remove(oldId)
     };
 
     private func migrateGraphLocators(oldId : Text, newId : Text) {
@@ -1971,6 +1999,7 @@ persistent actor {
                             revoked_at = null
                         };
                         connections.put(key, conn);
+                        appendUniqueTextIndex(profileConnectionIndex, profileId, appId);
                         connectionSubjects.put(key, caller);
                         connectionEpochStarts.put(key, epochStart);
                         #ok(1)
@@ -2015,10 +2044,15 @@ persistent actor {
     };
 
     public query func listConnections(profileId : ProfileId) : async [IntegrationConnection] {
-        let buf = Buffer.Buffer<IntegrationConnection>(0);
-        for ((_, conn) in connections.entries()) {
-            if (conn.profile_id == profileId) {
-                buf.add(conn)
+        let appIds = switch (profileConnectionIndex.get(profileId)) {
+            case (?values) values;
+            case null [];
+        };
+        let buf = Buffer.Buffer<IntegrationConnection>(appIds.size());
+        for (appId in appIds.vals()) {
+            switch (connections.get(connectionKey(profileId, appId))) {
+                case (?conn) { buf.add(conn) };
+                case null {};
             }
         };
         Buffer.toArray(buf)
@@ -2130,6 +2164,7 @@ persistent actor {
             currency = prevCurrency;
             last_updated = now
         });
+        appendUniqueTextIndex(profileSummaryIndex, newRecord.profile_id, sKey);
         #ok(recordId)
     };
 
