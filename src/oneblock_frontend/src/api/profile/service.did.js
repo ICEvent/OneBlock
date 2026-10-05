@@ -360,10 +360,6 @@ export const idlFactory = ({ IDL }) => {
     'related_claims' : IDL.Vec(ClaimId),
     'capability' : IDL.Opt(CapabilityRef),
   });
-  const PeerReviewPage = IDL.Record({
-    'items' : IDL.Vec(PeerReview),
-    'next_cursor' : IDL.Opt(IDL.Nat),
-  });
   const SourceKind = IDL.Variant({
     'peer' : IDL.Null,
     'self_declared' : IDL.Null,
@@ -403,10 +399,6 @@ export const idlFactory = ({ IDL }) => {
     'predicate' : IDL.Text,
     'capability' : IDL.Opt(CapabilityRef),
   });
-  const ProfileClaimPage = IDL.Record({
-    'items' : IDL.Vec(ProfileClaim),
-    'next_cursor' : IDL.Opt(IDL.Nat),
-  });
   const ProbabilityScores = IDL.Record({
     'human_score' : IDL.Float64,
     'updated_at' : Timestamp,
@@ -426,6 +418,14 @@ export const idlFactory = ({ IDL }) => {
     'confidence' : IDL.Float64,
     'tlabel' : IDL.Text,
     'visibility' : Visibility,
+  });
+  const PeerReviewPage = IDL.Record({
+    'next_cursor' : IDL.Opt(IDL.Nat),
+    'items' : IDL.Vec(PeerReview),
+  });
+  const ProfileClaimPage = IDL.Record({
+    'next_cursor' : IDL.Opt(IDL.Nat),
+    'items' : IDL.Vec(ProfileClaim),
   });
   const Result_2 = IDL.Variant({ 'ok' : ProbabilityScores, 'err' : IDL.Text });
   const NewActivityType = IDL.Record({
