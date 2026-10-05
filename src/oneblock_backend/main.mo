@@ -1763,6 +1763,107 @@ persistent actor {
         if (Text.size(input.context) == 0) {
             return #err("review context is required")
         };
+        if (Text.size(input.context) > 512) {
+            return #err("review context is too long")
+        };
+        switch (input.narrative) {
+            case (?value) {
+                if (Text.size(value) > 4000) {
+                    return #err("review narrative is too long")
+                }
+            };
+            case null {};
+        };
+        if (input.assessment_tags.size() > 16) {
+            return #err("too many assessment tags")
+        };
+        if (input.evidence.size() > 16) {
+            return #err("too many evidence references")
+        };
+        if (input.related_claims.size() > 32) {
+            return #err("too many related claims")
+        };
+
+        var reviewTextBudget : Nat = Text.size(input.context);
+        switch (input.narrative) {
+            case (?value) { reviewTextBudget += Text.size(value) };
+            case null {};
+        };
+        switch (input.capability) {
+            case (?capability) {
+                if (Text.size(capability.path) > 256) {
+                    return #err("capability path is too long")
+                };
+                reviewTextBudget += Text.size(capability.path);
+                switch (capability.display_label) {
+                    case (?displayLabel) {
+                        if (Text.size(displayLabel) > 256) {
+                            return #err("capability label is too long")
+                        };
+                        reviewTextBudget += Text.size(displayLabel)
+                    };
+                    case null {};
+                }
+            };
+            case null {};
+        };
+        switch (input.relationship) {
+            case (#other(value)) {
+                if (Text.size(value) > 128) {
+                    return #err("review relationship is too long")
+                };
+                reviewTextBudget += Text.size(value)
+            };
+            case _ {};
+        };
+        for (tag in input.assessment_tags.vals()) {
+            if (Text.size(tag) > 128) {
+                return #err("assessment tag is too long")
+            };
+            reviewTextBudget += Text.size(tag)
+        };
+        for (claimId in input.related_claims.vals()) {
+            if (Text.size(claimId) > 256) {
+                return #err("related claim id is too long")
+            };
+            reviewTextBudget += Text.size(claimId)
+        };
+        for (evidence in input.evidence.vals()) {
+            if (Text.size(evidence.schema) > 256) {
+                return #err("evidence schema is too long")
+            };
+            reviewTextBudget += Text.size(evidence.schema);
+            switch (evidence.uri) {
+                case (?value) {
+                    if (Text.size(value) > 1024) {
+                        return #err("evidence uri is too long")
+                    };
+                    reviewTextBudget += Text.size(value)
+                };
+                case null {};
+            };
+            switch (evidence.hash) {
+                case (?value) {
+                    if (Text.size(value) > 256) {
+                        return #err("evidence hash is too long")
+                    };
+                    reviewTextBudget += Text.size(value)
+                };
+                case null {};
+            };
+            switch (evidence.external_id) {
+                case (?value) {
+                    if (Text.size(value) > 256) {
+                        return #err("evidence external id is too long")
+                    };
+                    reviewTextBudget += Text.size(value)
+                };
+                case null {};
+            }
+        };
+        if (reviewTextBudget > 8192) {
+            return #err("review payload is too large")
+        };
         let profile = switch (profiles.get(input.profile_id)) {
             case null { return #err("profile not found") };
             case (?p) p;
