@@ -12,6 +12,7 @@ import Buffer "mo:base/Buffer";
 import Array "mo:base/Array";
 import Order "mo:base/Order";
 import Float "mo:base/Float";
+import Blob "mo:base/Blob";
 
 import Types "types";
 import ProfileGraph "profile_graph";
@@ -274,7 +275,8 @@ persistent actor {
                             merged.add(recordId)
                         }
                     };
-                    profileActivityIndex.put(epoch.current_profile_id, Buffer.toArray(merged))
+                    profileActivityIndex.put(epoch.current_profile_id, Buffer.toArray(merged));
+                    rebuildDerivedSummariesForProfile(epoch.current_profile_id, epoch.subject)
                 }
             };
         }
@@ -730,6 +732,75 @@ persistent actor {
             let buf = Buffer.fromArray<Text>(existing);
             buf.add(value);
             index.put(profileId, Buffer.toArray(buf))
+        }
+    };
+
+    private func rebuildDerivedSummariesForProfile(profileId : Text, owner : Principal) {
+        let existingKeys = switch (profileSummaryIndex.get(profileId)) {
+            case (?values) values;
+            case null [];
+        };
+        for (key in existingKeys.vals()) {
+            ignore derivedSummaries.remove(key)
+        };
+        ignore profileSummaryIndex.remove(profileId);
+
+        let rebuilt = TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
+        let recordIds = switch (profileActivityIndex.get(profileId)) {
+            case (?ids) ids;
+            case null [];
+        };
+        for (recordId in recordIds.vals()) {
+            switch (activityRecordSubjects.get(recordId), activityRecordsMap.get(recordId)) {
+                case (?subject, ?record) {
+                    if (subject == owner) {
+                        let key = summaryKey(profileId, record.app_id, record.activity_type);
+                        let previous = rebuilt.get(key);
+                        let (count, total, currency, updatedAt) = switch (previous) {
+                            case null { (0, null, record.currency, record.ingest_timestamp) };
+                            case (?summary) {
+                                (
+                                    summary.record_count,
+                                    summary.total_amount,
+                                    summary.currency,
+                                    if (record.ingest_timestamp > summary.last_updated) {
+                                        record.ingest_timestamp
+                                    } else {
+                                        summary.last_updated
+                                    }
+                                )
+                            };
+                        };
+                        let nextTotal : ?Float = switch (record.amount) {
+                            case null total;
+                            case (?amount) {
+                                switch (total) {
+                                    case null ?amount;
+                                    case (?existing) ?(existing + amount);
+                                }
+                            };
+                        };
+                        rebuilt.put(key, {
+                            profile_id = profileId;
+                            app_id = record.app_id;
+                            activity_type = record.activity_type;
+                            record_count = count + 1;
+                            total_amount = nextTotal;
+                            currency = currency;
+                            last_updated = updatedAt;
+                        })
+                    }
+                };
+                case _ {};
+            }
+        };
+        let keys = Buffer.Buffer<Text>(0);
+        for ((key, summary) in rebuilt.entries()) {
+            derivedSummaries.put(key, summary);
+            keys.add(key)
+        };
+        if (keys.size() > 0) {
+            profileSummaryIndex.put(profileId, Buffer.toArray(keys))
         }
     };
 
@@ -1493,12 +1564,104 @@ persistent actor {
         profileReviewIndex.put(profileId, Buffer.toArray(buf))
     };
 
+    private func textBytes(value : Text) : Nat {
+        Blob.size(Text.encodeUtf8(value))
+    };
+
+    private func optionalTextBytes(value : ?Text) : Nat {
+        switch (value) {
+            case (?text) textBytes(text);
+            case null 0;
+        }
+    };
+
+    private func claimValueBytes(value : ProfileGraph.ClaimValue) : Nat {
+        switch (value) {
+            case (#text(text)) textBytes(text);
+            case (#reference(text)) textBytes(text);
+            case (#number(_)) 16;
+            case (#boolean(_)) 1;
+        }
+    };
+
+    private func evidenceBytes(evidence : ProfileGraph.EvidenceRef) : Nat {
+        textBytes(evidence.schema)
+        + optionalTextBytes(evidence.uri)
+        + optionalTextBytes(evidence.hash)
+        + optionalTextBytes(evidence.external_id)
+    };
+
+    private func profileClaimApproxBytes(claim : ProfileClaim) : Nat {
+        var total =
+            textBytes(claim.id)
+            + textBytes(claim.profile_id)
+            + textBytes(claim.predicate)
+            + claimValueBytes(claim.value)
+            + textBytes(claim.provenance.issuer_id)
+            + 256;
+        switch (claim.context) {
+            case (?value) { total += textBytes(value) };
+            case null {};
+        };
+        switch (claim.capability) {
+            case (?capability) {
+                total += textBytes(capability.path);
+                total += optionalTextBytes(capability.display_label)
+            };
+            case null {};
+        };
+        for (evidence in claim.provenance.evidence.vals()) {
+            total += evidenceBytes(evidence)
+        };
+        total
+    };
+
+    private func addClaimWithinBudget(
+        buf : Buffer.Buffer<ProfileClaim>,
+        usedBytes : Nat,
+        claim : ProfileClaim
+    ) : (Nat, Bool) {
+        if (buf.size() >= 200) {
+            return (usedBytes, false)
+        };
+        let claimBytes = profileClaimApproxBytes(claim);
+        if (usedBytes + claimBytes > 1_500_000) {
+            return (usedBytes, false)
+        };
+        buf.add(claim);
+        (usedBytes + claimBytes, true)
+    };
+
     public shared ({ caller }) func createSelfClaim(input : NewSelfClaim) : async Result.Result<Text, Text> {
         if (Principal.isAnonymous(caller)) {
             return #err("not authenticated")
         };
         if (Text.size(input.predicate) == 0) {
             return #err("predicate is required")
+        };
+        if (textBytes(input.predicate) > 256) {
+            return #err("predicate is too long")
+        };
+        var selfClaimBytes : Nat = textBytes(input.predicate) + claimValueBytes(input.value);
+        switch (input.context) {
+            case (?value) { selfClaimBytes += textBytes(value) };
+            case null {};
+        };
+        switch (input.capability) {
+            case (?capability) {
+                selfClaimBytes += textBytes(capability.path);
+                selfClaimBytes += optionalTextBytes(capability.display_label)
+            };
+            case null {};
+        };
+        if (input.evidence.size() > 16) {
+            return #err("too many evidence references")
+        };
+        for (evidence in input.evidence.vals()) {
+            selfClaimBytes += evidenceBytes(evidence)
+        };
+        if (selfClaimBytes > 16_384) {
+            return #err("claim payload is too large")
         };
         let profile = switch (profiles.get(input.profile_id)) {
             case null { return #err("profile not found") };
@@ -1700,18 +1863,44 @@ persistent actor {
             case (?p) p;
         };
         let buf = Buffer.Buffer<ProfileClaim>(0);
+        var claimBytesUsed : Nat = 0;
+        var claimBudgetOpen = true;
 
         // Transitional adapter: existing editable profile fields are exposed as
         // self-declared claims without copying or migrating legacy stable state.
         let profileVisibility = graphVisibility(profile.visibility);
         if (canReadGraphItem(caller, profile.owner, profileVisibility)) {
-            buf.add(legacyProfileClaim(profile, legacyTextClaimId(profile, "name", profile.name), "profile.name", #text(profile.name)));
+            if (claimBudgetOpen) {
+                let (nextBytes, added) = addClaimWithinBudget(
+                    buf,
+                    claimBytesUsed,
+                    legacyProfileClaim(profile, legacyTextClaimId(profile, "name", profile.name), "profile.name", #text(profile.name))
+                );
+                claimBytesUsed := nextBytes;
+                claimBudgetOpen := added
+            };
             if (Text.size(profile.bio) > 0) {
-                buf.add(legacyProfileClaim(profile, legacyTextClaimId(profile, "bio", profile.bio), "profile.bio", #text(profile.bio)))
+                if (claimBudgetOpen) {
+                    let (nextBytes, added) = addClaimWithinBudget(
+                        buf,
+                        claimBytesUsed,
+                        legacyProfileClaim(profile, legacyTextClaimId(profile, "bio", profile.bio), "profile.bio", #text(profile.bio))
+                    );
+                    claimBytesUsed := nextBytes;
+                    claimBudgetOpen := added
+                }
             };
             for (link in profile.links.vals()) {
                 let linkId = legacyLinkClaimId(profile, link);
-                buf.add(legacyProfileClaim(profile, linkId, "profile.link." # link.name, #reference(link.url)))
+                if (claimBudgetOpen) {
+                    let (nextBytes, added) = addClaimWithinBudget(
+                        buf,
+                        claimBytesUsed,
+                        legacyProfileClaim(profile, linkId, "profile.link." # link.name, #reference(link.url))
+                    );
+                    claimBytesUsed := nextBytes;
+                    claimBudgetOpen := added
+                }
             }
         };
 
@@ -1727,9 +1916,12 @@ persistent actor {
                 case (?claim) {
                     if (
                         claim.subject == profile.owner and
-                        canReadGraphItem(caller, claim.subject, claim.visibility)
+                        canReadGraphItem(caller, claim.subject, claim.visibility) and
+                        claimBudgetOpen
                     ) {
-                        buf.add(claim)
+                        let (nextBytes, added) = addClaimWithinBudget(buf, claimBytesUsed, claim);
+                        claimBytesUsed := nextBytes;
+                        claimBudgetOpen := added
                     }
                 };
             }
@@ -1750,9 +1942,12 @@ persistent actor {
                         case (?claim) {
                             if (
                                 claim.subject == profile.owner and
-                                canReadGraphItem(caller, claim.subject, claim.visibility)
+                                canReadGraphItem(caller, claim.subject, claim.visibility) and
+                                claimBudgetOpen
                             ) {
-                                buf.add(claim)
+                                let (nextBytes, added) = addClaimWithinBudget(buf, claimBytesUsed, claim);
+                                claimBytesUsed := nextBytes;
+                                claimBudgetOpen := added
                             }
                         };
                     }
@@ -1770,12 +1965,12 @@ persistent actor {
         if (Text.size(input.context) == 0) {
             return #err("review context is required")
         };
-        if (Text.size(input.context) > 512) {
+        if (textBytes(input.context) > 512) {
             return #err("review context is too long")
         };
         switch (input.narrative) {
             case (?value) {
-                if (Text.size(value) > 4000) {
+                if (textBytes(value) > 4000) {
                     return #err("review narrative is too long")
                 }
             };
@@ -1791,23 +1986,23 @@ persistent actor {
             return #err("too many related claims")
         };
 
-        var reviewTextBudget : Nat = Text.size(input.context);
+        var reviewTextBudget : Nat = textBytes(input.context);
         switch (input.narrative) {
-            case (?value) { reviewTextBudget += Text.size(value) };
+            case (?value) { reviewTextBudget += textBytes(value) };
             case null {};
         };
         switch (input.capability) {
             case (?capability) {
-                if (Text.size(capability.path) > 256) {
+                if (textBytes(capability.path) > 256) {
                     return #err("capability path is too long")
                 };
-                reviewTextBudget += Text.size(capability.path);
+                reviewTextBudget += textBytes(capability.path);
                 switch (capability.display_label) {
                     case (?displayLabel) {
-                        if (Text.size(displayLabel) > 256) {
+                        if (textBytes(displayLabel) > 256) {
                             return #err("capability label is too long")
                         };
-                        reviewTextBudget += Text.size(displayLabel)
+                        reviewTextBudget += textBytes(displayLabel)
                     };
                     case null {};
                 }
@@ -1816,54 +2011,54 @@ persistent actor {
         };
         switch (input.relationship) {
             case (#other(value)) {
-                if (Text.size(value) > 128) {
+                if (textBytes(value) > 128) {
                     return #err("review relationship is too long")
                 };
-                reviewTextBudget += Text.size(value)
+                reviewTextBudget += textBytes(value)
             };
             case _ {};
         };
         for (tag in input.assessment_tags.vals()) {
-            if (Text.size(tag) > 128) {
+            if (textBytes(tag) > 128) {
                 return #err("assessment tag is too long")
             };
-            reviewTextBudget += Text.size(tag)
+            reviewTextBudget += textBytes(tag)
         };
         for (claimId in input.related_claims.vals()) {
-            if (Text.size(claimId) > 256) {
+            if (textBytes(claimId) > 256) {
                 return #err("related claim id is too long")
             };
-            reviewTextBudget += Text.size(claimId)
+            reviewTextBudget += textBytes(claimId)
         };
         for (evidence in input.evidence.vals()) {
-            if (Text.size(evidence.schema) > 256) {
+            if (textBytes(evidence.schema) > 256) {
                 return #err("evidence schema is too long")
             };
-            reviewTextBudget += Text.size(evidence.schema);
+            reviewTextBudget += textBytes(evidence.schema);
             switch (evidence.uri) {
                 case (?value) {
-                    if (Text.size(value) > 1024) {
+                    if (textBytes(value) > 1024) {
                         return #err("evidence uri is too long")
                     };
-                    reviewTextBudget += Text.size(value)
+                    reviewTextBudget += textBytes(value)
                 };
                 case null {};
             };
             switch (evidence.hash) {
                 case (?value) {
-                    if (Text.size(value) > 256) {
+                    if (textBytes(value) > 256) {
                         return #err("evidence hash is too long")
                     };
-                    reviewTextBudget += Text.size(value)
+                    reviewTextBudget += textBytes(value)
                 };
                 case null {};
             };
             switch (evidence.external_id) {
                 case (?value) {
-                    if (Text.size(value) > 256) {
+                    if (textBytes(value) > 256) {
                         return #err("evidence external id is too long")
                     };
-                    reviewTextBudget += Text.size(value)
+                    reviewTextBudget += textBytes(value)
                 };
                 case null {};
             }
@@ -1989,7 +2184,7 @@ persistent actor {
     };
 
     public shared ({ caller }) func respondToPeerReview(reviewId : Text, response : Text) : async Result.Result<Nat, Text> {
-        if (Text.size(response) > 1024) {
+        if (textBytes(response) > 1024) {
             return #err("review response is too long")
         };
         let review = switch (peerReviews.get(reviewId)) {
@@ -2023,7 +2218,7 @@ persistent actor {
     public shared ({ caller }) func disputePeerReview(reviewId : Text, response : ?Text) : async Result.Result<Nat, Text> {
         switch (response) {
             case (?value) {
-                if (Text.size(value) > 1024) {
+                if (textBytes(value) > 1024) {
                     return #err("review response is too long")
                 }
             };
