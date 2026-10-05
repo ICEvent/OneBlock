@@ -263,6 +263,10 @@ export interface PeerReview {
   'related_claims' : Array<ClaimId>,
   'capability' : [] | [CapabilityRef],
 }
+export interface PeerReviewPage {
+  'next_cursor' : [] | [bigint],
+  'items' : Array<PeerReview>,
+}
 export interface PolicyEvaluation {
   'principal' : IdentityPrincipal,
   'items' : Array<PolicyEvaluationItem>,
@@ -328,6 +332,10 @@ export interface ProfileClaim {
   'profile_id' : string,
   'predicate' : string,
   'capability' : [] | [CapabilityRef],
+}
+export interface ProfileClaimPage {
+  'next_cursor' : [] | [bigint],
+  'items' : Array<ProfileClaim>,
 }
 export type ProfileId = string;
 export interface Provenance {
@@ -506,7 +514,12 @@ export interface _SERVICE {
   'listConnections' : ActorMethod<[ProfileId], Array<IntegrationConnection>>,
   'listOipProviders' : ActorMethod<[], Array<OipProvider>>,
   'listPeerReviews' : ActorMethod<[string], Array<PeerReview>>,
+  'listPeerReviewsPage' : ActorMethod<[string, bigint, bigint], PeerReviewPage>,
   'listProfileClaims' : ActorMethod<[string], Array<ProfileClaim>>,
+  'listProfileClaimsPage' : ActorMethod<
+    [string, bigint, bigint],
+    ProfileClaimPage
+  >,
   'recomputeScores' : ActorMethod<[string, [] | [string]], Result_2>,
   'registerActivityType' : ActorMethod<[NewActivityType], Result_1>,
   'registerApp' : ActorMethod<[NewIntegrationApp], Result_1>,
