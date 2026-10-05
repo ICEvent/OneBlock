@@ -1565,7 +1565,7 @@ persistent actor {
     };
 
     private func textBytes(value : Text) : Nat {
-        Blob.size(Text.encodeUtf8(value))
+        Blob.toArray(Text.encodeUtf8(value)).size()
     };
 
     private func optionalTextBytes(value : ?Text) : Nat {
