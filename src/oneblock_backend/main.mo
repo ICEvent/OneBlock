@@ -2095,7 +2095,10 @@ persistent actor {
             }
         };
         // Related references may point to native or projected claims, but the
-        // immutable subject must match the reviewed person.
+        // immutable subject must match the reviewed person. Projected claims
+        // are snapshotted once accepted so later profile edits cannot leave
+        // the review with a dangling historical reference.
+        let projectedSnapshots = Buffer.Buffer<ProfileClaim>(input.related_claims.size());
         for (claimId in input.related_claims.vals()) {
             switch (resolveClaim(claimId)) {
                 case null { return #err("related claim unavailable") };
@@ -2107,9 +2110,15 @@ persistent actor {
                         claim.subject != profile.owner
                     ) {
                         return #err("related claim unavailable")
+                    };
+                    if (profileClaims.get(claimId) == null) {
+                        projectedSnapshots.add(claim)
                     }
                 };
             }
+        };
+        for (snapshot in projectedSnapshots.vals()) {
+            profileClaims.put(snapshot.id, snapshot)
         };
         let now = Time.now();
         let id = generatePeerReviewId();
