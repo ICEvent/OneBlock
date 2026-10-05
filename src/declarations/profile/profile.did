@@ -616,6 +616,11 @@ service : {
   getProfileCount: () -> (nat) query;
   getProfiles: (pageSize: nat, pageNumber: nat) -> (vec Profile) query;
   getScores: ("principal": text) -> (opt ProbabilityScores) query;
+  getSystemData: () -> (record {
+                          cycles: nat;
+                          heap: nat;
+                          memory: nat;
+                        }) query;
   getTrait: (traitId: text) -> (opt Trait) query;
   getTraits: (profileId: text) -> (vec Trait) query;
   listActivityTypes: (appId: AppId) -> (vec ActivityType) query;
