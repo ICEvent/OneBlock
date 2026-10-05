@@ -557,6 +557,17 @@ export const idlFactory = ({ IDL }) => {
     'getProfileCount' : IDL.Func([], [IDL.Nat], ['query']),
     'getProfiles' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Vec(Profile)], ['query']),
     'getScores' : IDL.Func([IDL.Text], [IDL.Opt(ProbabilityScores)], ['query']),
+    'getSystemData' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'memory' : IDL.Nat,
+            'heap' : IDL.Nat,
+            'cycles' : IDL.Nat,
+          }),
+        ],
+        ['query'],
+      ),
     'getTrait' : IDL.Func([IDL.Text], [IDL.Opt(Trait)], ['query']),
     'getTraits' : IDL.Func([IDL.Text], [IDL.Vec(Trait)], ['query']),
     'listActivityTypes' : IDL.Func([AppId], [IDL.Vec(ActivityType)], ['query']),
