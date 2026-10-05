@@ -506,6 +506,10 @@ export interface _SERVICE {
   'getProfileCount' : ActorMethod<[], bigint>,
   'getProfiles' : ActorMethod<[bigint, bigint], Array<Profile>>,
   'getScores' : ActorMethod<[string], [] | [ProbabilityScores]>,
+  'getSystemData' : ActorMethod<
+    [],
+    { 'memory' : bigint, 'heap' : bigint, 'cycles' : bigint }
+  >,
   'getTrait' : ActorMethod<[string], [] | [Trait]>,
   'getTraits' : ActorMethod<[string], Array<Trait>>,
   'listActivityTypes' : ActorMethod<[AppId], Array<ActivityType>>,
