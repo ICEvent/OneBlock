@@ -1,5 +1,6 @@
 import Cycles "mo:base/ExperimentalCycles";
 import Nat "mo:base/Nat";
+import Nat32 "mo:base/Nat32";
 import Int "mo:base/Int";
 import Text "mo:base/Text";
 import TrieMap "mo:base/TrieMap";
@@ -1539,18 +1540,24 @@ persistent actor {
         "legacy:profile:" # Principal.toText(profile.owner) # ":" # suffix
     };
 
+    private func projectedVersionDigest(value : Text) : Text {
+        // Keep projected IDs fixed-size while still versioning mutable content.
+        // Two independently salted Text.hash values plus length make accidental
+        // collisions materially less likely than a single 32-bit hash.
+        Nat.toText(Text.size(value))
+        # "-"
+        # Nat.toText(Nat32.toNat(Text.hash("oneblock:a:" # value)))
+        # "-"
+        # Nat.toText(Nat32.toNat(Text.hash("oneblock:b:" # value)))
+    };
+
     private func legacyTextClaimId(profile : Profile, field : Text, value : Text) : Text {
-        // Include the projected value so edits cannot silently retarget an old
-        // review reference to different profile content.
-        let versionKey = Nat.toText(Text.size(value)) # ":" # value;
-        legacyClaimId(profile, field # ":" # versionKey)
+        legacyClaimId(profile, field # ":" # projectedVersionDigest(value))
     };
 
     private func legacyLinkClaimId(profile : Profile, link : Types.Link) : Text {
-        // Length-prefix the mutable text fields so the identifier is deterministic
-        // and boundary-safe without relying on a short non-cryptographic hash.
-        let key = Nat.toText(Text.size(link.name)) # ":" # link.name # ":" # link.url;
-        legacyClaimId(profile, "link:" # key)
+        let versioned = link.name # "\u{1f}" # link.url;
+        legacyClaimId(profile, "link:" # projectedVersionDigest(versioned))
     };
 
     private func findProfileByOwner(owner : Principal) : ?Profile {
@@ -1861,7 +1868,7 @@ persistent actor {
                 case null {};
             }
         };
-        if (reviewTextBudget > 8192) {
+        if (reviewTextBudget > 4096) {
             return #err("review payload is too large")
         };
         let profile = switch (profiles.get(input.profile_id)) {
@@ -1879,7 +1886,9 @@ persistent actor {
             case (?ids) ids;
             case null [];
         };
-        if (existingReviewIds.size() >= 1000) {
+        // 200 reviews * <=4 KiB review text + <=1 KiB response leaves
+        // substantial headroom below the IC query reply limit even with Candid overhead.
+        if (existingReviewIds.size() >= 200) {
             return #err("review limit reached for this profile")
         };
         var reviewerReviewCount : Nat = 0;
@@ -1980,6 +1989,9 @@ persistent actor {
     };
 
     public shared ({ caller }) func respondToPeerReview(reviewId : Text, response : Text) : async Result.Result<Nat, Text> {
+        if (Text.size(response) > 1024) {
+            return #err("review response is too long")
+        };
         let review = switch (peerReviews.get(reviewId)) {
             case null { return #err("review unavailable") };
             case (?r) r;
@@ -2009,6 +2021,14 @@ persistent actor {
     };
 
     public shared ({ caller }) func disputePeerReview(reviewId : Text, response : ?Text) : async Result.Result<Nat, Text> {
+        switch (response) {
+            case (?value) {
+                if (Text.size(value) > 1024) {
+                    return #err("review response is too long")
+                }
+            };
+            case null {};
+        };
         let review = switch (peerReviews.get(reviewId)) {
             case null { return #err("review unavailable") };
             case (?r) r;
