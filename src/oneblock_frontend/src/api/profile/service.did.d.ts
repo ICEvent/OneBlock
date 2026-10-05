@@ -264,8 +264,8 @@ export interface PeerReview {
   'capability' : [] | [CapabilityRef],
 }
 export interface PeerReviewPage {
-  'items' : Array<PeerReview>,
   'next_cursor' : [] | [bigint],
+  'items' : Array<PeerReview>,
 }
 export interface PolicyEvaluation {
   'principal' : IdentityPrincipal,
@@ -334,8 +334,8 @@ export interface ProfileClaim {
   'capability' : [] | [CapabilityRef],
 }
 export interface ProfileClaimPage {
-  'items' : Array<ProfileClaim>,
   'next_cursor' : [] | [bigint],
+  'items' : Array<ProfileClaim>,
 }
 export type ProfileId = string;
 export interface Provenance {
