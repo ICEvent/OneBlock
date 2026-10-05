@@ -1,3 +1,4 @@
+import Prim "mo:prim";
 import Cycles "mo:base/ExperimentalCycles";
 import Nat "mo:base/Nat";
 import Int "mo:base/Int";
@@ -1294,6 +1295,26 @@ persistent actor {
             return 0
         }
 
+    };
+
+    public query ({ caller }) func getSystemData() : async {
+        cycles : Nat;
+        memory : Nat;
+        heap : Nat;
+    } {
+        if (isAdmin(caller)) {
+            {
+                cycles = Cycles.balance();
+                memory = Prim.rts_memory_size();
+                heap = Prim.rts_heap_size();
+            }
+        } else {
+            {
+                cycles = 0;
+                memory = 0;
+                heap = 0;
+            }
+        }
     };
 
     public shared ({ caller }) func addAdmin(pid : Text) : async Result.Result<Nat, Text> {
