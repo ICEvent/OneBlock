@@ -28,11 +28,14 @@ async function collectPaged<T>(
 ) {
   const items: T[] = [];
   let cursor = 0n;
-  for (let page = 0; page < 200; page += 1) {
+  while (true) {
     const result = await fetchPage(cursor, 50n);
     items.push(...result.items);
     const [nextCursor] = result.next_cursor;
     if (nextCursor === undefined) break;
+    if (nextCursor <= cursor) {
+      throw new Error('Provenance pagination cursor did not advance');
+    }
     cursor = nextCursor;
   }
   return items;
