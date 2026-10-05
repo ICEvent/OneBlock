@@ -23,6 +23,21 @@ function blockDate(timestamp: bigint) {
   }
 }
 
+async function collectPaged<T>(
+  fetchPage: (cursor: bigint, pageSize: bigint) => Promise<{ items: T[]; next_cursor: [] | [bigint] }>,
+) {
+  const items: T[] = [];
+  let cursor = 0n;
+  for (let page = 0; page < 200; page += 1) {
+    const result = await fetchPage(cursor, 50n);
+    items.push(...result.items);
+    const [nextCursor] = result.next_cursor;
+    if (nextCursor === undefined) break;
+    cursor = nextCursor;
+  }
+  return items;
+}
+
 const ProfilePage = () => {
   const oneblock = useOneblock();
   const { state: { agent, isAuthed, principal } } = useGlobalContext();
@@ -67,8 +82,12 @@ const ProfilePage = () => {
         const [scoreResult, blockResult, claimResult, reviewResult] = await Promise.all([
           ownerText ? oneblock.getScores(ownerText).catch(() => []) : Promise.resolve([]),
           oneblock.listBlocks(profileData.id).catch(() => []),
-          oneblock.listProfileClaims(profileData.id).catch(() => []),
-          oneblock.listPeerReviews(profileData.id).catch(() => []),
+          collectPaged<ProfileClaim>((cursor, pageSize) =>
+            oneblock.listProfileClaimsPage(profileData.id, cursor, pageSize)
+          ).catch(() => oneblock.listProfileClaims(profileData.id).catch(() => [])),
+          collectPaged<PeerReview>((cursor, pageSize) =>
+            oneblock.listPeerReviewsPage(profileData.id, cursor, pageSize)
+          ).catch(() => oneblock.listPeerReviews(profileData.id).catch(() => [])),
         ]);
         if (!active) return;
 
