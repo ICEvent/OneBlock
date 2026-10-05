@@ -419,6 +419,14 @@ export const idlFactory = ({ IDL }) => {
     'tlabel' : IDL.Text,
     'visibility' : Visibility,
   });
+  const PeerReviewPage = IDL.Record({
+    'next_cursor' : IDL.Opt(IDL.Nat),
+    'items' : IDL.Vec(PeerReview),
+  });
+  const ProfileClaimPage = IDL.Record({
+    'next_cursor' : IDL.Opt(IDL.Nat),
+    'items' : IDL.Vec(ProfileClaim),
+  });
   const Result_2 = IDL.Variant({ 'ok' : ProbabilityScores, 'err' : IDL.Text });
   const NewActivityType = IDL.Record({
     'description' : IDL.Text,
@@ -561,9 +569,19 @@ export const idlFactory = ({ IDL }) => {
       ),
     'listOipProviders' : IDL.Func([], [IDL.Vec(OipProvider)], ['query']),
     'listPeerReviews' : IDL.Func([IDL.Text], [IDL.Vec(PeerReview)], ['query']),
+    'listPeerReviewsPage' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Nat],
+        [PeerReviewPage],
+        ['query'],
+      ),
     'listProfileClaims' : IDL.Func(
         [IDL.Text],
         [IDL.Vec(ProfileClaim)],
+        ['query'],
+      ),
+    'listProfileClaimsPage' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Nat],
+        [ProfileClaimPage],
         ['query'],
       ),
     'recomputeScores' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [Result_2], []),
