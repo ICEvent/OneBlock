@@ -59,6 +59,8 @@ persistent actor {
     type NewSelfClaim = ProfileGraph.NewSelfClaim;
     type PeerReview = ProfileGraph.PeerReview;
     type NewPeerReview = ProfileGraph.NewPeerReview;
+    type ProfileClaimPage = { items : [ProfileClaim]; next_cursor : ?Nat };
+    type PeerReviewPage = { items : [PeerReview]; next_cursor : ?Nat };
     type LegacyOwnershipEpoch = {
         legacy_profile_id : Text;
         current_profile_id : Text;
@@ -1857,105 +1859,102 @@ persistent actor {
         }
     };
 
-    public query ({ caller }) func listProfileClaims(profileId : Text) : async [ProfileClaim] {
+    private func buildProfileClaimPage(
+        caller : Principal,
+        profileId : Text,
+        cursor : Nat,
+        requestedPageSize : Nat
+    ) : ProfileClaimPage {
         let profile = switch (profiles.get(profileId)) {
-            case null { return [] };
+            case null { return { items = []; next_cursor = null } };
             case (?p) p;
         };
-        let buf = Buffer.Buffer<ProfileClaim>(0);
-        var claimBytesUsed : Nat = 0;
-        var claimBudgetOpen = true;
-
-        // Transitional adapter: existing editable profile fields are exposed as
-        // self-declared claims without copying or migrating legacy stable state.
+        let pageSize = if (requestedPageSize == 0) 1 else if (requestedPageSize > 50) 50 else requestedPageSize;
         let profileVisibility = graphVisibility(profile.visibility);
-        if (canReadGraphItem(caller, profile.owner, profileVisibility)) {
-            if (claimBudgetOpen) {
-                let (nextBytes, added) = addClaimWithinBudget(
-                    buf,
-                    claimBytesUsed,
-                    legacyProfileClaim(profile, legacyTextClaimId(profile, "name", profile.name), "profile.name", #text(profile.name))
-                );
-                claimBytesUsed := nextBytes;
-                claimBudgetOpen := added
-            };
-            if (Text.size(profile.bio) > 0) {
-                if (claimBudgetOpen) {
-                    let (nextBytes, added) = addClaimWithinBudget(
-                        buf,
-                        claimBytesUsed,
-                        legacyProfileClaim(profile, legacyTextClaimId(profile, "bio", profile.bio), "profile.bio", #text(profile.bio))
-                    );
-                    claimBytesUsed := nextBytes;
-                    claimBudgetOpen := added
-                }
-            };
-            for (link in profile.links.vals()) {
-                let linkId = legacyLinkClaimId(profile, link);
-                if (claimBudgetOpen) {
-                    let (nextBytes, added) = addClaimWithinBudget(
-                        buf,
-                        claimBytesUsed,
-                        legacyProfileClaim(profile, linkId, "profile.link." # link.name, #reference(link.url))
-                    );
-                    claimBytesUsed := nextBytes;
-                    claimBudgetOpen := added
-                }
-            }
-        };
+        let legacyVisible = canReadGraphItem(caller, profile.owner, profileVisibility);
+        let bioCount : Nat = if (Text.size(profile.bio) > 0) 1 else 0;
+        let legacyCount : Nat = 1 + bioCount + profile.links.size();
+        let claimIds = switch (profileClaimIndex.get(profileId)) { case (?ids) ids; case null [] };
+        let activityIds = switch (profileActivityIndex.get(profileId)) { case (?ids) ids; case null [] };
+        let total = legacyCount + claimIds.size() + activityIds.size();
+        let buf = Buffer.Buffer<ProfileClaim>(pageSize);
+        var usedBytes : Nat = 0;
+        var pos = if (cursor > total) total else cursor;
+        var scanned : Nat = 0;
+        let maxScan : Nat = pageSize * 4 + 32;
 
-        // Claim indexes migrate with profile IDs; authorization remains tied to
-        // the immutable subject stored on each claim.
-        let claimIds = switch (profileClaimIndex.get(profileId)) {
-            case null { [] };
-            case (?ids) { ids };
-        };
-        for (claimId in claimIds.vals()) {
-            switch (profileClaims.get(claimId)) {
-                case null {};
+        label scan while (pos < total and buf.size() < pageSize and usedBytes < 1_500_000 and scanned < maxScan) {
+            let current = pos;
+            pos += 1;
+            scanned += 1;
+            var candidate : ?ProfileClaim = null;
+            if (current < legacyCount) {
+                if (legacyVisible) {
+                    if (current == 0) {
+                        candidate := ?legacyProfileClaim(profile, legacyTextClaimId(profile, "name", profile.name), "profile.name", #text(profile.name))
+                    } else if (bioCount == 1 and current == 1) {
+                        candidate := ?legacyProfileClaim(profile, legacyTextClaimId(profile, "bio", profile.bio), "profile.bio", #text(profile.bio))
+                    } else {
+                        let linkOffset = current - 1 - bioCount;
+                        if (linkOffset < profile.links.size()) {
+                            let link = profile.links[linkOffset];
+                            candidate := ?legacyProfileClaim(profile, legacyLinkClaimId(profile, link), "profile.link." # link.name, #reference(link.url))
+                        }
+                    }
+                }
+            } else if (current < legacyCount + claimIds.size()) {
+                let claimId = claimIds[current - legacyCount];
+                switch (profileClaims.get(claimId)) {
+                    case (?claim) {
+                        if (claim.subject == profile.owner and canReadGraphItem(caller, claim.subject, claim.visibility)) {
+                            candidate := ?claim
+                        }
+                    };
+                    case null {};
+                }
+            } else {
+                let recordId = activityIds[current - legacyCount - claimIds.size()];
+                switch (activityRecordsMap.get(recordId)) {
+                    case (?record) {
+                        switch (activityClaim(record)) {
+                            case (?claim) {
+                                if (claim.subject == profile.owner and canReadGraphItem(caller, claim.subject, claim.visibility)) {
+                                    candidate := ?claim
+                                }
+                            };
+                            case null {};
+                        }
+                    };
+                    case null {};
+                }
+            };
+            switch (candidate) {
                 case (?claim) {
-                    if (
-                        claim.subject == profile.owner and
-                        canReadGraphItem(caller, claim.subject, claim.visibility) and
-                        claimBudgetOpen
-                    ) {
-                        let (nextBytes, added) = addClaimWithinBudget(buf, claimBytesUsed, claim);
-                        claimBytesUsed := nextBytes;
-                        claimBudgetOpen := added
+                    let bytes = profileClaimApproxBytes(claim);
+                    if (usedBytes + bytes <= 1_500_000) {
+                        buf.add(claim);
+                        usedBytes += bytes
+                    } else {
+                        // Cursor already advanced past this oversized page item;
+                        // individual claims remain directly retrievable by ID.
                     }
                 };
-            }
-        };
-
-        // External records stay immutable while their per-profile index migrates
-        // on rename, keeping reads bounded to this profile's activity set.
-        let activityIds = switch (profileActivityIndex.get(profileId)) {
-            case null { [] };
-            case (?ids) { ids };
-        };
-        for (recordId in activityIds.vals()) {
-            switch (activityRecordsMap.get(recordId)) {
                 case null {};
-                case (?record) {
-                    switch (activityClaim(record)) {
-                        case null {};
-                        case (?claim) {
-                            if (
-                                claim.subject == profile.owner and
-                                canReadGraphItem(caller, claim.subject, claim.visibility) and
-                                claimBudgetOpen
-                            ) {
-                                let (nextBytes, added) = addClaimWithinBudget(buf, claimBytesUsed, claim);
-                                claimBytesUsed := nextBytes;
-                                claimBudgetOpen := added
-                            }
-                        };
-                    }
-                };
             }
         };
+        { items = Buffer.toArray(buf); next_cursor = if (pos < total) ?pos else null }
+    };
 
-        Buffer.toArray(buf)
+    public query ({ caller }) func listProfileClaimsPage(
+        profileId : Text,
+        cursor : Nat,
+        pageSize : Nat
+    ) : async ProfileClaimPage {
+        buildProfileClaimPage(caller, profileId, cursor, pageSize)
+    };
+
+    public query ({ caller }) func listProfileClaims(profileId : Text) : async [ProfileClaim] {
+        buildProfileClaimPage(caller, profileId, 0, 50).items
     };
 
     public shared ({ caller }) func createPeerReview(input : NewPeerReview) : async Result.Result<Text, Text> {
@@ -2081,16 +2080,11 @@ persistent actor {
             case (?ids) ids;
             case null [];
         };
-        // 200 reviews * <=4 KiB review text + <=1 KiB response leaves
-        // substantial headroom below the IC query reply limit even with Candid overhead.
-        if (existingReviewIds.size() >= 200) {
-            return #err("review limit reached for this profile")
-        };
         var reviewerReviewCount : Nat = 0;
         label reviewCount for (existingId in existingReviewIds.vals()) {
             switch (peerReviews.get(existingId)) {
                 case (?existingReview) {
-                    if (existingReview.reviewer == caller) {
+                    if (existingReview.reviewer == caller and existingReview.status != #withdrawn) {
                         reviewerReviewCount += 1;
                         if (reviewerReviewCount >= 20) {
                             return #err("review limit reached for this reviewer and profile")
@@ -2154,19 +2148,27 @@ persistent actor {
         }
     };
 
-    public query ({ caller }) func listPeerReviews(profileId : Text) : async [PeerReview] {
+    private func buildPeerReviewPage(
+        caller : Principal,
+        profileId : Text,
+        cursor : Nat,
+        requestedPageSize : Nat
+    ) : PeerReviewPage {
         let profile = switch (profiles.get(profileId)) {
-            case null { return [] };
+            case null { return { items = []; next_cursor = null } };
             case (?p) p;
         };
-        let ids = switch (profileReviewIndex.get(profileId)) {
-            case null { [] };
-            case (?value) { value };
-        };
-        let buf = Buffer.Buffer<PeerReview>(ids.size());
-        for (id in ids.vals()) {
+        let ids = switch (profileReviewIndex.get(profileId)) { case (?value) value; case null [] };
+        let pageSize = if (requestedPageSize == 0) 1 else if (requestedPageSize > 50) 50 else requestedPageSize;
+        let buf = Buffer.Buffer<PeerReview>(pageSize);
+        var pos = if (cursor > ids.size()) ids.size() else cursor;
+        var scanned : Nat = 0;
+        let maxScan : Nat = pageSize * 4 + 32;
+        label scan while (pos < ids.size() and buf.size() < pageSize and scanned < maxScan) {
+            let id = ids[pos];
+            pos += 1;
+            scanned += 1;
             switch (peerReviews.get(id)) {
-                case null {};
                 case (?review) {
                     if (
                         review.subject == profile.owner and
@@ -2178,9 +2180,22 @@ persistent actor {
                         buf.add(review)
                     }
                 };
+                case null {};
             }
         };
-        Buffer.toArray(buf)
+        { items = Buffer.toArray(buf); next_cursor = if (pos < ids.size()) ?pos else null }
+    };
+
+    public query ({ caller }) func listPeerReviewsPage(
+        profileId : Text,
+        cursor : Nat,
+        pageSize : Nat
+    ) : async PeerReviewPage {
+        buildPeerReviewPage(caller, profileId, cursor, pageSize)
+    };
+
+    public query ({ caller }) func listPeerReviews(profileId : Text) : async [PeerReview] {
+        buildPeerReviewPage(caller, profileId, 0, 50).items
     };
 
     public shared ({ caller }) func respondToPeerReview(reviewId : Text, response : Text) : async Result.Result<Nat, Text> {
