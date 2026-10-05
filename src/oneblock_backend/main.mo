@@ -1734,7 +1734,27 @@ persistent actor {
 
     private func resolveClaim(claimId : Text) : ?ProfileClaim {
         switch (profileClaims.get(claimId)) {
-            case (?claim) { return ?claim };
+            case (?claim) {
+                switch (findProfileByOwner(claim.subject)) {
+                    case (?currentProfile) {
+                        return ?{
+                            id = claim.id;
+                            profile_id = currentProfile.id;
+                            subject = claim.subject;
+                            predicate = claim.predicate;
+                            value = claim.value;
+                            capability = claim.capability;
+                            context = claim.context;
+                            provenance = claim.provenance;
+                            valid_from = claim.valid_from;
+                            valid_until = claim.valid_until;
+                            visibility = claim.visibility;
+                            created_at = claim.created_at;
+                        }
+                    };
+                    case null { return ?claim };
+                }
+            };
             case null {};
         };
 
@@ -2280,6 +2300,20 @@ persistent actor {
         #ok(1)
     };
 
+    private func removeReviewIndex(profileId : Text, reviewId : Text) {
+        switch (profileReviewIndex.get(profileId)) {
+            case null {};
+            case (?ids) {
+                let kept = Array.filter<Text>(ids, func(id : Text) : Bool { id != reviewId });
+                if (kept.size() == 0) {
+                    ignore profileReviewIndex.remove(profileId)
+                } else {
+                    profileReviewIndex.put(profileId, kept)
+                }
+            };
+        }
+    };
+
     public shared ({ caller }) func withdrawPeerReview(reviewId : Text) : async Result.Result<Nat, Text> {
         let review = switch (peerReviews.get(reviewId)) {
             case null { return #err("review unavailable") };
@@ -2306,6 +2340,7 @@ persistent actor {
             created_at = review.created_at;
             updated_at = Time.now();
         });
+        removeReviewIndex(review.profile_id, reviewId);
         #ok(1)
     };
 
