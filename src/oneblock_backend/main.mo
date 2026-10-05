@@ -232,6 +232,7 @@ persistent actor {
                 // Never apply an epoch while the historical ID is active again.
                 if (profiles.get(epoch.legacy_profile_id) != null) { return };
                 historicalProfileOwners.put(epoch.legacy_profile_id, epoch.subject);
+                let migratedIds = Buffer.Buffer<Text>(0);
                 switch (profileActivityIndex.get(epoch.legacy_profile_id)) {
                     case null {};
                     case (?recordIds) {
@@ -243,14 +244,17 @@ persistent actor {
                                         record.profile_id == epoch.legacy_profile_id and
                                         timestampInEpoch(record.ingest_timestamp, epoch)
                                     ) {
-                                        switch (activityRecordSubjects.get(recordId)) {
-                                            case null { activityRecordSubjects.put(recordId, epoch.subject) };
-                                            case (?existing) {
-                                                if (existing != epoch.subject) {
-                                                    // Conflicting historical evidence stays quarantined.
-                                                    ignore activityRecordSubjects.remove(recordId)
-                                                }
+                                        let safelyBound = switch (activityRecordSubjects.get(recordId)) {
+                                            case null {
+                                                activityRecordSubjects.put(recordId, epoch.subject);
+                                                true
                                             };
+                                            case (?existing) {
+                                                existing == epoch.subject
+                                            };
+                                        };
+                                        if (safelyBound) {
+                                            migratedIds.add(recordId)
                                         }
                                     }
                                 };
@@ -258,7 +262,19 @@ persistent actor {
                         }
                     };
                 };
-                mergeTextIndex(profileActivityIndex, epoch.legacy_profile_id, epoch.current_profile_id)
+                if (migratedIds.size() > 0) {
+                    let existing = switch (profileActivityIndex.get(epoch.current_profile_id)) {
+                        case (?ids) ids;
+                        case null [];
+                    };
+                    let merged = Buffer.fromArray<Text>(existing);
+                    for (recordId in migratedIds.vals()) {
+                        if (Array.find<Text>(existing, func(id : Text) : Bool { id == recordId }) == null) {
+                            merged.add(recordId)
+                        }
+                    };
+                    profileActivityIndex.put(epoch.current_profile_id, Buffer.toArray(merged))
+                }
             };
         }
     };
@@ -270,21 +286,38 @@ persistent actor {
     };
 
     private func rebuildIntegrationProfileIndexes() {
-        // One-time upgrade repair for legacy state. Global scans are acceptable
-        // here because they are not on the user-triggered rename path.
+        // One-time upgrade repair for legacy state. Accumulate in mutable
+        // buffers and materialize once per profile to keep this O(N).
+        let connectionBuffers = TrieMap.TrieMap<Text, Buffer.Buffer<Text>>(Text.equal, Text.hash);
         for ((_, connection) in connections.entries()) {
-            appendUniqueTextIndex(
-                profileConnectionIndex,
-                connection.profile_id,
-                connection.app_id
-            )
+            let buf = switch (connectionBuffers.get(connection.profile_id)) {
+                case (?existing) existing;
+                case null {
+                    let created = Buffer.Buffer<Text>(1);
+                    connectionBuffers.put(connection.profile_id, created);
+                    created
+                };
+            };
+            buf.add(connection.app_id)
         };
+        for ((profileId, buf) in connectionBuffers.entries()) {
+            profileConnectionIndex.put(profileId, Buffer.toArray(buf))
+        };
+
+        let summaryBuffers = TrieMap.TrieMap<Text, Buffer.Buffer<Text>>(Text.equal, Text.hash);
         for ((key, summary) in derivedSummaries.entries()) {
-            appendUniqueTextIndex(
-                profileSummaryIndex,
-                summary.profile_id,
-                key
-            )
+            let buf = switch (summaryBuffers.get(summary.profile_id)) {
+                case (?existing) existing;
+                case null {
+                    let created = Buffer.Buffer<Text>(1);
+                    summaryBuffers.put(summary.profile_id, created);
+                    created
+                };
+            };
+            buf.add(key)
+        };
+        for ((profileId, buf) in summaryBuffers.entries()) {
+            profileSummaryIndex.put(profileId, Buffer.toArray(buf))
         }
     };
 
@@ -699,35 +732,80 @@ persistent actor {
         }
     };
 
-    private func migrateDerivedSummaries(oldId : Text, newId : Text) {
-        let keys = switch (profileSummaryIndex.get(oldId)) {
+    private func migrateDerivedSummaries(oldId : Text, newId : Text, owner : Principal) {
+        // Legacy aggregates may span multiple ownership epochs after ID reuse.
+        // Rebuild summaries exclusively from records immutably bound to owner.
+        let oldKeys = switch (profileSummaryIndex.get(oldId)) {
             case (?values) values;
             case null [];
         };
-        let migratedKeys = Buffer.Buffer<Text>(keys.size());
-        for (oldKey in keys.vals()) {
-            switch (derivedSummaries.get(oldKey)) {
-                case null {};
-                case (?summary) {
-                    let newKey = summaryKey(newId, summary.app_id, summary.activity_type);
-                    derivedSummaries.put(newKey, {
-                        profile_id = newId;
-                        app_id = summary.app_id;
-                        activity_type = summary.activity_type;
-                        record_count = summary.record_count;
-                        total_amount = summary.total_amount;
-                        currency = summary.currency;
-                        last_updated = summary.last_updated;
-                    });
-                    migratedKeys.add(newKey);
-                    ignore derivedSummaries.remove(oldKey);
+        for (oldKey in oldKeys.vals()) {
+            ignore derivedSummaries.remove(oldKey)
+        };
+        ignore profileSummaryIndex.remove(oldId);
+
+        let rebuilt = TrieMap.TrieMap<Text, DerivedSummary>(Text.equal, Text.hash);
+        let recordIds = switch (profileActivityIndex.get(oldId)) {
+            case (?ids) ids;
+            case null [];
+        };
+        for (recordId in recordIds.vals()) {
+            switch (activityRecordSubjects.get(recordId), activityRecordsMap.get(recordId)) {
+                case (?subject, ?record) {
+                    if (subject == owner) {
+                        let key = summaryKey(newId, record.app_id, record.activity_type);
+                        let previous = rebuilt.get(key);
+                        let (count, total, currency, updatedAt) = switch (previous) {
+                            case null {
+                                (0, null, record.currency, record.ingest_timestamp)
+                            };
+                            case (?summary) {
+                                (
+                                    summary.record_count,
+                                    summary.total_amount,
+                                    summary.currency,
+                                    if (record.ingest_timestamp > summary.last_updated) {
+                                        record.ingest_timestamp
+                                    } else {
+                                        summary.last_updated
+                                    }
+                                )
+                            };
+                        };
+                        let nextTotal : ?Float = switch (record.amount) {
+                            case null total;
+                            case (?amount) {
+                                switch (total) {
+                                    case null ?amount;
+                                    case (?existing) ?(existing + amount);
+                                }
+                            };
+                        };
+                        rebuilt.put(key, {
+                            profile_id = newId;
+                            app_id = record.app_id;
+                            activity_type = record.activity_type;
+                            record_count = count + 1;
+                            total_amount = nextTotal;
+                            currency = currency;
+                            last_updated = updatedAt;
+                        })
+                    }
                 };
+                case _ {};
             }
         };
-        if (migratedKeys.size() > 0) {
-            profileSummaryIndex.put(newId, Buffer.toArray(migratedKeys))
+
+        let newKeys = Buffer.Buffer<Text>(0);
+        for ((key, summary) in rebuilt.entries()) {
+            derivedSummaries.put(key, summary);
+            newKeys.add(key)
         };
-        ignore profileSummaryIndex.remove(oldId)
+        if (newKeys.size() > 0) {
+            profileSummaryIndex.put(newId, Buffer.toArray(newKeys))
+        } else {
+            ignore profileSummaryIndex.remove(newId)
+        }
     };
 
     private func migrateConnections(oldId : Text, newId : Text) {
@@ -857,7 +935,7 @@ persistent actor {
                                 // Only pre-established immutable subject bindings move
                                 // safely with the profile's activity index.
                                 migrateConnections(oid, nid);
-                                migrateDerivedSummaries(oid, nid);
+                                migrateDerivedSummaries(oid, nid, p.owner);
                                 migrateGraphLocators(oid, nid);
                                 migrateTextIndex(profileActivityIndex, oid, nid);
                                 migrateTextIndex(profileClaimIndex, oid, nid);
@@ -2204,23 +2282,29 @@ persistent actor {
             case null { return [] };
             case (?ids) { ids }
         };
+        let profile = switch (profiles.get(profileId)) {
+            case null { return [] };
+            case (?p) p;
+        };
         let buf = Buffer.Buffer<ActivityRecord>(0);
         for (rid in ids.vals()) {
-            switch (activityRecordsMap.get(rid)) {
-                case null {};
-                case (?r) {
-                    let appMatch = switch (appId) {
-                        case null { true };
-                        case (?aid) { r.app_id == aid }
-                    };
-                    let typeMatch = switch (activityType) {
-                        case null { true };
-                        case (?at) { r.activity_type == at }
-                    };
-                    if (appMatch and typeMatch) {
-                        buf.add(r)
+            switch (activityRecordSubjects.get(rid), activityRecordsMap.get(rid)) {
+                case (?subject, ?r) {
+                    if (subject == profile.owner) {
+                        let appMatch = switch (appId) {
+                            case null { true };
+                            case (?aid) { r.app_id == aid }
+                        };
+                        let typeMatch = switch (activityType) {
+                            case null { true };
+                            case (?at) { r.activity_type == at }
+                        };
+                        if (appMatch and typeMatch) {
+                            buf.add(r)
+                        }
                     }
-                }
+                };
+                case _ {};
             }
         };
         Buffer.toArray(buf)
