@@ -514,10 +514,7 @@ export interface _SERVICE {
   'listConnections' : ActorMethod<[ProfileId], Array<IntegrationConnection>>,
   'listOipProviders' : ActorMethod<[], Array<OipProvider>>,
   'listPeerReviews' : ActorMethod<[string], Array<PeerReview>>,
-  'listPeerReviewsPage' : ActorMethod<
-    [string, bigint, bigint],
-    PeerReviewPage
-  >,
+  'listPeerReviewsPage' : ActorMethod<[string, bigint, bigint], PeerReviewPage>,
   'listProfileClaims' : ActorMethod<[string], Array<ProfileClaim>>,
   'listProfileClaimsPage' : ActorMethod<
     [string, bigint, bigint],
