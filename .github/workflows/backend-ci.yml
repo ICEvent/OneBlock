@@ -62,6 +62,7 @@ jobs:
           cmp src/declarations/profile/profile.did.d.ts src/oneblock_frontend/src/api/profile/service.did.d.ts
 
       - name: Upload generated declarations
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: profile-declarations
