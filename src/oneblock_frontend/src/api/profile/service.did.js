@@ -360,6 +360,10 @@ export const idlFactory = ({ IDL }) => {
     'related_claims' : IDL.Vec(ClaimId),
     'capability' : IDL.Opt(CapabilityRef),
   });
+  const PeerReviewPage = IDL.Record({
+    'items' : IDL.Vec(PeerReview),
+    'next_cursor' : IDL.Opt(IDL.Nat),
+  });
   const SourceKind = IDL.Variant({
     'peer' : IDL.Null,
     'self_declared' : IDL.Null,
@@ -398,6 +402,10 @@ export const idlFactory = ({ IDL }) => {
     'profile_id' : IDL.Text,
     'predicate' : IDL.Text,
     'capability' : IDL.Opt(CapabilityRef),
+  });
+  const ProfileClaimPage = IDL.Record({
+    'items' : IDL.Vec(ProfileClaim),
+    'next_cursor' : IDL.Opt(IDL.Nat),
   });
   const ProbabilityScores = IDL.Record({
     'human_score' : IDL.Float64,
@@ -561,9 +569,19 @@ export const idlFactory = ({ IDL }) => {
       ),
     'listOipProviders' : IDL.Func([], [IDL.Vec(OipProvider)], ['query']),
     'listPeerReviews' : IDL.Func([IDL.Text], [IDL.Vec(PeerReview)], ['query']),
+    'listPeerReviewsPage' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Nat],
+        [PeerReviewPage],
+        ['query'],
+      ),
     'listProfileClaims' : IDL.Func(
         [IDL.Text],
         [IDL.Vec(ProfileClaim)],
+        ['query'],
+      ),
+    'listProfileClaimsPage' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Nat],
+        [ProfileClaimPage],
         ['query'],
       ),
     'recomputeScores' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [Result_2], []),
