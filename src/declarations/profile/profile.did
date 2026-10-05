@@ -171,6 +171,11 @@ type Provenance =
    verification: VerificationMethod;
  };
 type ProfileId = text;
+type ProfileClaimPage = 
+ record {
+   items: vec ProfileClaim;
+   next_cursor: opt nat;
+ };
 type ProfileClaim = 
  record {
    capability: opt CapabilityRef;
@@ -243,6 +248,11 @@ type PolicyEvaluation =
    passed: bool;
    policy_id: PolicyId;
    "principal": IdentityPrincipal;
+ };
+type PeerReviewPage = 
+ record {
+   items: vec PeerReview;
+   next_cursor: opt nat;
  };
 type PeerReview = 
  record {
@@ -615,7 +625,11 @@ service : {
    (vec IntegrationConnection) query;
   listOipProviders: () -> (vec OipProvider) query;
   listPeerReviews: (profileId: text) -> (vec PeerReview) query;
+  listPeerReviewsPage: (profileId: text, cursor: nat, pageSize: nat) ->
+   (PeerReviewPage) query;
   listProfileClaims: (profileId: text) -> (vec ProfileClaim) query;
+  listProfileClaimsPage: (profileId: text, cursor: nat, pageSize: nat) ->
+   (ProfileClaimPage) query;
   recomputeScores: ("principal": text, policyId: opt text) -> (Result_2);
   registerActivityType: (newType: NewActivityType) -> (Result_1);
   registerApp: (newApp: NewIntegrationApp) -> (Result_1);
