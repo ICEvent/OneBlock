@@ -269,6 +269,25 @@ persistent actor {
         }
     };
 
+    private func rebuildIntegrationProfileIndexes() {
+        // One-time upgrade repair for legacy state. Global scans are acceptable
+        // here because they are not on the user-triggered rename path.
+        for ((_, connection) in connections.entries()) {
+            appendUniqueTextIndex(
+                profileConnectionIndex,
+                connection.profile_id,
+                connection.app_id
+            )
+        };
+        for ((key, summary) in derivedSummaries.entries()) {
+            appendUniqueTextIndex(
+                profileSummaryIndex,
+                summary.profile_id,
+                key
+            )
+        }
+    };
+
     private func backfillLegacyConnectionOwnership() {
         // For pre-upgrade state, only a connection created during the current
         // Profile instance can be attributed safely. Reconnects after this
@@ -397,6 +416,9 @@ persistent actor {
     system func postupgrade() {
         // Restore only provenance that can be proven. Explicit ownership
         // epochs handle pre-upgrade renames, including profiles with no blocks.
+        // Rebuild integration indexes once so legacy state benefits from the
+        // bounded per-profile rename path immediately after upgrade.
+        rebuildIntegrationProfileIndexes();
         applyLegacyOwnershipEpochs();
         backfillLegacyConnectionOwnership();
         backfillLegacyActivitySubjects();
