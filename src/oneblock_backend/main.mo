@@ -1492,11 +1492,34 @@ persistent actor {
         };
     };
 
-    public query func getTrait(traitId : Text) : async ?Trait {
-        traits.get(traitId)
+    // Trait visibility must be enforced at every read, including direct-ID
+    // lookups. Ownership is derived from the profile's authoritative trait index,
+    // not from caller-supplied identifiers or the trait's visibility.
+    private func canReadTrait(caller : Principal, owner : Principal, trait : Trait) : Bool {
+        if (caller == owner) return true;
+        switch (trait.visibility) {
+            case (#global) true;
+            case (#unlisted or #personal) false;
+        }
     };
 
-    public query func getTraits(profileId : Text) : async [Trait] {
+    public query ({ caller }) func getTrait(traitId : Text) : async ?Trait {
+        let trait = switch (traits.get(traitId)) {
+            case null return null;
+            case (?value) value;
+        };
+        // No additional stable index: legacy profile-to-trait relationships
+        // remain the source of truth across upgrades and profile renames.
+        for (profile in profiles.vals()) {
+            if (Array.find<Text>(profile.traits, func (id : Text) : Bool { id == traitId }) != null) {
+                if (canReadTrait(caller, profile.owner, trait)) return ?trait;
+                return null;
+            };
+        };
+        null
+    };
+
+    public query ({ caller }) func getTraits(profileId : Text) : async [Trait] {
         let profile = profiles.get(profileId);
         switch (profile) {
             case (?p) {
@@ -1505,7 +1528,9 @@ persistent actor {
                     let trait = traits.get(traitId);
                     switch (trait) {
                         case (?t) {
-                            traitList.add(t);
+                            if (canReadTrait(caller, p.owner, t)) {
+                                traitList.add(t);
+                            };
                         };
                         case null {};
                     };
