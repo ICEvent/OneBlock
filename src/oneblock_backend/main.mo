@@ -1499,7 +1499,8 @@ persistent actor {
         if (caller == owner) return true;
         switch (trait.visibility) {
             case (#global) true;
-            case (#unlisted or #personal) false;
+            case (#unlisted) false;
+            case (#personal) false;
         }
     };
 
