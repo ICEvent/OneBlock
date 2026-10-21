@@ -1492,11 +1492,57 @@ persistent actor {
         };
     };
 
-    public query func getTrait(traitId : Text) : async ?Trait {
-        traits.get(traitId)
+    // Trait visibility must be enforced at every read, including direct-ID
+    // lookups. Ownership is derived from the profile's authoritative trait index,
+    // not from caller-supplied identifiers or the trait's visibility.
+    private func canReadTrait(caller : Principal, owner : Principal, trait : Trait) : Bool {
+        if (caller == owner) return true;
+        switch (trait.visibility) {
+            case (#global) true;
+            case (#unlisted) false;
+            case (#personal) false;
+        }
     };
 
-    public query func getTraits(profileId : Text) : async [Trait] {
+    // Like callerOwnsBlock, use only the authenticated principal's indexed
+    // profile for owner-only traits. Scanning every profile on each direct
+    // read is both unnecessary and unbounded at scale.
+    private func callerOwnsTrait(caller : Principal, traitId : Text) : Bool {
+        switch (userprofiles.get(caller)) {
+            case null false;
+            case (?profileId) {
+                switch (profiles.get(profileId)) {
+                    case null false;
+                    case (?profile) {
+                        if (profile.owner != caller) return false;
+                        for (candidateId in profile.traits.vals()) {
+                            if (candidateId == traitId) return true;
+                        };
+                        false
+                    };
+                };
+            };
+        }
+    };
+
+    public query ({ caller }) func getTrait(traitId : Text) : async ?Trait {
+        switch (traits.get(traitId)) {
+            case null null;
+            case (?trait) {
+                switch (trait.visibility) {
+                    case (#global) ?trait;
+                    case (#unlisted) {
+                        if (callerOwnsTrait(caller, traitId)) ?trait else null
+                    };
+                    case (#personal) {
+                        if (callerOwnsTrait(caller, traitId)) ?trait else null
+                    };
+                }
+            };
+        }
+    };
+
+    public query ({ caller }) func getTraits(profileId : Text) : async [Trait] {
         let profile = profiles.get(profileId);
         switch (profile) {
             case (?p) {
@@ -1505,7 +1551,9 @@ persistent actor {
                     let trait = traits.get(traitId);
                     switch (trait) {
                         case (?t) {
-                            traitList.add(t);
+                            if (canReadTrait(caller, p.owner, t)) {
+                                traitList.add(t);
+                            };
                         };
                         case null {};
                     };
