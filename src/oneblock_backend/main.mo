@@ -1504,20 +1504,42 @@ persistent actor {
         }
     };
 
-    public query ({ caller }) func getTrait(traitId : Text) : async ?Trait {
-        let trait = switch (traits.get(traitId)) {
-            case null return null;
-            case (?value) value;
-        };
-        // No additional stable index: legacy profile-to-trait relationships
-        // remain the source of truth across upgrades and profile renames.
-        for (profile in profiles.vals()) {
-            if (Array.find<Text>(profile.traits, func (id : Text) : Bool { id == traitId }) != null) {
-                if (canReadTrait(caller, profile.owner, trait)) return ?trait;
-                return null;
+    // Like callerOwnsBlock, use only the authenticated principal's indexed
+    // profile for owner-only traits. Scanning every profile on each direct
+    // read is both unnecessary and unbounded at scale.
+    private func callerOwnsTrait(caller : Principal, traitId : Text) : Bool {
+        switch (userprofiles.get(caller)) {
+            case null false;
+            case (?profileId) {
+                switch (profiles.get(profileId)) {
+                    case null false;
+                    case (?profile) {
+                        if (profile.owner != caller) return false;
+                        for (candidateId in profile.traits.vals()) {
+                            if (candidateId == traitId) return true;
+                        };
+                        false
+                    };
+                };
             };
-        };
-        null
+        }
+    };
+
+    public query ({ caller }) func getTrait(traitId : Text) : async ?Trait {
+        switch (traits.get(traitId)) {
+            case null null;
+            case (?trait) {
+                switch (trait.visibility) {
+                    case (#global) ?trait;
+                    case (#unlisted) {
+                        if (callerOwnsTrait(caller, traitId)) ?trait else null
+                    };
+                    case (#personal) {
+                        if (callerOwnsTrait(caller, traitId)) ?trait else null
+                    };
+                }
+            };
+        }
     };
 
     public query ({ caller }) func getTraits(profileId : Text) : async [Trait] {
