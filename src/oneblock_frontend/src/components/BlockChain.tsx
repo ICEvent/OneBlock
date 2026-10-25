@@ -19,11 +19,11 @@ const BlockChain: React.FC<BlockChainProps> = ({ blocks, showPrivacy = false }) 
     );
   }
 
-  // Sort blocks by start_time (chronological order)
+  // Display newest life blocks first without mutating the source array.
   const sortedBlocks = [...blocks].sort((a, b) => {
     const timeA = Number(a.start_time);
     const timeB = Number(b.start_time);
-    return timeA - timeB;
+    return timeB - timeA;
   });
 
   return (
