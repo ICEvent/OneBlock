@@ -90,8 +90,13 @@ persistent actor {
     var stableActivityConnectionEpochs : [(Text, Int)] = []; // recordId -> connection.created_at (audit provenance)
     var stableActivityLifecycleIds : [(Text, Nat)] = []; // recordId -> profile lifecycle token
     var stableActivityCurrentProfiles : [(Text, Text)] = []; // recordId -> current profileId
+    var stableActivityRecordSubjects : [(Text, Principal)] = [];
     var stableIdempotencyKeys : [(Text, Text)] = []; // namespaced idempotency key -> record/factor id
     var stableProfileActivityIndex : [(Text, [Text])] = []; // profileId -> [recordId]
+    var stableProfileConnectionIndex : [(Text, [Text])] = [];
+    var stableProfileSummaryIndex : [(Text, [Text])] = [];
+    var stableConnectionSubjects : [(Text, Principal)] = [];
+    var stableConnectionEpochStarts : [(Text, Int)] = [];
     var stableOrphanedProfileIntegrationState : [(Text, Bool)] = []; // reusable profile IDs with legacy orphaned state
     var stableDerivedSummaries : [(Text, DerivedSummary)] = [];
     var stablePublicDerivedSummaries : [(Text, DerivedSummary)] = [];
@@ -168,6 +173,10 @@ persistent actor {
     connectionSubjects := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableConnectionSubjects), Text.equal, Text.hash);
     transient var connectionEpochStarts = TrieMap.TrieMap<Text, Int>(Text.equal, Text.hash);
     connectionEpochStarts := TrieMap.fromEntries<Text, Int>(Iter.fromArray(stableConnectionEpochStarts), Text.equal, Text.hash);
+    transient var activityRecordSubjects = TrieMap.TrieMap<Text, Principal>(Text.equal, Text.hash);
+    activityRecordSubjects := TrieMap.fromEntries<Text, Principal>(Iter.fromArray(stableActivityRecordSubjects), Text.equal, Text.hash);
+    transient var profileSummaryIndex = TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
+    profileSummaryIndex := TrieMap.fromEntries<Text, [Text]>(Iter.fromArray(stableProfileSummaryIndex), Text.equal, Text.hash);
 
     transient var profileLifecycleIds = TrieMap.TrieMap<Text, Nat>(Text.equal, Text.hash);
     profileLifecycleIds := TrieMap.fromEntries<Text, Nat>(Iter.fromArray(stableProfileLifecycleIds), Text.equal, Text.hash);
@@ -313,6 +322,8 @@ persistent actor {
     private func rebuildIntegrationProfileIndexes() {
         // One-time upgrade repair for legacy state. Accumulate in mutable
         // buffers and materialize once per profile to keep this O(N).
+        profileConnectionIndex := TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
+        profileSummaryIndex := TrieMap.TrieMap<Text, [Text]>(Text.equal, Text.hash);
         let connectionBuffers = TrieMap.TrieMap<Text, Buffer.Buffer<Text>>(Text.equal, Text.hash);
         for ((_, connection) in connections.entries()) {
             let buf = switch (connectionBuffers.get(connection.profile_id)) {
@@ -456,8 +467,13 @@ persistent actor {
         stableActivityConnectionEpochs := Iter.toArray(activityConnectionEpochs.entries());
         stableActivityLifecycleIds := Iter.toArray(activityLifecycleIds.entries());
         stableActivityCurrentProfiles := Iter.toArray(activityCurrentProfiles.entries());
+        stableActivityRecordSubjects := Iter.toArray(activityRecordSubjects.entries());
         stableIdempotencyKeys := Iter.toArray(idempotencyKeys.entries());
         stableProfileActivityIndex := Iter.toArray(profileActivityIndex.entries());
+        stableProfileConnectionIndex := Iter.toArray(profileConnectionIndex.entries());
+        stableProfileSummaryIndex := Iter.toArray(profileSummaryIndex.entries());
+        stableConnectionSubjects := Iter.toArray(connectionSubjects.entries());
+        stableConnectionEpochStarts := Iter.toArray(connectionEpochStarts.entries());
         stableOrphanedProfileIntegrationState := Iter.toArray(orphanedProfileIntegrationState.entries());
         stableDerivedSummaries := Iter.toArray(derivedSummaries.entries());
         stablePublicDerivedSummaries := Iter.toArray(publicDerivedSummaries.entries());
@@ -500,8 +516,13 @@ persistent actor {
         stableActivityConnectionEpochs := [];
         stableActivityLifecycleIds := [];
         stableActivityCurrentProfiles := [];
+        stableActivityRecordSubjects := [];
         stableIdempotencyKeys := [];
         stableProfileActivityIndex := [];
+        stableProfileConnectionIndex := [];
+        stableProfileSummaryIndex := [];
+        stableConnectionSubjects := [];
+        stableConnectionEpochStarts := [];
         stableOrphanedProfileIntegrationState := [];
         stableDerivedSummaries := [];
 
@@ -3183,10 +3204,6 @@ persistent actor {
         let ids = switch (profileActivityIndex.get(profileId)) {
             case null { return [] };
             case (?ids) { ids };
-        };
-        let profile = switch (profiles.get(profileId)) {
-            case null { return [] };
-            case (?p) p;
         };
         let buf = Buffer.Buffer<ActivityRecord>(0);
         for (rid in ids.vals()) {
