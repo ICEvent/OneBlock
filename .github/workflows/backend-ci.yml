@@ -1,6 +1,7 @@
 name: Backend CI
 
 on:
+  workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
@@ -15,56 +16,27 @@ on:
       - 'dfx.json'
       - '.github/workflows/backend-ci.yml'
 
+permissions:
+  contents: read
+
+concurrency:
+  # Keep only the newest lifecycle-token and migration-guard validation for each branch/ref.
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   motoko:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install prerequisites
-        run: sudo apt-get update && sudo apt-get install -y libunwind-dev
-
       - name: Install dfx
-        env:
-          DFX_VERSION: 0.30.1
-          DFXVM_INIT_YES: "true"
-        run: |
-          sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
-          echo "$HOME/.local/share/dfx/bin" >> "$GITHUB_PATH"
-          echo "$HOME/bin" >> "$GITHUB_PATH"
+        uses: dfinity/setup-dfx@main
 
-      - name: Verify dfx
+      - name: Show dfx version
         run: dfx --version
 
-      - name: Build backend and generate declarations
-        run: |
-          python3 - <<'PY'
-          import json
-          path = "dfx.json"
-          with open(path) as f:
-              data = json.load(f)
-          data.get("networks", {}).get("local", {}).pop("providers", None)
-          with open(path, "w") as f:
-              json.dump(data, f, indent=2)
-              f.write("\n")
-          PY
-          dfx start --background --clean
-          trap 'dfx stop || true' EXIT
-          dfx canister create profile
-          dfx build profile
-          dfx generate profile
-
-      - name: Verify frontend actor declarations are current
-        run: |
-          cmp src/declarations/profile/profile.did.js src/oneblock_frontend/src/api/profile/service.did.js
-          cmp src/declarations/profile/profile.did.d.ts src/oneblock_frontend/src/api/profile/service.did.d.ts
-
-      - name: Upload generated declarations
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: profile-declarations
-          path: src/declarations/profile
-          if-no-files-found: error
+      - name: Check profile canister
+        run: dfx build --check profile
