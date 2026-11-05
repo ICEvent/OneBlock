@@ -1,5 +1,6 @@
 //@ts-nocheck
 import React, { useEffect, useState } from "react";
+import { Principal } from "@dfinity/principal";
 import { Link as NavLink, useParams } from "react-router-dom";
 import { Profile } from "../api/profile/service.did.d";
 import type { PeerReview, ProfileClaim } from "../api/profile/service.did.d";
@@ -65,7 +66,15 @@ const ProfilePage = () => {
 
       try {
         if (!id) return;
-        const [profileData] = await oneblock.getProfile(id);
+        let isPrincipal = false;
+        try {
+          isPrincipal = Principal.fromText(id).toText() === id;
+        } catch {
+          // A legacy profile ID is not required to be a Principal.
+        }
+        const [profileData] = isPrincipal
+          ? await oneblock.getProfileByPrincipal(id)
+          : await oneblock.getProfile(id);
         if (!active || !profileData) return;
 
         const nextProfile = {
