@@ -59,6 +59,14 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
   };
   // A holder explicitly authorizes exactly one complete claim digest and
   // pseudonymous subject commitment to a named approved issuer.
+  public type ConsentRequest = {
+    issuer : Principal;
+    holder : Principal;
+    claim_sha256 : Blob;
+    subject_commitment : Blob;
+    expires_at : Int;
+    requested_at : Int;
+  };
   public type HolderApproval = {
     holder : Principal;
     issuer : Principal;
@@ -127,6 +135,7 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
   var issuerPolicies : [IssuerPolicy] = [];
   var issuerNamespaces : [IssuerNamespace] = [];
   var approvals : [HolderApproval] = [];
+  var consentRequests : [ConsentRequest] = [];
   var withdrawals : [ConsentWithdrawal] = [];
 
   assert (not Principal.isAnonymous(administrator));
@@ -190,6 +199,22 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
       if (event.issuer == issuer and event.claim_sha256 == digest) return true;
     };
     false
+  };
+
+  func requestFor(issuer : Principal, holder : Principal, digest : Blob, subject : Blob) : ?ConsentRequest {
+    for (req in consentRequests.vals()) {
+      if (req.issuer == issuer and req.holder == holder and
+          req.claim_sha256 == digest and req.subject_commitment == subject) return ?req;
+    };
+    null
+  };
+
+  func countRequestsByIssuer(issuer : Principal) : Nat {
+    var count = 0;
+    for (req in consentRequests.vals()) {
+      if (req.issuer == issuer) count += 1;
+    };
+    count
   };
 
   func approvalFor(issuer : Principal, digest : Blob, subject : Blob) : ?HolderApproval {
@@ -454,6 +479,37 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
     policyFor(issuer)
   };
 
+  // Caller-bound, quota-limited request prevents arbitrary new Principals from
+  // filling the approval array for an already-approved issuer.
+  public shared ({ caller }) func requestConsent(
+    holder : Principal,
+    claimHash : Blob,
+    subjectHash : Blob,
+    expiresAt : Int
+  ) : async Result.Result<ConsentRequest, Text> {
+    if (not approved(caller)) return #err("issuer not approved or suspended");
+    if (Principal.isAnonymous(holder)) return #err("anonymous holder");
+    if (not isDigest(claimHash) or not isDigest(subjectHash)) return #err("invalid commitment");
+    if (expiresAt <= Time.now() or expiresAt > Time.now() + 2_592_000_000_000_000) {
+      return #err("consent request window must be within 30 days");
+    };
+    if (isWithdrawn(caller, claimHash)) return #err("authorization previously withdrawn");
+    if (requestFor(caller, holder, claimHash, subjectHash) != null) return #err("consent request already exists");
+    let limit = switch (policyFor(caller)) {
+      case null return #err("issuer policy missing");
+      case (?p) p.claim_limit * 2;
+    };
+    if (countRequestsByIssuer(caller) >= limit) return #err("issuer request quota reached");
+    if (consentRequests.size() >= approvalLimit) return #err("request registry capacity reached");
+    let request : ConsentRequest = {
+      issuer = caller; holder = holder;
+      claim_sha256 = claimHash; subject_commitment = subjectHash;
+      expires_at = expiresAt; requested_at = Time.now();
+    };
+    consentRequests := Array.append(consentRequests, [request]);
+    #ok(request)
+  };
+
   // Authorization is holder-signed at the ICP caller level: the holder must
   // approve the EXACT full canonical claim digest before issuer submission.
   // The holder's principal is never exposed by public query APIs.
@@ -466,6 +522,13 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
     if (not authenticated(caller)) return #err("anonymous holder");
     if (not approved(issuer)) return #err("issuer not approved or suspended");
     if (not isDigest(claimHash) or not isDigest(subjectHash)) return #err("invalid commitment");
+    let requested = switch (requestFor(issuer, caller, claimHash, subjectHash)) {
+      case null return #err("approved issuer request required");
+      case (?req) req;
+    };
+    if (requested.expires_at < Time.now() or expiresAt > requested.expires_at) {
+      return #err("request expired or approval window too broad");
+    };
     if (expiresAt <= Time.now() or expiresAt > Time.now() + 2_592_000_000_000_000) {
       return #err("consent submission window must be within 30 days");
     };
