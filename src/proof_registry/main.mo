@@ -425,7 +425,9 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
     if (namespaceFor(issuer) != null) return #err("issuer namespace already approved");
     if (not validNamespace(prefix)) return #err("invalid schema namespace prefix");
     for (item in issuerNamespaces.vals()) {
-      if (item.prefix == prefix) return #err("namespace already assigned to another issuer");
+      if (Text.startsWith(item.prefix, #text(prefix)) or Text.startsWith(prefix, #text(item.prefix))) {
+        return #err("namespace overlaps an existing issuer namespace");
+      }
     };
     let item : IssuerNamespace = { issuer = issuer; prefix = prefix };
     issuerNamespaces := Array.append(issuerNamespaces, [item]);
