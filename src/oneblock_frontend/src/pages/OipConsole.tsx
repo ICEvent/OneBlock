@@ -14,17 +14,17 @@ const TAB_META: Record<Tab, { label: string; guide: string }> = {
   policy: {
     label: "Policy",
     guide:
-      "Define and evaluate access-control policies. A policy sets minimum score thresholds (human, trust, reputation) that an identity must reach to pass.",
+      "Define and evaluate access-control policies. Legacy score-based access policies are quarantined until certified provenance is available.",
   },
   provider: {
     label: "Provider",
     guide:
-      "Register trusted third-party data providers (oracles). Providers submit signed factors on behalf of users — for example, a GitHub oracle attesting a social account.",
+      "Register trusted third-party data providers (oracles). Providers can submit unverified factors. Signed payload verification is disabled until real cryptographic checks exist.",
   },
   trust: {
     label: "Trust",
     guide:
-      "Model peer-to-peer trust edges between principals. Adding a trust edge increases the reputation score of the target identity.",
+      "Model peer-to-peer trust edges between principals. Trust edges are user statements and do not establish verified reputation.",
   },
 };
 
@@ -133,7 +133,7 @@ export default function OipConsole() {
                 <button className="oip-btn" disabled={loading} onClick={() => run(() => oneblock.recomputeScores(principal, toOpt(policyId)))}>
                   Recompute Scores
                 </button>
-                <button className="oip-btn" disabled={loading} onClick={() => run(() => oneblock.addFactor({ principal, category: { human: null }, factor_type: "captcha", provider: "manual", value: "pass", verified: true, confidence: 0.84, reliability: 0.82, weight_hint: 0.2, expires_at: [], metadata: [] }))}>
+                <button className="oip-btn" disabled={loading} onClick={() => run(() => oneblock.addFactor({ principal, category: { human: null }, factor_type: "captcha", provider: "manual", value: "pass", verified: false, confidence: 0.84, reliability: 0.82, weight_hint: 0.2, expires_at: [], metadata: [] }))}>
                   Add Human Factor
                 </button>
                 <button className="oip-btn" style={{ borderColor: "#7f1d1d", color: "#f87171" }} disabled={loading} onClick={() => run(() => oneblock.runDecaySweep())}>
