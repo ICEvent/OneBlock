@@ -204,6 +204,10 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
     [Text.encodeUtf8("claims"), Text.encodeUtf8(claimId)]
   };
 
+  func schemaPath(issuer : Principal, schemaId : Text) : [Blob] {
+    [Text.encodeUtf8("schemas"), Text.encodeUtf8(Principal.toText(issuer)), Text.encodeUtf8(schemaId)]
+  };
+
   // V1 wire value = version 0x01 || 32-byte SHA-256 claim commitment || status.
   // Status: 0 active; 1 issuer-revoked; 2 issuer suspended; 3 consent withdrawn
   // (also used conservatively for historical records without consent).
@@ -233,6 +237,9 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
   // On install/upgrade rebuild from persistent claims and revocations.
   // In particular this handles upgrades from phase 1 (without CertTree).
   func synchronizeCertifiedTree() {
+    for (schema in schemas.vals()) {
+      certifiedTree.put(schemaPath(schema.issuer, schema.schema_id), schema.schema_sha256);
+    };
     for (claim in attestations.vals()) {
       certifiedTree.put(
         claimPath(claim.id),
@@ -434,6 +441,8 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
       registered_at = Time.now();
     };
     schemas := Array.append(schemas, [item]);
+    certifiedTree.put(schemaPath(caller, schemaId), schemaHash);
+    certifiedTree.setCertifiedData();
     #ok(item)
   };
 
@@ -569,6 +578,22 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
     witness : Blob;
   } {
     let path = claimPath(claimId);
+    {
+      value = certifiedTree.lookup(path);
+      certificate = CertifiedData.getCertificate();
+      witness = certifiedTree.encodeWitness(certifiedTree.reveal(path));
+    }
+  };
+
+  // Independently verifiable immutable per-issuer schema digest.
+  // Client must verify certificate + Merkle witness against the expected
+  // trusted canister root, issuer principal, schema ID and schema bytes.
+  public query func getCertifiedSchema(issuer : Principal, schemaId : Text) : async {
+    value : ?Blob;
+    certificate : ?Blob;
+    witness : Blob;
+  } {
+    let path = schemaPath(issuer, schemaId);
     {
       value = certifiedTree.lookup(path);
       certificate = CertifiedData.getCertificate();
