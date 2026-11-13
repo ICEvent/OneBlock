@@ -8,6 +8,8 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'sdk/**'
+      - 'src/declarations/**'
+      - 'scripts/harden-generated-agents.mjs'
       - 'tests/strictClaim.test.mjs'
       - 'tests/validateSourceClaim.test.mjs'
       - '.github/workflows/frontend-ci.yml'
@@ -19,6 +21,8 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'sdk/**'
+      - 'src/declarations/**'
+      - 'scripts/harden-generated-agents.mjs'
       - 'tests/strictClaim.test.mjs'
       - 'tests/validateSourceClaim.test.mjs'
       - '.github/workflows/frontend-ci.yml'
@@ -42,6 +46,9 @@ jobs:
 
       - name: Check frontend dependency vulnerabilities
         run: npm audit --audit-level=moderate
+
+      - name: Verify trusted IC root and safe environment allowlist
+        run: node scripts/harden-generated-agents.mjs --check
 
       - name: Strict JSON, issuer and domain-schema validation
         run: node --test tests/strictClaim.test.mjs tests/validateSourceClaim.test.mjs
