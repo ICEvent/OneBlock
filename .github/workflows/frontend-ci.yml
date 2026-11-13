@@ -12,6 +12,7 @@ on:
       - 'scripts/harden-generated-agents.mjs'
       - 'tests/strictClaim.test.mjs'
       - 'tests/reactSingleton.test.mjs'
+      - 'tests/viteBrowserGlobals.test.mjs'
       - 'tests/validateSourceClaim.test.mjs'
       - '.github/workflows/frontend-ci.yml'
   push:
@@ -26,6 +27,7 @@ on:
       - 'scripts/harden-generated-agents.mjs'
       - 'tests/strictClaim.test.mjs'
       - 'tests/reactSingleton.test.mjs'
+      - 'tests/viteBrowserGlobals.test.mjs'
       - 'tests/validateSourceClaim.test.mjs'
       - '.github/workflows/frontend-ci.yml'
 
@@ -48,6 +50,9 @@ jobs:
 
       - name: Verify single React runtime and Router hook compatibility
         run: node --test tests/reactSingleton.test.mjs
+
+      - name: Ensure browser globalThis compatibility for ICP certificate libraries
+        run: node --test tests/viteBrowserGlobals.test.mjs
 
       - name: Check frontend dependency vulnerabilities
         run: npm audit --audit-level=moderate
