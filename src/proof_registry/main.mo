@@ -459,6 +459,7 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
 
   public shared ({ caller }) func approveIssuerRotation(oldIssuer : Principal, successor : Principal) : async Result.Result<IssuerRotation, Text> {
     if (not admin(caller)) return #err("administrator approval required");
+    if (not approved(oldIssuer)) return #err("former issuer suspended; rotation blocked");
     let old = switch (rotationFor(oldIssuer)) {
       case null return #err("issuer rotation not requested");
       case (?r) r;
@@ -478,6 +479,7 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
       case (?r) r;
     };
     if (rotation.successor != caller) return #err("only nominated successor may accept");
+    if (not approved(oldIssuer)) return #err("former issuer suspended; rotation blocked");
     if (not rotation.admin_approved) return #err("administrator approval required");
     if (rotation.completed_at != null) return #err("issuer rotation already completed");
     if (issuerFor(caller) != null) return #err("successor already registered");
