@@ -35,8 +35,6 @@ export const createActor = (agent,actorOptions) => {
 };
 
 const _agent = new HttpAgent({ host: "https://ic0.app" });
-_agent.fetchRootKey().catch((err) => {
-  console.warn("Unable to fetch root key:", err);
-});
+// Mainnet agent retains its SDK-pinned trusted IC root key.
 
 export const profile = createActor(_agent);

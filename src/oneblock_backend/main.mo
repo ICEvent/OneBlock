@@ -763,32 +763,21 @@ persistent actor {
         let dt : Float = Float.fromInt(now - lastUpdated) / 1_000_000_000.0 / 86400.0;
         if (dt <= 0.0) { 1.0 } else { Float.exp(0.0 - (lambda * dt)) }
     };
-    private func recomputeScoresInternal(g : IdentityGraph, policyOpt : ?ContextPolicy, now : Int) : ProbabilityScores {
-        let weights = switch (policyOpt) { case (?p) p.weights; case null defaultPolicyWeights() };
-        let lambda = switch (policyOpt) { case (?p) p.decay_lambda; case null 0.08 };
-        var human : Float = 0.0;
-        var uniq : Float = 0.0;
-        var trust : Float = 0.0;
-        var rep : Float = 0.0;
-        for (f in g.factors.vals()) {
-            let base = clamp01(f.confidence) * clamp01(f.reliability) * clamp01(scoreForCategory(weights, f.category)) * freshness(f, now);
-            switch (f.category) {
-                case (#human) { human += base; trust += base };
-                case (#existence) { uniq += base; trust += base };
-                case (#continuity) { trust += base };
-                case (#social) { human += base * 0.5; trust += base };
-                case (#economic) { uniq += base * 0.3; trust += base };
-                case (#reputation) { rep += base; trust += base * 0.7 };
-            }
-        };
-        let d = decayMultiplier(g.scores.updated_at, now, lambda);
-        human := clamp01(human * d); uniq := clamp01(uniq * d); rep := clamp01(rep * d); trust := clamp01(trust * d);
+    // Legacy OIP factors cannot be cryptographically linked to an authorized
+    // issuer or a certified claim. Previously caller-provided 'verified',
+    // confidence and reliability could inflate human/trust/reputation metrics.
+    // Quarantine ALL pre-proof OIP factors until we have a versioned, independently
+    // verified provenance migration. Zero means 'not assessed', not 'bad person'.
+    private func recomputeScoresInternal(_g : IdentityGraph, _policyOpt : ?ContextPolicy, now : Int) : ProbabilityScores {
         {
-            human_score = human; uniqueness_score = uniq; trust_score = trust; reputation_score = rep;
-            ai_probability = clamp01((1.0 - human) * 0.6);
-            organization_probability = clamp01((1.0 - human) * 0.4);
+            human_score = 0.0;
+            uniqueness_score = 0.0;
+            trust_score = 0.0;
+            reputation_score = 0.0;
+            ai_probability = 0.0;
+            organization_probability = 0.0;
             updated_at = now;
-            model_version = "oip-v0.2-m2";
+            model_version = "oip-v0.3-legacy-quarantined";
         }
     };
 
@@ -3488,7 +3477,7 @@ persistent actor {
                 let now = Time.now();
                 let factor : Factor = {
                     id = generateFactorId(); principal = input.principal; category = input.category;
-                    factor_type = input.factor_type; provider = input.provider; value = input.value; verified = input.verified;
+                    factor_type = input.factor_type; provider = input.provider; value = input.value; verified = false;
                     confidence = clamp01(input.confidence); reliability = clamp01(input.reliability); weight_hint = clamp01(input.weight_hint);
                     issued_at = now; updated_at = now; expires_at = input.expires_at; revoked_at = null; status = #active; metadata = input.metadata;
                 };
@@ -3514,8 +3503,10 @@ persistent actor {
             case (?rid) { return #err("duplicate submission: " # rid) };
             case null {}
         };
-        if (provider.verification == #signed_payload and input.signed_payload == null) {
-            return #err("signed_payload required")
+        // Presence of signed_payload is NOT cryptographic verification.
+        // Reject this policy until signature, issuer key and replay checks exist.
+        if (provider.verification == #signed_payload) {
+            return #err("signed payload verification unavailable; use certified proof registry")
         };
         switch (identityGraphs.get(input.principal)) {
             case null { return #err("identity graph not found") };
@@ -3528,7 +3519,7 @@ persistent actor {
                     factor_type = input.factor_type;
                     provider = input.provider_id;
                     value = input.value;
-                    verified = true;
+                    verified = false;
                     confidence = clamp01(input.confidence);
                     reliability = clamp01(
                         switch (input.reliability) {
@@ -3615,29 +3606,13 @@ persistent actor {
     };
 
     public query func getScores(principal : Text) : async ?ProbabilityScores {
-        switch (identityGraphs.get(principal)) { case null null; case (?g) ?g.scores }
+        switch (identityGraphs.get(principal)) { case null null; case (?g) ?recomputeScoresInternal(g, null, Time.now()) }
     };
 
-    public query func evaluatePolicy(principal : Text, policyId : Text) : async Result.Result<PolicyEvaluation, Text> {
-        switch (identityGraphs.get(principal)) {
-            case null { #err("identity graph not found") };
-            case (?g) {
-                switch (contextPolicies.get(policyId)) {
-                    case null { #err("policy not found") };
-                    case (?p) {
-                        let b = Buffer.Buffer<PolicyEvaluationItem>(0);
-                        let s = g.scores;
-                        switch (p.requirements.min_human_score) { case (?v) b.add({ key = "min_human_score"; passed = s.human_score >= v; expected = Float.toText(v); actual = Float.toText(s.human_score) }); case null {} };
-                        switch (p.requirements.min_uniqueness_score) { case (?v) b.add({ key = "min_uniqueness_score"; passed = s.uniqueness_score >= v; expected = Float.toText(v); actual = Float.toText(s.uniqueness_score) }); case null {} };
-                        switch (p.requirements.min_trust_score) { case (?v) b.add({ key = "min_trust_score"; passed = s.trust_score >= v; expected = Float.toText(v); actual = Float.toText(s.trust_score) }); case null {} };
-                        switch (p.requirements.min_reputation_score) { case (?v) b.add({ key = "min_reputation_score"; passed = s.reputation_score >= v; expected = Float.toText(v); actual = Float.toText(s.reputation_score) }); case null {} };
-                        let items = Buffer.toArray(b);
-                        var allPass = true;
-                        for (it in items.vals()) { if (not it.passed) { allPass := false } };
-                        #ok({ policy_id = policyId; principal = principal; passed = allPass; items = items; evaluated_at = Time.now() })
-                    }
-                }
-            }
-        }
-    }
+    // Until signed/certified factors replace the legacy data model,
+    // no unverified score may authorize access, even with a 0 threshold.
+    public query func evaluatePolicy(_principal : Text, _policyId : Text) : async Result.Result<PolicyEvaluation, Text> {
+        #err("legacy identity factors are unverified; score-based policy evaluation disabled")
+    };
+
 }

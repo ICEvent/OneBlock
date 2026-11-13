@@ -84,6 +84,7 @@ const Navbar = () => {
         </button>
 
         <div id="primary-nav-links" className={`nav-links ${isMenuOpen ? 'active' : ''}`}>
+          <Link to="/verify" className={location.pathname === '/verify' ? 'active' : ''}>Verify</Link>
           {isAuthed ? (
             <>
               <Link to="/console" className={location.pathname === '/console' ? 'active' : ''}>Console</Link>

@@ -1,0 +1,53 @@
+name: Proof Registry Phase 1
+
+on:
+  pull_request:
+    paths:
+      - "dfx.json"
+      - "src/proof_registry/**"
+      - "tests/proof_registry_e2e.py"
+      - "tests/proof_registry_security_static.py"
+      - "tests/verifyCertifiedClaim.e2e.mjs"
+      - "tests/claimDigest.test.mjs"
+      - "sdk/**"
+      - "mops.toml"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/proof-registry.yml"
+  workflow_dispatch:
+
+jobs:
+  proof-registry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dfinity/setup-dfx@main
+        with:
+          dfx-version: "0.30.1"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned Motoko certification dependencies
+        run: |
+          npm install --global ic-mops@3.5.1
+          mops install
+      - name: Install independent certificate verifier test dependencies
+        run: npm install --no-save --package-lock=false --ignore-scripts @dfinity/certificate-verification@4.0.0 @icp-sdk/core@^6.0.0
+      - name: Test canonical claim digest and witness encoding
+        run: node --test tests/claimDigest.test.mjs
+      - name: Verify DFX toolchain
+        run: dfx --version
+      - name: Start local ICP replica
+        run: dfx start --background --clean
+      - name: Compile and deploy isolated local registry
+        run: |
+          ADMIN="$(dfx identity get-principal)"
+          dfx deploy proof_registry --argument "(principal \"$ADMIN\")"
+      - name: Validate static source security constraints
+        run: python3 tests/proof_registry_security_static.py
+      - name: Adversarial authority and immutability E2E
+        run: python3 tests/proof_registry_e2e.py
+      - name: Stop local replica
+        if: always()
+        run: dfx stop || true

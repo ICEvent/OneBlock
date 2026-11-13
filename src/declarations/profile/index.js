@@ -21,15 +21,7 @@ export const createActor = (canisterId, options = {}) => {
     );
   }
 
-  // Fetch root key for certificate validation during development
-  if (process.env.DFX_NETWORK !== "ic") {
-    agent.fetchRootKey().catch((err) => {
-      console.warn(
-        "Unable to fetch root key. Check to ensure that your local replica is running"
-      );
-      console.error(err);
-    });
-  }
+  // Do not override a trusted root key. Local replicas require caller bootstrap.
 
   // Creates an actor with using the candid interface and the HttpAgent
   return Actor.createActor(idlFactory, {

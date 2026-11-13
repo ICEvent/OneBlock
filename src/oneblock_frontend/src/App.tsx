@@ -18,6 +18,7 @@ import  Console  from "./pages/Console";
 import  BlockPage  from "./pages/Block";
 import PolicyEval from "./pages/PolicyEval";
 import OipConsole from "./pages/OipConsole";
+import Verify from "./pages/Verify";
 
 // Preserve legacy /:id block links while resolving canonical Principal URLs.
 const PrincipalOrBlockPage = () => {
@@ -44,6 +45,7 @@ export default () => {
           <Route path="/console" element={<Console />} />
           <Route path="/policy" element={<PolicyEval />} />
           <Route path="/oip" element={<OipConsole />} />
+          <Route path="/verify" element={<Verify />} />
         </Routes>
       </Store>
     </BrowserRouter>

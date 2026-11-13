@@ -8,7 +8,7 @@ export const defaultAgent = new HttpAgent({
   host: HOST,
 });
 
-defaultAgent.fetchRootKey().catch((err) => {
-  console.warn("Unable to fetch root key:", err);
-});
+// Production uses HttpAgent's built-in trusted ICP root key.
+// Never fetch and replace that key from an arbitrary mainnet gateway.
+// A local-only replica may fetch its own root key in a separate DEV agent.
 

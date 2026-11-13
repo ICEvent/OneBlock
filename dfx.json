@@ -13,20 +13,22 @@
       ],
       "type": "assets",
       "workspace": "oneblock_frontend"
+    },
+    "proof_registry": {
+      "main": "src/proof_registry/main.mo",
+      "type": "motoko"
     }
   },
   "defaults": {
     "build": {
       "args": "",
-      "packtool": ""
+      "packtool": "mops sources"
     }
   },
   "networks": {
     "local": {
-      "providers": [
-        "http://127.0.0.1:8000"
-      ],
-      "type": "ephemeral"
+      "type": "ephemeral",
+      "bind": "127.0.0.1:8000"
     }
   },
   "output_env_file": ".env",
