@@ -60,3 +60,22 @@ This is a **stacked PR on #24**. Related backend dependencies are **#25** (issue
 - Add issuer governance, verified subject consent, full canonical schema validation, time-sensitive status freshness policies and privacy/risk review before calling the whole system a production trust service.
 
 This UI does **not** provide a public HTTP signing gateway and does not accept unauthenticated arbitrary proof submissions.
+
+## Security review changes after PR #27 (PR #31)
+
+The original verification MVP was *not* sufficient for a complete issuer data claim. These additional steps are now mandatory:
+
+- The supplied `issuer_id` must equal the canonical authenticated issuer Principal prefix in the **registry_record_id**; a brand label is never authenticated identity.
+- The `source_event_id` must be an opaque 128/256-bit lowercase hexadecimal identifier and equal the record ID suffix; a name, invoice number or address is rejected.
+- OVDP envelope validated against the Draft 2020-12 schema, including person-linked `consent_ref`, timestamp format and the phase-2 cap of eight evidence references.
+- The user supplies original **Domain Schema JSON**. The app validates its `$id` against `claim.schema_id`, forbids remote refs, dynamic refs and issuer-defined regex/pattern properties, limits schema payload to 64KiB, validates `claim_data` locally using AJV 2020-12, and computes canonical JSON Schema SHA256.
+- The app independently checks a second ICP certificate/Merkle witness from `getCertifiedSchema(issuerPrincipal, schemaId)`. The issuer-scoped Schema hash must match the submitted source Schema bytes. Without a verified Schema, there is **no successful verification**.
+- The certified claim status distinguishes `active`, `revoked`, `issuer_suspended` and `consent_withdrawn`. Old consentless records are invalid. No result implies legal organization vetting or bilateral subject identity control.
+- The certificate age tolerance was tightened from five minutes to one minute. The displayed time is the **client-side checking time**, not an IC-certified timestamp. High-stakes transfers require additional up-to-date consensus checks.
+- No arbitrary external JSON Schema is downloaded or evaluated from a user-chosen URL.
+
+### Safe release gates
+
+PR #31 depends on PR #28's governed issuer/consent/certified-schema APIs and PR #30's OVDP schema. For production, all upstream PRs require joint review: the frontend must not be deployed before the matching backend. A real browser Playwright test on a controlled deployed canister is still required, as is independently confirmed issuer-brand vetting and subject identity control for use cases that need those guarantees.
+
+The root npm audit was reduced to **zero** known advisories by compatible dependency updates and a tested Vite 8 / React plugin 6 migration; Frontend CI now checks `npm audit --audit-level=moderate` and the strict issuer/schema tests. This is a time-of-check result, not a guarantee against new future advisories.
