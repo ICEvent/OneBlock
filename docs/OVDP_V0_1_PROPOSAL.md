@@ -19,7 +19,7 @@ This document builds on `PROTOCOL_V1.md`, `PROFILE_PROVENANCE.md`, `ActivityReco
 
 - Common claim envelope: **OVDP v0.1**, transport-neutral (Candid on ICP, HTTPS JSON gateway off-chain).
 - Canonical JSON: **RFC 8785 JCS** with I-JSON restrictions. All financial amounts, currencies' minor units, large integers and high-precision timestamps are **strings**, never `float64`.
-- Commitment: `SHA-256(UTF8("oneblock:claim:v1\n") || JCS(claim_body))`. `claim_body` excludes claim_id, proof/signature and registry receipt. The domain separator and canonical bytes must have cross-language test vectors before production. The `claim_id` is `sha256:<lowercase-hex>`.
+- Commitment: `SHA-256(UTF8("oneblock:claim:v1\n") || JCS(claim_body))`. `claim_body` excludes claim_id, proof/signature and registry receipt. The domain separator and canonical bytes must have cross-language test vectors before production. **Two distinct identifiers** are required: `claim_id` is `sha256:<lowercase-hex>` (content address), while `registry_record_id` is `<authenticated-issuer-principal>/<opaque-random-event-id>` (certified Merkle lookup key). Never treat a registry record ID as a content hash. Both must be returned in the receipt and checked independently.
 - Cryptographic authorisation: (a) direct ICP inter-canister update with `caller` equal to a registered canister principal, or (b) explicitly verified supported signature suite (e.g. Ed25519 key with registered issuer binding). **A present `signed_payload` is not proof of a valid signature.** A public HTTP gateway must not lend its own identity to unverified input.
 - Registry commitment: ICP `certified_data` with a Merkle witness and IC certificate. Ordinary query results alone are not cryptographically certified. The client checks the certificate against the IC root key, tree witness, claim digest and requested canister.
 - Optional interoperability export: W3C VC Data Model 2.0 + applicable securing scheme and Bitstring Status List v1.0. Label an export a "W3C VC" **only if it actually conforms to W3C**; an OVDP receipt alone is not a compliant VC.
@@ -89,7 +89,7 @@ type ClaimBody = {
   event_at: string;                    // UTC RFC 3339
   issued_at: string;                   // UTC RFC 3339, claimed by issuer
   valid_until?: string;
-  source_event_id: string;             // uniqueness scope = issuer_id
+  source_event_id: string;             // 128-bit or 256-bit unpredictable lowercase hex ID, uniqueness scope = issuer Principal
   supersedes?: string;                 // prior claim ID, never mutate prior claim
   links?: string[];                    // related claim IDs
   visibility: "public" | "unlisted" | "restricted";
@@ -113,7 +113,7 @@ type EvidenceRef = {
 };
 type SignedSubmission = {
   claim_body: ClaimBody;
-  claim_id: string;                   // derived from canonical claim_body, not arbitrary
+  claim_id: string;                   // sha256:<lowercase digest>, derived from full canonical body, not arbitrary
   auth: {
     method: "ic-caller" | "ed25519";
     issuer_key_id?: string;
@@ -133,7 +133,8 @@ Hashes of easily guessed private values (e.g. a small CAD amount, known email, y
 
 ```ts
 type AttestationReceipt = {
-  claim_id: string;
+  claim_id: string;                  // sha256:<hash>
+  registry_record_id: string;        // issuer-principal/opaque-event-id; certificate Merkle path
   issuer_id: string;
   accepted_at: string;              // registry-observed time
   registry_canister: string;
@@ -147,7 +148,7 @@ type ClaimStatusEvent = {
   event_id: string;
   claim_id: string;
   issuer_id: string;
-  action: "revoke" | "suspend" | "reinstate" | "supersede" | "dispute";
+  action: "revoke" | "suspend" | "reinstate" | "supersede" | "dispute" | "withdraw_consent";
   reason_code?: string;
   effective_at: string;
   sequence: string;
@@ -155,7 +156,19 @@ type ClaimStatusEvent = {
 };
 ```
 
-Claims and status events are append-only. Current state is a derived view; `disputed` is not equivalent to `revoked`. Revocation must be signed/authorized by the issuer or a narrowly specified authority; subject rights to dispute or hide a personal presentation must not silently rewrite the issuer's historical assertion. A "certified receipt" must be returned only when proof material is actually available and verifiable.
+Claims and status events are append-only. Certified state distinguishes `active`, `revoked`, `issuer_suspended`, `consent_withdrawn`, and `expired` where applicable. `active` is never a statement about factual truth. Current state is a derived view; `disputed` is not equivalent to `revoked`. Revocation must be signed/authorized by the issuer or a narrowly specified authority; subject rights to dispute or hide a personal presentation must not silently rewrite the issuer's historical assertion. A "certified receipt" must be returned only when proof material is actually available and verifiable.
+
+### Phase-2 registration and verification invariants
+
+**Issuer authorization:** Production registry signers are administrator-approved Principal identities; there is no public self-registration. The cryptographically verified issuer is the Candid caller, not a display name. A Claim must set `issuer_id` to exactly `Principal.toText(caller)` in the initial principal-only profile; any display/organization name requires an independently certified registry binding and external vetting.
+
+**Subject authorization:** Before the first claim submission, the holder must approve the exact complete canonical claim digest, pseudonymous subject commitment, authorized issuer and finite submission window from the holder's own authenticated Principal. Withdrawal becomes permanently invalid for that digest; issuing a corrected claim requires a new content hash and event ID. Receipt-based user consent is an *authorization record*, not automatically proof the JSON `subject` refers to that person. Until a bilateral subject identity proof is implemented, UI must label subject identity `unverified`.
+
+**Privacy:** The source ID is a 128/256-bit unpredictable lowercase hex identifier, never a job description, name, phone number or email. The holder's real Principal and raw evidence must not be published in a public certified leaf. A hash without an unpredictable nonce does not protect low-entropy information.
+
+**Schema:** Certified proof status alone does not validate JSON Schema. A claim's envelope must validate against the immutable envelope schema and its `claim_data` must validate against issuer-registered, immutably content-addressed domain schema. Until both schema digest and schema body are available to the independent verifier, mark schema compliance `not verified`.
+
+**Freshness:** A certificate proves status at certificate time, not globally real-time state. Avoid wording `current active` without a freshness window, and recheck immediately before high-risk transfers or access grants.
 
 ## 3. Example (illustrative, NOT a valid signed proof)
 
