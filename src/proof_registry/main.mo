@@ -4,6 +4,9 @@ import Principal "mo:base/Principal";
 import Result "mo:base/Result";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
+import Nat8 "mo:base/Nat8";
+import CertTree "mo:ic-certification/CertTree";
+import CertifiedData "mo:base/CertifiedData";
 
 // OVDP phase-1 registry: caller-bound issuer commitments.
 // This is NOT a certified Merkle proof registry, signature validator,
@@ -79,6 +82,11 @@ persistent actor ProofRegistry {
   var attestations : [Attestation] = [];
   var statusEvents : [StatusEvent] = [];
 
+  // Stable certified map; per-key evidence is a 34-byte commitment+status.
+  // Never put raw personal/business data in this public tree.
+  let certifiedStore : CertTree.Store = CertTree.newStore();
+  transient let certifiedTree = CertTree.Ops(certifiedStore);
+
   func authenticated(caller : Principal) : Bool {
     not Principal.isAnonymous(caller)
   };
@@ -111,6 +119,35 @@ persistent actor ProofRegistry {
     };
     null
   };
+
+  func claimPath(claimId : Text) : [Blob] {
+    [Text.encodeUtf8("claims"), Text.encodeUtf8(claimId)]
+  };
+
+  // V1 wire value = version 0x01 || 32-byte SHA-256 claim commitment || status.
+  // 0x00 active, 0x01 revoked. A signed digest alone is not proof of truth.
+  func certifiedValue(claim : Attestation, revoked : Bool) : Blob {
+    let statusByte : Nat8 = if (revoked) 1 else 0;
+    Blob.fromArray(
+      Array.append<Nat8>(
+        [1],
+        Array.append<Nat8>(Blob.toArray(claim.claim_sha256), [statusByte]),
+      ),
+    )
+  };
+
+  // On install/upgrade rebuild from persistent claims and revocations.
+  // In particular this handles upgrades from phase 1 (without CertTree).
+  func synchronizeCertifiedTree() {
+    for (claim in attestations.vals()) {
+      certifiedTree.put(
+        claimPath(claim.id),
+        certifiedValue(claim, statusFor(claim.id) != null),
+      );
+    };
+    certifiedTree.setCertifiedData();
+  };
+  synchronizeCertifiedTree();
 
   func isDigest(value : Blob) : Bool {
     value.size() == 32
@@ -205,6 +242,8 @@ persistent actor ProofRegistry {
       accepted_at = Time.now();
     };
     attestations := Array.append(attestations, [item]);
+    certifiedTree.put(claimPath(id), certifiedValue(item, false));
+    certifiedTree.setCertifiedData();
     #ok(item)
   };
 
@@ -229,6 +268,8 @@ persistent actor ProofRegistry {
       sequence = statusEvents.size() + 1;
     };
     statusEvents := Array.append(statusEvents, [event]);
+    certifiedTree.put(claimPath(claimId), certifiedValue(claim, true));
+    certifiedTree.setCertifiedData();
     #ok(event)
   };
 
@@ -276,6 +317,21 @@ persistent actor ProofRegistry {
           certified = false;
         }
       };
+    }
+  };
+
+  // Candid queries are only trustworthy after clients verify the
+  // BLS certificate, Merkle witness and exact claim leaf contents.
+  public query func getCertifiedClaim(claimId : Text) : async {
+    value : ?Blob;
+    certificate : ?Blob;
+    witness : Blob;
+  } {
+    let path = claimPath(claimId);
+    {
+      value = certifiedTree.lookup(path);
+      certificate = CertifiedData.getCertificate();
+      witness = certifiedTree.encodeWitness(certifiedTree.reveal(path));
     }
   };
 
