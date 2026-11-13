@@ -66,5 +66,8 @@ test("duplicate raw keys, external schema refs and malicious schema IDs are reje
   const raw = JSON.stringify(claim).replace('"issuer_id":"aaaaa-aa"', '"issuer_id":"aaaaa-aa","issuer_id":"attacker"');
   assert.throws(() => validateSourceClaim(raw, JSON.stringify(schema), recordId, envelope), /Duplicate JSON/);
   assert.throws(() => testCall(claim, { ...schema, $ref: "https://attacker.example/x" }), /Remote or non-local/);
+  assert.throws(() => testCall(claim, { ...schema, properties: { completed: { type: "string", pattern: "(a+)+$" } } }), /regular expressions/);
+  assert.throws(() => testCall(claim, { ...schema, patternProperties: { ".*": { type: "number" } } }), /regular expressions/);
+  assert.throws(() => testCall(claim, { ...schema, $dynamicRef: "#/$defs/loop" }), /regular expressions/);
   assert.throws(() => testCall(claim, { ...schema, $schema: "http://json-schema.org/draft-07/schema#" }), /2020-12/);
 });
