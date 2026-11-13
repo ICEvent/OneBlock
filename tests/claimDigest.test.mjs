@@ -58,5 +58,7 @@ test("certified leaf status is encoded and rejected if invalid", () => {
   assert.deepEqual(unpackClaimLeaf(active), { sha256: "11".repeat(32), status: "active" });
   assert.deepEqual(unpackClaimLeaf(revoked), { sha256: "11".repeat(32), status: "revoked" });
   assert.throws(() => unpackClaimLeaf(Uint8Array.from([1, ...digest])), /format/);
+  assert.deepEqual(unpackClaimLeaf(Uint8Array.from([1, ...digest, 2])).status, "issuer_suspended");
+  assert.deepEqual(unpackClaimLeaf(Uint8Array.from([1, ...digest, 3])).status, "consent_withdrawn");
   assert.throws(() => unpackClaimLeaf(Uint8Array.from([1, ...digest, 99])), /unknown/);
 });
