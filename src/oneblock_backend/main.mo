@@ -3609,29 +3609,10 @@ persistent actor {
         switch (identityGraphs.get(principal)) { case null null; case (?g) ?recomputeScoresInternal(g, null, Time.now()) }
     };
 
-    public query func evaluatePolicy(principal : Text, policyId : Text) : async Result.Result<PolicyEvaluation, Text> {
-        switch (identityGraphs.get(principal)) {
-            case null { #err("identity graph not found") };
-            case (?g) {
-                // No legacy OIP score qualifies for access-control decisions,
-                // including policies with zero thresholds or no requirements.
-                return #err("legacy identity factors are unverified; score-based policy evaluation disabled");
-                switch (contextPolicies.get(policyId)) {
-                    case null { #err("policy not found") };
-                    case (?p) {
-                        let b = Buffer.Buffer<PolicyEvaluationItem>(0);
-                        let s = recomputeScoresInternal(g, null, Time.now());
-                        switch (p.requirements.min_human_score) { case (?v) b.add({ key = "min_human_score"; passed = s.human_score >= v; expected = Float.toText(v); actual = Float.toText(s.human_score) }); case null {} };
-                        switch (p.requirements.min_uniqueness_score) { case (?v) b.add({ key = "min_uniqueness_score"; passed = s.uniqueness_score >= v; expected = Float.toText(v); actual = Float.toText(s.uniqueness_score) }); case null {} };
-                        switch (p.requirements.min_trust_score) { case (?v) b.add({ key = "min_trust_score"; passed = s.trust_score >= v; expected = Float.toText(v); actual = Float.toText(s.trust_score) }); case null {} };
-                        switch (p.requirements.min_reputation_score) { case (?v) b.add({ key = "min_reputation_score"; passed = s.reputation_score >= v; expected = Float.toText(v); actual = Float.toText(s.reputation_score) }); case null {} };
-                        let items = Buffer.toArray(b);
-                        var allPass = true;
-                        for (it in items.vals()) { if (not it.passed) { allPass := false } };
-                        #ok({ policy_id = policyId; principal = principal; passed = allPass; items = items; evaluated_at = Time.now() })
-                    }
-                }
-            }
-        }
-    }
+    // Until signed/certified factors replace the legacy data model,
+    // no unverified score may authorize access, even with a 0 threshold.
+    public query func evaluatePolicy(_principal : Text, _policyId : Text) : async Result.Result<PolicyEvaluation, Text> {
+        #err("legacy identity factors are unverified; score-based policy evaluation disabled")
+    };
+
 }
