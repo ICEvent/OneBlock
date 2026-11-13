@@ -42,13 +42,13 @@ def main() -> None:
     owner = dfx("identity", "get-principal").strip()
     print("issuer principal:", owner)
     expect(call("getRegistryCounts"), "claims = 0")
-    expect(call("registerIssuer", '("Hortsun example (unvetted)")'), "variant { ok")
-    expect(call("registerSchema", f'("hortsun.service.v1", {blob(0x55)})'), "variant { ok")
+    expect(call("registerIssuer", '("Hortsun example (unvetted)")'), "ok = record")
+    expect(call("registerSchema", f'("hortsun.service.v1", {blob(0x55)})'), "ok = record")
 
     first = call("submitCommitment", submission())
-    expect(first, "variant { ok")
+    expect(first, "ok = record")
     expect(first, f"{owner}/job-1024")
-    expect(call("submitCommitment", submission()), "variant { ok")
+    expect(call("submitCommitment", submission()), "ok = record")
     expect(call("getRegistryCounts"), "claims = 1")
     expect(call("submitCommitment", submission(0x44)), "conflicting idempotency key")
 
@@ -58,7 +58,7 @@ def main() -> None:
     claim_id = f"{owner}/job-1024"
     expect(call("revokeCommitment", f'("{claim_id}", "corrected")', "adversary"), "only the original issuer")
 
-    expect(call("revokeCommitment", f'("{claim_id}", "corrected")'), "variant { ok")
+    expect(call("revokeCommitment", f'("{claim_id}", "corrected")'), "ok = record")
     expect(call("revokeCommitment", f'("{claim_id}", "corrected")'), "already revoked")
     state = call("getClaimState", f'("{claim_id}")')
     expect(state, "revoked")
