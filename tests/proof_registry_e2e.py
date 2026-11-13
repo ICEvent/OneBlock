@@ -58,6 +58,7 @@ def main() -> None:
     dfx("identity", "new", "holder", "--storage-mode", "plaintext")
     dfx("identity", "new", "adversary", "--storage-mode", "plaintext")
     adversary = dfx("--identity", "adversary", "identity", "get-principal").strip()
+    holder = dfx("--identity", "holder", "identity", "get-principal").strip()
 
     expect(call("getRegistryCounts"), "claims = 0")
     expect(call("registerIssuer", '("Hortsun example (unvetted)")', "adversary"), "administrator approval required")
@@ -74,6 +75,10 @@ def main() -> None:
     expect(call("submitCommitment", submission()), "holder approval for exact claim digest is required")
     expiry = time.time_ns() + 3600 * 1_000_000_000
     grant_arg = f'(principal "{owner}", {blob(0x11)}, {blob(0x22)}, {expiry} : int)'
+    request_arg = f'(principal "{holder}", {blob(0x11)}, {blob(0x22)}, {expiry} : int)'
+    expect(call("approveCommitment", grant_arg, "holder"), "approved issuer request required")
+    expect(call("requestConsent", request_arg, "adversary"), "issuer not approved")
+    expect(call("requestConsent", request_arg), "ok = record")
     expect(call("approveCommitment", grant_arg, "holder"), "ok = record")
     expect(call("approveCommitment", grant_arg, "holder"), "already authorized")
     # This holder cannot impersonate issuer (and may not revoke another issuer's records).
@@ -90,6 +95,8 @@ def main() -> None:
 
     # Valid approval for a *different* digest still cannot overwrite an event.
     grant_other = f'(principal "{owner}", {blob(0x44)}, {blob(0x22)}, {expiry} : int)'
+    request_other = f'(principal "{holder}", {blob(0x44)}, {blob(0x22)}, {expiry} : int)'
+    expect(call("requestConsent", request_other), "ok = record")
     expect(call("approveCommitment", grant_other, "holder"), "ok = record")
     expect(call("submitCommitment", submission(0x44)), "conflicting idempotency key")
 
