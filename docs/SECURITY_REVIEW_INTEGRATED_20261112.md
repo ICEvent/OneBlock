@@ -45,6 +45,8 @@ The two copies of `schemas/ovdp/claim-body-v1.schema.json` (contract and browser
 
 ## Safe merge/release posture
 
-All component PRs and aggregate PR #32 remain **Draft**. Do not cherry-pick the aggregate blindly: review and sequence #23/#30 protocol, #24 workbench, #25/#26 proof infrastructure, #28 security hardening, #29 legacy OIP safeguards, and #27/#31 frontend (deduplicating shared SDK code). The earlier Backend CI missing-Mops issue was fixed **in aggregate** and must survive the final merge.
+**Source-code integration authorization (2026-11-13):** The project owner reports all requested local tests, including the browser Verify flow, passed and explicitly authorized merging the reviewed code to `main`. The root React/ReactDOM singleton and Vite 8 `globalThis` browser errors were resolved afterward, with green `Frontend CI` on PR #31 and all four CI workflows on PR #32 (commit `b2f5f521f995d1f511eb03c31b712725efcf1e45`). The terminal repo review confirmed byte-identical critical module content from #28/#29/#30/#31 and the integrated branch.
 
-This review is static plus existing CI evidence, not proof of formal correctness or production readiness. No mainnet canister write, deployment, data migration or merge was performed as part of this review.
+**Merge plan:** Merge exactly the already-reviewed aggregated PR #32 into `main` once, instead of attempting to separately merge stacked PRs with overlapping SDK/lock files. Mark #23–#31 as *superseded by the integrated merge*, never as individually merged if they are closed. This choice avoids duplicate/overwritten source and preserves the combined four-workflow CI validation. Record the final `main` SHA and verify parity after merging.
+
+**Not a production release:** Source-code merge alone does not approve IC mainnet install/upgrade, user data migration, external credential rotation, public issuance, or changing identity assurance claims. The release blockers above remain open until individually resolved. This review is static plus existing CI evidence and user-reported local validation, not proof of formal correctness.
