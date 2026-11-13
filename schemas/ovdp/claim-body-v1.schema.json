@@ -29,7 +29,9 @@
     "issuer_id": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 256
+      "maxLength": 256,
+      "description": "Authenticated ICP issuer principal (canonical text), never a brand display name.",
+      "pattern": "^[a-z0-9-]{5,64}$"
     },
     "subject": {
       "$ref": "#/$defs/entityRef"
@@ -54,7 +56,7 @@
     },
     "evidence": {
       "type": "array",
-      "maxItems": 32,
+      "maxItems": 8,
       "items": {
         "$ref": "#/$defs/evidenceRef"
       }
@@ -70,8 +72,10 @@
     },
     "source_event_id": {
       "type": "string",
-      "minLength": 1,
-      "maxLength": 256
+      "minLength": 32,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{32}([a-f0-9]{32})?$",
+      "description": "Opaque 128-bit or 256-bit unpredictable lowercase hex ID; no private business identifiers."
     },
     "supersedes": {
       "$ref": "#/$defs/sha256Digest"
@@ -189,5 +193,32 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "subject": {
+            "properties": {
+              "kind": {
+                "const": "person"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          }
+        },
+        "required": [
+          "subject"
+        ]
+      },
+      "then": {
+        "required": [
+          "consent_ref"
+        ]
+      }
+    }
+  ],
+  "$comment": "Envelope validation only; requires independent issuer/subject authorization, domain schema check, and IC certificate. Do not interpret as factual truth."
 }
