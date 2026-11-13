@@ -49,6 +49,7 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
     accepted_at : Int;
   };
 
+  public type IssuerNamespace = { issuer : Principal; prefix : Text };
   public type IssuerPolicy = {
     issuer : Principal;
     active : Bool;
@@ -124,6 +125,7 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
   var administrator : Principal = initialAdmin;
   var pendingAdministrator : ?Principal = null;
   var issuerPolicies : [IssuerPolicy] = [];
+  var issuerNamespaces : [IssuerNamespace] = [];
   var approvals : [HolderApproval] = [];
   var withdrawals : [ConsentWithdrawal] = [];
 
@@ -141,6 +143,27 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
       if (policy.issuer == issuer) return ?policy;
     };
     null
+  };
+
+  func namespaceFor(issuer : Principal) : ?Text {
+    for (item in issuerNamespaces.vals()) {
+      if (item.issuer == issuer) return ?item.prefix;
+    };
+    null
+  };
+
+  func validNamespace(value : Text) : Bool {
+    let size = Text.size(value);
+    if (size < 4 or size > 64) return false;
+    if (not (Text.endsWith(value, #text(".") ) or Text.endsWith(value, #text(":")))) return false;
+    for (ch in Text.toIter(value)) {
+      if (not (
+        (ch >= 'a' and ch <= 'z') or
+        (ch >= '0' and ch <= '9') or
+        ch == '.' or ch == ':' or ch == '-'
+      )) return false;
+    };
+    true
   };
 
   func approved(issuer : Principal) : Bool {
@@ -354,6 +377,28 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
     authorizeIssuerInternal(issuer, displayName)
   };
 
+  // Namespace is immutable once approved. Legal identity still needs external
+  // vetting; do not grant someone else's brand namespace without checks.
+  public shared ({ caller }) func setIssuerNamespace(issuer : Principal, prefix : Text) : async Result.Result<IssuerNamespace, Text> {
+    if (not admin(caller)) return #err("administrator approval required");
+    if (issuerFor(issuer) == null) return #err("issuer not registered");
+    if (namespaceFor(issuer) != null) return #err("issuer namespace already approved");
+    if (not validNamespace(prefix)) return #err("invalid schema namespace prefix");
+    for (item in issuerNamespaces.vals()) {
+      if (item.prefix == prefix) return #err("namespace already assigned to another issuer");
+    };
+    let item : IssuerNamespace = { issuer = issuer; prefix = prefix };
+    issuerNamespaces := Array.append(issuerNamespaces, [item]);
+    #ok(item)
+  };
+
+  public query func getIssuerNamespace(issuer : Principal) : async ?IssuerNamespace {
+    switch (namespaceFor(issuer)) {
+      case null null;
+      case (?prefix) ?{ issuer = issuer; prefix = prefix };
+    }
+  };
+
   public shared ({ caller }) func setIssuerActive(issuer : Principal, active : Bool) : async Result.Result<IssuerPolicy, Text> {
     if (not admin(caller)) return #err("administrator approval required");
     let old = switch (policyFor(issuer)) {
@@ -461,6 +506,12 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
     if (not authenticated(caller)) return #err("anonymous caller");
     if (not approved(caller)) return #err("issuer not approved or suspended");
     if (not validShortId(schemaId)) return #err("invalid schema id");
+    switch (namespaceFor(caller)) {
+      case null return #err("issuer namespace not approved");
+      case (?prefix) {
+        if (not Text.startsWith(schemaId, #text(prefix))) return #err("schema namespace not approved");
+      };
+    };
     if (not isDigest(schemaHash)) return #err("schema hash must contain exactly 32 bytes");
     if (schemaFor(caller, schemaId) != null) return #err("schema id already registered; release a new version");
     if (schemas.size() >= schemaLimit) return #err("schema registry capacity reached");
