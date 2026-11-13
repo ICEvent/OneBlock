@@ -1,0 +1,21 @@
+name: Temporary npm lock resolution and audit
+on:
+  pull_request:
+    paths:
+      - "package.json"
+      - ".github/workflows/temp-schema-lock.yml"
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --package-lock-only --ignore-scripts --no-fund --no-audit
+      - run: npm audit --json > /tmp/audit.json || true
+      - run: |
+          node -e 'const fs=require("fs"); const d=fs.readFileSync("package-lock.json").toString("base64"); for(let i=0;i<d.length;i+=1000) console.log("LOCK_CHUNK:"+d.slice(i,i+1000)); const a=JSON.parse(fs.readFileSync("/tmp/audit.json","utf8")); console.log("AUDIT_SUMMARY:"+JSON.stringify(a.metadata?.vulnerabilities)); console.log("AUDIT_AFFECTED:"+JSON.stringify(Object.entries(a.vulnerabilities??{}).map(([n,v])=>({name:n,severity:v.severity,fix:v.fixAvailable}))))'
