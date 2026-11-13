@@ -34,7 +34,11 @@ jobs:
       - name: Start local ICP replica
         run: dfx start --background --clean
       - name: Compile and deploy isolated local registry
-        run: dfx deploy proof_registry
+        run: |
+          ADMIN="$(dfx identity get-principal)"
+          dfx deploy proof_registry --argument "(principal \"$ADMIN\")"
+      - name: Validate static source security constraints
+        run: python3 tests/proof_registry_security_static.py
       - name: Adversarial authority and immutability E2E
         run: python3 tests/proof_registry_e2e.py
       - name: Stop local replica
