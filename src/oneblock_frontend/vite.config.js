@@ -26,6 +26,7 @@ export default defineConfig({
     'process.env.CANISTER_ID_PROFILE_ASSETS': JSON.stringify(process.env.CANISTER_ID_PROFILE_ASSETS || ''),
   },
   resolve: {
+    dedupe: ["react", "react-dom"],
     alias: [
       {
         find: "declarations",
