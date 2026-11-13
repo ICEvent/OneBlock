@@ -8,6 +8,13 @@ source = Path("src/oneblock_backend/main.mo")
 assert "persistent actor class ProofRegistry(initialAdmin : Principal)" in registry
 assert 'administrator approval required' in registry
 assert "if (not approved(caller))" in registry
+assert "setIssuerNamespace" in registry
+assert "schema namespace not approved" in registry
+assert "requestFor(issuer, caller, claimHash, subjectHash)" in registry
+assert "issuer request quota reached" in registry
+assert "PublicAttestation" in registry
+assert "validReasonCode" in registry
+assert "getCertifiedSchema" in registry
 assert "approvalFor(caller, input.claim_sha256, input.subject_commitment)" in registry
 assert "isWithdrawn(caller, input.claim_sha256)" in registry
 assert "certifyAllForIssuer(issuer);" in registry
