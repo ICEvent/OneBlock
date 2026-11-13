@@ -46,6 +46,7 @@ const Verify = () => {
   const [error, setError] = useState("");
   const [proofClaimId, setProofClaimId] = useState("");
   const [proofJson, setProofJson] = useState("");
+  const [proofSchemaJson, setProofSchemaJson] = useState("");
   const [proofResult, setProofResult] = useState<CertifiedProofReport | null>(null);
   const [proofError, setProofError] = useState("");
   const [proofBusy, setProofBusy] = useState(false);
@@ -75,7 +76,7 @@ const Verify = () => {
     setProofError("");
     setProofBusy(true);
     try {
-      const report = await verifyProofFromClaimJson(proofClaimId, proofJson);
+      const report = await verifyProofFromClaimJson(proofClaimId, proofJson, proofSchemaJson);
       setProofResult(report);
     } catch (err) {
       setProofError(err instanceof Error ? err.message : "认证证明验证失败，请核实 Claim ID、原始声明和 ICP 连接。");
@@ -92,7 +93,7 @@ const Verify = () => {
           <span className="verify-eyebrow">ONEBLOCK · VERIFICATION TOOLS</span>
           <h1>Verify information, not assumptions.</h1>
           <p>检查原始内容是否被修改，理解第三方声明缺少哪些可验证证据。每一步都说明已证实什么、尚未证实什么。</p>
-          <span className="verify-privacy">无需登录 · 文字/文件与 Claim JSON 在本地处理 · 链上验证仅发送 Claim ID</span>
+          <span className="verify-privacy">无需登录 · 文字/文件与 Claim JSON 在本地处理 · 链上验证仅查询 Record ID、签发 Principal 与 Schema ID</span>
         </header>
 
         <div className="verify-layout">
@@ -160,33 +161,46 @@ const Verify = () => {
             ) : (
               <div className="verify-content" role="tabpanel">
                 <h2>Certified Proof Verification</h2>
-                <p className="verify-muted">提供注册记录的 Claim ID 和完整原始 JSON。浏览器会计算规范化摘要，独立验证 ICP 证书、Merkle 证明及当前状态；不将原始声明上传到 Canister。</p>
+                <p className="verify-muted">请提供登记 Record ID、完整 Claim JSON 和签发者的 Domain Schema JSON。浏览器本地核验格式、签发 Principal、Schema 内容与两份 ICP 认证摘要；不上传原始数据。</p>
                 <div className="verify-config">
                   <strong>受信任的 Proof Registry</strong>
                   <code>{configuredRegistryId() || "未配置（不可执行链上验证）"}</code>
                   <small>Canister ID 由站点部署配置指定，不能通过表单随意切换。</small>
                 </div>
-                <label className="verify-field">Claim ID（Principal/来源事件 ID）
-                  <input disabled={proofBusy} spellCheck={false} value={proofClaimId} onChange={(e) => { setProofClaimId(e.target.value); setProofResult(null); setProofError(""); }} placeholder="aaaaa-aa/opaque-event-id" />
+                <label className="verify-field">Record ID（签发 Principal / 随机事件 ID）
+                  <input disabled={proofBusy} spellCheck={false} value={proofClaimId} onChange={(e) => { setProofClaimId(e.target.value); setProofResult(null); setProofError(""); }} placeholder="issuer-principal/32或64位随机hex" />
                 </label>
                 <label className="verify-field">原始 Claim JSON
                   <textarea disabled={proofBusy} rows={11} spellCheck={false} value={proofJson} onChange={(e) => { setProofJson(e.target.value); setProofResult(null); setProofError(""); }} placeholder='{"protocol":"oneblock.claim","version":"1.0",...}' />
                 </label>
-                <button type="button" className="verify-primary" disabled={proofBusy || !configuredRegistryId() || !proofClaimId.trim() || !proofJson.trim()} onClick={() => void runCertifiedProof()}>{proofBusy ? "正在独立验证…" : "验证 ICP 认证证明"}</button>
+                <label className="verify-field">原始 Domain Schema JSON（发行方登记的版本）
+                  <textarea disabled={proofBusy} rows={8} spellCheck={false} value={proofSchemaJson} onChange={(e) => { setProofSchemaJson(e.target.value); setProofResult(null); setProofError(""); }} placeholder='{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"urn:issuer:schema:1",...}' />
+                </label>
+                <button type="button" className="verify-primary" disabled={proofBusy || !configuredRegistryId() || !proofClaimId.trim() || !proofJson.trim() || !proofSchemaJson.trim()} onClick={() => void runCertifiedProof()}>{proofBusy ? "正在独立验证…" : "验证 ICP 认证证明"}</button>
                 {!configuredRegistryId() && <p className="verify-muted" role="status">尚未部署可信登记簿 Canister，请由管理员配置 VITE_PROOF_REGISTRY_CANISTER_ID。此页面不会伪造成功结果。</p>}
                 {proofError && <p className="verify-error" role="alert">验证未通过：{proofError}</p>}
                 {proofResult && <div className="verify-result" role="status" aria-live="polite">
-                  <h3>{proofResult.status === "active" ? "ICP 登记证明已验证 · 当前状态 Active" : "ICP 登记证明已验证 · 已撤销"}</h3>
+                  <h3>{proofResult.status === "active" ? "ICP 登记与 Schema 已核验 · 最近状态 Active" : "ICP 认证记录已核验 · 当前不可作为有效证明"}</h3>
                   <p className={proofResult.status === "active" ? "verify-status verified" : "verify-status revoked"}>
-                    {proofResult.status === "active" ? "IC 证书、Merkle 路径及声明摘要一致。" : "认证树确认该记录已撤销，不能作为当前有效证明使用。"}
+                    {proofResult.status === "active"
+                      ? "最近有效认证窗口内，Claim/Schema 摘要与 Merkle 证明一致。"
+                      : proofResult.status === "revoked"
+                        ? "声明已被签发者撤销。"
+                        : proofResult.status === "issuer_suspended"
+                          ? "签发 Principal 已被管理者暂停。"
+                          : "用户已撤回授权，或这是一条没有有效授权的旧记录。"}
                   </p>
                   <div className="verify-kv"><span>签发 Principal</span><code>{proofResult.issuerPrincipal}</code></div>
+                  <div className="verify-kv"><span>Schema SHA-256</span><code>{proofResult.schemaSha256}</code></div>
+                  <div className="verify-kv"><span>Schema 验证</span><strong>认证摘要与数据符合要求</strong></div>
+                  <div className="verify-kv"><span>检验时间（本机）</span><strong>{new Date(proofResult.checkPerformedAt).toLocaleString()}</strong></div>
                   <div className="verify-kv"><span>Claim SHA-256</span><code>{proofResult.claimSha256}</code></div>
                   <div className="verify-kv"><span>登记状态</span><strong>{proofResult.status}</strong></div>
                   <div className="verify-kv"><span>IC 认证证明</span><strong>已通过</strong></div>
                   <div className="verify-kv"><span>机构/品牌身份</span><strong>未验证</strong></div>
+                  <div className="verify-kv"><span>Subject 身份对应关系</span><strong>未验证</strong></div>
                   <div className="verify-kv"><span>业务事实真实性</span><strong>未验证</strong></div>
-                  <p className="verify-disclaimer">这里只能证明某 ICP Principal 在指定登记簿记录了相应数据承诺，不能证明公司身份、用户授权或现实事件真实发生。证书有新鲜度窗口，实时高风险操作须再次核验。</p>
+                  <p className="verify-disclaimer">认证仅证明指定 Principal 登记的 Claim/Schema 摘要与最近认证状态相符。登记簿对提交前的具体摘要授权进行了检查，但不能单靠该证明确认 Subject 的现实身份、机构资质或事件真实性。证书允许最多一分钟时间偏差；转账和授权等高风险操作仍需新鲜共识检查。</p>
                 </div>}
               </div>
             )}
@@ -201,7 +215,7 @@ const Verify = () => {
             </div>
             <div className="verify-info-card">
               <h2>当前工具的边界</h2>
-              <p>此版本提供本地 SHA-256、Claim 结构检查和配置后可用的 ICP 认证摘要/撤销状态验证。</p>
+              <p>此版本提供本地 SHA-256、Claim 检查，以及配置后可用的 Claim + Schema 双重 ICP 认证摘要与失效状态验证。</p>
               <p>尚未实现机构实名核验、完整 Schema 校验、用户授权与业务事实交叉印证。</p>
               <p>任何缺少证据的结论必须标记为「未验证」，不能显示为「真实」。</p>
             </div>
