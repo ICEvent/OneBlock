@@ -149,6 +149,7 @@ def main() -> None:
     expect(call("approveIssuerRotation", f'(principal "{owner}", principal "{successor}")'), "ok = record")
     expect(call("acceptIssuerRotation", f'(principal "{owner}")', "issuer-successor"), "ok = record")
     certified(old_active_id, "issuer_suspended", second_digest)
+    expect(call("setIssuerActive", f'(principal "{owner}", true)'), "rotated issuer is permanently retired")
     expect(call("registerSchema", f'("hortsun.service.v3", {blob(0x55)})'), "issuer not approved")
     expect(call("registerSchema", f'("hortsun.service.v2", {blob(0x77)})', "issuer-successor"), "ok = record")
 
