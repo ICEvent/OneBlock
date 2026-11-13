@@ -7,10 +7,10 @@ import {
 import { unpackClaimLeaf } from "../sdk/verifyCertifiedClaim.mjs";
 
 test("JCS-like canonical JSON follows ECMAScript number/string and UTF-16 key sorting", () => {
-  const input = { z: 0.002, B: -0, a: [true, null, { b: "hi", a: "世界" }], A: 1e30 };
+  const input = { z: 0.002, B: -0, a: [true, null, { b: "hi", a: "世界" }], A: 1e-30 };
   assert.equal(
     canonicalizeJson(input),
-    '{"A":1e+30,"B":0,"a":[true,null,{"a":"世界","b":"hi"}],"z":0.002}',
+    '{"A":1e-30,"B":0,"a":[true,null,{"a":"世界","b":"hi"}],"z":0.002}',
   );
   assert.equal(canonicalizeJson({ "\u20ac": 1, "\r": 2 }), '{"\\r":2,"€":1}');
 });
@@ -47,7 +47,7 @@ test("full canonical claim is content addressed with a domain separator", async 
   assert.equal(digest1, independentDigest);
   assert.notEqual(await computeClaimDigest({ ...claim, claim_data: { ...claim.claim_data, outcome: "failed" } }), digest1);
   assert.notEqual(await computeClaimDigest({ ...claim, issuer_id: "other" }), digest1);
-  assert.deepEqual(hexToBytes(digest1), Buffer.from(digest1, "hex"));
+  assert.deepEqual(hexToBytes(digest1), Uint8Array.from(Buffer.from(digest1, "hex")));
   assert.equal(bytesToHex(hexToBytes(digest1)), digest1);
 });
 
