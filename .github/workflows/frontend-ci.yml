@@ -7,6 +7,11 @@ on:
       - 'src/oneblock_frontend/**'
       - 'package.json'
       - 'package-lock.json'
+      - 'sdk/**'
+      - 'src/declarations/**'
+      - 'scripts/harden-generated-agents.mjs'
+      - 'tests/strictClaim.test.mjs'
+      - 'tests/validateSourceClaim.test.mjs'
       - '.github/workflows/frontend-ci.yml'
   push:
     branches:
@@ -15,6 +20,11 @@ on:
       - 'src/oneblock_frontend/**'
       - 'package.json'
       - 'package-lock.json'
+      - 'sdk/**'
+      - 'src/declarations/**'
+      - 'scripts/harden-generated-agents.mjs'
+      - 'tests/strictClaim.test.mjs'
+      - 'tests/validateSourceClaim.test.mjs'
       - '.github/workflows/frontend-ci.yml'
 
 jobs:
@@ -33,6 +43,15 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Check frontend dependency vulnerabilities
+        run: npm audit --audit-level=moderate
+
+      - name: Verify trusted IC root and safe environment allowlist
+        run: node scripts/harden-generated-agents.mjs --check
+
+      - name: Strict JSON, issuer and domain-schema validation
+        run: node --test tests/strictClaim.test.mjs tests/validateSourceClaim.test.mjs
 
       - name: Type check
         run: npx tsc -p src/oneblock_frontend/tsconfig.json --noEmit
