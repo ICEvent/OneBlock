@@ -13,7 +13,7 @@ import { IDL } from "@dfinity/candid";
 import { verifyCertifiedClaim } from "../sdk/verifyCertifiedClaim.mjs";
 
 const [claimId, digestHex, expectedStatus] = process.argv.slice(2);
-if (!claimId || !digestHex || !["active", "revoked"].includes(expectedStatus)) {
+if (!claimId || !digestHex || !["active", "revoked", "issuer_suspended", "consent_withdrawn"].includes(expectedStatus)) {
   throw new Error("usage: node tests/verifyCertifiedClaim.e2e.mjs <claimId> <sha256> <active|revoked>");
 }
 const canisterId = process.env.PROOF_REGISTRY_CANISTER_ID;
