@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oneblock.page/schemas/ovdp/claim-body-v1.schema.json",
+  "title": "OneBlock Verifiable Data Protocol ClaimBody 1.0",
+  "description": "Transport-neutral unsigned claim body. It must be RFC 8785/JCS canonicalized and hashed with the documented oneblock:claim:v1 domain separator; do not include signature or receipt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "version",
+    "issuer_id",
+    "subject",
+    "predicate",
+    "schema_id",
+    "claim_data",
+    "evidence",
+    "event_at",
+    "issued_at",
+    "source_event_id",
+    "visibility"
+  ],
+  "properties": {
+    "protocol": {
+      "const": "oneblock.claim"
+    },
+    "version": {
+      "const": "1.0"
+    },
+    "issuer_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "Authenticated ICP issuer principal (canonical text), never a brand display name.",
+      "pattern": "^[a-z0-9-]{5,64}$"
+    },
+    "subject": {
+      "$ref": "#/$defs/entityRef"
+    },
+    "predicate": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 256,
+      "pattern": "^[a-z][a-z0-9._-]*:[a-z][a-z0-9._-]*$"
+    },
+    "object": {
+      "$ref": "#/$defs/entityRef"
+    },
+    "schema_id": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 512
+    },
+    "claim_data": {
+      "type": "object",
+      "description": "Validated against the separately registered immutable domain JSON Schema. It is NOT validated by this envelope schema alone."
+    },
+    "evidence": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/evidenceRef"
+      }
+    },
+    "event_at": {
+      "$ref": "#/$defs/utcTime"
+    },
+    "issued_at": {
+      "$ref": "#/$defs/utcTime"
+    },
+    "valid_until": {
+      "$ref": "#/$defs/utcTime"
+    },
+    "source_event_id": {
+      "type": "string",
+      "minLength": 32,
+      "maxLength": 64,
+      "pattern": "^[a-f0-9]{32}([a-f0-9]{32})?$",
+      "description": "Opaque 128-bit or 256-bit unpredictable lowercase hex ID; no private business identifiers."
+    },
+    "supersedes": {
+      "$ref": "#/$defs/sha256Digest"
+    },
+    "links": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sha256Digest"
+      }
+    },
+    "visibility": {
+      "enum": [
+        "public",
+        "unlisted",
+        "restricted"
+      ]
+    },
+    "consent_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  },
+  "$defs": {
+    "utcTime": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$",
+      "description": "Canonical timestamp policy: UTC RFC3339 only. Fix precision before signing; IETF format validation must be enabled by validator."
+    },
+    "sha256Digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "entityRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "kind": {
+          "enum": [
+            "person",
+            "organization",
+            "agent",
+            "app",
+            "asset",
+            "contract",
+            "event",
+            "transaction",
+            "object"
+          ]
+        }
+      }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "content_sha256",
+        "availability"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "schema_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "content_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "availability": {
+          "enum": [
+            "public",
+            "authorized",
+            "offline"
+          ]
+        },
+        "commitment_nonce_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "subject": {
+            "properties": {
+              "kind": {
+                "const": "person"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          }
+        },
+        "required": [
+          "subject"
+        ]
+      },
+      "then": {
+        "required": [
+          "consent_ref"
+        ]
+      }
+    }
+  ],
+  "$comment": "Envelope validation only; requires independent issuer/subject authorization, domain schema check, and IC certificate. Do not interpret as factual truth."
+}
