@@ -9,6 +9,7 @@ assert "verified = false;" in backend, "legacy factor must default to unverified
 assert "signed payload verification unavailable; use certified proof registry" in backend
 assert 'model_version = "oip-v0.3-legacy-quarantined"' in backend
 assert "getScores(principal : Text)" in backend
+assert "legacy identity factors are unverified; score-based policy evaluation disabled" in backend
 assert "recomputeScoresInternal(g, null, Time.now())" in backend
 assert "Legacy OIP factors have not been cryptographically verified" in scores
 assert "verified: false, confidence: 0.84" in console
