@@ -6,6 +6,8 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+const ROOT = fileURLToPath(new URL("../", import.meta.url));
 
 const paths = [
   "src/declarations/profile/index.js",
@@ -13,7 +15,7 @@ const paths = [
 ];
 const check = process.argv.includes("--check");
 for (const path of paths) {
-  const abs = resolve(process.cwd(), path);
+  const abs = resolve(ROOT, path);
   let contents = readFileSync(abs, "utf8");
   const source = contents;
   contents = contents.replace(
@@ -30,7 +32,7 @@ for (const path of paths) {
   }
 }
 
-const vite = readFileSync(resolve(process.cwd(), "src/oneblock_frontend/vite.config.js"), "utf8");
+const vite = readFileSync(resolve(ROOT, "src/oneblock_frontend/vite.config.js"), "utf8");
 if (/['"]process\.env['"]\s*:\s*process\.env/.test(vite) ||
     /environment\(["']all["']/.test(vite)) {
   throw new Error("Unsafe global environment exposure in Vite config");
