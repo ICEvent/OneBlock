@@ -50,6 +50,13 @@ def main() -> None:
     expect(first, f"{owner}/job-1024")
     expect(call("submitCommitment", submission()), "ok = record")
     expect(call("getRegistryCounts"), "claims = 1")
+    claim_id = f"{owner}/job-1024"
+    certified_active = dfx("canister", "call", "--query", "proof_registry", "getCertifiedClaim", f'("{claim_id}")')
+    expect(certified_active, "certificate = opt blob")
+    expect(certified_active, "witness = blob")
+    expect(certified_active, "value = opt blob")
+    absent = dfx("canister", "call", "--query", "proof_registry", "getCertifiedClaim", '("not-found")')
+    expect(absent, "value = null")
     expect(call("submitCommitment", submission(0x44)), "conflicting idempotency key")
     expect(call("submitCommitment", submission().replace(blob(0x11), 'blob "\\00"')), "claim hash must contain exactly 32 bytes")
 
@@ -65,9 +72,16 @@ def main() -> None:
     expect(state, "revoked")
     expect(state, "certified = false")
     expect(call("getRegistryCounts"), "status_events = 1")
+    certified_revoked = dfx("canister", "call", "--query", "proof_registry", "getCertifiedClaim", f'("{claim_id}")')
+    expect(certified_revoked, "certificate = opt blob")
+    expect(certified_revoked, "witness = blob")
+    assert certified_active != certified_revoked, "revocation must change certified witness/value"
     dfx("canister", "install", "proof_registry", "--mode", "upgrade")
     expect(call("getClaimState", f'("{claim_id}")'), "revoked")
     expect(call("getRegistryCounts"), "status_events = 1")
+    certified_after_upgrade = dfx("canister", "call", "--query", "proof_registry", "getCertifiedClaim", f'("{claim_id}")')
+    expect(certified_after_upgrade, "certificate = opt blob")
+    expect(certified_after_upgrade, "witness = blob")
     print("PASS: authority, schema, commitment, idempotency, mutation prevention, revocation")
 
 
