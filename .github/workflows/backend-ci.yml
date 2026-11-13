@@ -38,5 +38,12 @@ jobs:
       - name: Show dfx version
         run: dfx --version
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install pinned Motoko dependencies
+        run: |
+          npm install --global ic-mops@3.5.1
+          mops install
       - name: Check profile canister
         run: dfx build --check profile
