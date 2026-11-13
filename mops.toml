@@ -1,0 +1,7 @@
+[package]
+name = "oneblock"
+version = "0.0.0"
+description = "OneBlock project Motoko dependencies"
+
+[dependencies]
+ic-certification = "1.0.0"
