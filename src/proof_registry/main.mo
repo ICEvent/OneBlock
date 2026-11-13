@@ -289,7 +289,16 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
   func currentStatus(claim : Attestation) : ClaimStatus {
     if (statusFor(claim.id) != null) return #revoked;
     if (isWithdrawn(claim.issuer, claim.claim_sha256)) return #consent_withdrawn;
-    if (approvalFor(claim.issuer, claim.claim_sha256, claim.subject_commitment) == null) return #consent_withdrawn;
+    // An old phase-1 commitment without consent must NEVER become active
+    // just because a holder approved the digest after it was accepted.
+    // This also avoids disagreement between ordinary status queries and the
+    // certified tree after retroactive approvals.
+    switch (approvalFor(claim.issuer, claim.claim_sha256, claim.subject_commitment)) {
+      case null return #consent_withdrawn;
+      case (?grant) {
+        if (grant.approved_at > claim.accepted_at) return #consent_withdrawn;
+      };
+    };
     if (not approved(claim.issuer)) return #issuer_suspended;
     #active
   };
