@@ -6,7 +6,7 @@
   "scripts": {
     "setup": "npm i && dfx canister create oneblock_backend && dfx generate oneblock_backend && dfx deploy",
     "start": "vite --port 3000",
-    "prebuild": "dfx generate",
+    "prebuild": "dfx generate && node ../../scripts/harden-generated-agents.mjs",
     "build": "tsc && vite build",
     "format": "prettier --write \"src/**/*.{json,js,jsx,ts,tsx,css,scss}\""
   },
