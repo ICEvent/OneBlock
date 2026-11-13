@@ -57,6 +57,16 @@ export function canonicalizeJson(value) {
   }
 }
 
+/** SHA-256 over canonical JSON Schema bytes. Registered by the issuer. */
+export async function computeSchemaDigest(schema) {
+  if (schema === null || typeof schema !== "object" || Array.isArray(schema)) {
+    throw new Error("domain schema must be a JSON object");
+  }
+  const payload = new TextEncoder().encode(canonicalizeJson(schema));
+  const hash = await crypto.subtle.digest("SHA-256", payload);
+  return bytesToHex(new Uint8Array(hash));
+}
+
 export function hexToBytes(hex) {
   const normalized = String(hex).replace(/^sha256:/, "").toLowerCase();
   if (!HEX_SHA.test(normalized)) throw new Error("SHA-256 must be a 64-character hex string");
