@@ -3,7 +3,7 @@ export type CertifiedClaimResponse = {
   certificate: [] | [Uint8Array] | Uint8Array | null;
   witness: Uint8Array;
 };
-export function unpackClaimLeaf(bytes: Uint8Array): { sha256: string; status: "active" | "revoked" };
+export function unpackClaimLeaf(bytes: Uint8Array): { sha256: string; status: "active" | "revoked" | "issuer_suspended" | "consent_withdrawn" };
 export function verifyCertifiedClaim(input: {
   claimId: string;
   expectedSha256: string;
