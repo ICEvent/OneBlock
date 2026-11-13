@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import os
 
 
 def dfx(*args: str) -> str:
@@ -15,6 +16,15 @@ def dfx(*args: str) -> str:
 def call(method: str, args: str = "()", identity: str | None = None) -> str:
     prefix = ["--identity", identity] if identity else []
     return dfx(*prefix, "canister", "call", "proof_registry", method, args)
+
+
+def verify_certified(claim_id: str, status: str) -> None:
+    env = os.environ.copy()
+    env["PROOF_REGISTRY_CANISTER_ID"] = dfx("canister", "id", "proof_registry").strip()
+    subprocess.run([
+        "node", "tests/verifyCertifiedClaim.e2e.mjs",
+        claim_id, "11" * 32, status,
+    ], env=env, check=True)
 
 
 def expect(output: str, term: str) -> None:
@@ -55,6 +65,7 @@ def main() -> None:
     expect(certified_active, "certificate = opt blob")
     expect(certified_active, "witness = blob")
     expect(certified_active, "value = opt blob")
+    verify_certified(claim_id, "active")
     absent = dfx("canister", "call", "--query", "proof_registry", "getCertifiedClaim", '("not-found")')
     expect(absent, "value = null")
     expect(call("submitCommitment", submission(0x44)), "conflicting idempotency key")
@@ -76,12 +87,14 @@ def main() -> None:
     expect(certified_revoked, "certificate = opt blob")
     expect(certified_revoked, "witness = blob")
     assert certified_active != certified_revoked, "revocation must change certified witness/value"
+    verify_certified(claim_id, "revoked")
     dfx("canister", "install", "proof_registry", "--mode", "upgrade")
     expect(call("getClaimState", f'("{claim_id}")'), "revoked")
     expect(call("getRegistryCounts"), "status_events = 1")
     certified_after_upgrade = dfx("canister", "call", "--query", "proof_registry", "getCertifiedClaim", f'("{claim_id}")')
     expect(certified_after_upgrade, "certificate = opt blob")
     expect(certified_after_upgrade, "witness = blob")
+    verify_certified(claim_id, "revoked")
     print("PASS: authority, schema, commitment, idempotency, mutation prevention, revocation")
 
 
