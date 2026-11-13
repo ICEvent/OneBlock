@@ -42,11 +42,11 @@ def submission(digest_byte: int = 0x11, event_id: str = EVENT_ID) -> str:
     )
 
 
-def certified(claim_id: str, status: str) -> None:
+def certified(claim_id: str, status: str, digest_hex: str = "11" * 32) -> None:
     env = os.environ.copy()
     env["PROOF_REGISTRY_CANISTER_ID"] = dfx("canister", "id", "proof_registry").strip()
     subprocess.run(
-        ["node", "tests/verifyCertifiedClaim.e2e.mjs", claim_id, "11" * 32, status],
+        ["node", "tests/verifyCertifiedClaim.e2e.mjs", claim_id, digest_hex, status],
         env=env, check=True,
     )
 
@@ -127,6 +127,30 @@ def main() -> None:
     expect(call("getClaimState", f'("{claim_id}")'), "revoked")
     expect(call("getRegistryCounts"), "status_events = 1")
     certified(claim_id, "revoked")
+
+    # Make an active old-issuer claim to test that rotation invalidates its
+    # latest certified status, without silently reattributing the old origin.
+    new_event_id = "b2" * 16
+    old_active_id = f"{owner}/{new_event_id}"
+    second_digest = "66" * 32
+    request_second = f'(principal "{holder}", {blob(0x66)}, {blob(0x22)}, {expiry} : int)'
+    grant_second = f'(principal "{owner}", {blob(0x66)}, {blob(0x22)}, {expiry} : int)'
+    expect(call("requestConsent", request_second), "ok = record")
+    expect(call("approveCommitment", grant_second, "holder"), "ok = record")
+    expect(call("submitCommitment", submission(0x66, new_event_id)), "ok = record")
+    certified(old_active_id, "active", second_digest)
+
+    dfx("identity", "new", "issuer-successor", "--storage-mode", "plaintext")
+    successor = dfx("--identity", "issuer-successor", "identity", "get-principal").strip()
+    expect(call("requestIssuerRotation", f'(principal "{successor}")', "holder"), "issuer not approved")
+    expect(call("requestIssuerRotation", f'(principal "{successor}")'), "ok = record")
+    expect(call("acceptIssuerRotation", f'(principal "{owner}")', "issuer-successor"), "administrator approval required")
+    expect(call("approveIssuerRotation", f'(principal "{owner}", principal "{successor}")', "holder"), "administrator approval required")
+    expect(call("approveIssuerRotation", f'(principal "{owner}", principal "{successor}")'), "ok = record")
+    expect(call("acceptIssuerRotation", f'(principal "{owner}")', "issuer-successor"), "ok = record")
+    certified(old_active_id, "issuer_suspended", second_digest)
+    expect(call("registerSchema", f'("hortsun.service.v3", {blob(0x55)})'), "issuer not approved")
+    expect(call("registerSchema", f'("hortsun.service.v2", {blob(0x77)})', "issuer-successor"), "ok = record")
 
     # Rotating the governor requires acceptance by the named successor.
     expect(call("nominateAdministrator", f'(principal "{adversary}")'), "ok = principal")
