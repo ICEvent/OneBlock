@@ -1,3 +1,5 @@
+> **Security addendum:** The current hardening in PR #28 extends this earlier phase-2 design. See [PROOF_REGISTRY_HARDENING.md](./PROOF_REGISTRY_HARDENING.md) for administrator-controlled issuers, immutable namespaces, two-step holder consent, issuer rotation, limited public metadata, schema certification and the four-state leaf format. The pre-hardening active/revoked-only discussion below is retained as historical context; do not deploy the old phase-2 behavior independently.
+
 # Certified Proof Registry — Phase 2 (stacked on PR #25)
 
 **Status:** Draft; local ICP certification prototype. Not a claim that real-world statements are true. Never deploy directly to mainnet without independent security review.
