@@ -1,0 +1,25 @@
+name: Verify evidence MVP
+
+on:
+  pull_request:
+    paths:
+      - "src/oneblock_frontend/src/lib/verifyEvidence.ts"
+      - "tests/verifyEvidence.test.mjs"
+      - ".github/workflows/verify-evidence.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/oneblock_frontend/src/lib/verifyEvidence.ts"
+      - "tests/verifyEvidence.test.mjs"
+      - ".github/workflows/verify-evidence.yml"
+
+jobs:
+  verify-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Unit tests (WebCrypto SHA-256 and claim inspection)
+        run: node --experimental-strip-types --test tests/verifyEvidence.test.mjs
