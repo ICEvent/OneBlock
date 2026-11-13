@@ -15,13 +15,7 @@ export const canisterId = "rvzx7-oqaaa-aaaaj-qagxq-cai";
  export const createActor = (agent, actorOptions) => {
   // const agent = new HttpAgent({ ...options?.agentOptions });
   
-  // Fetch root key for certificate validation during development
-  if(process.env.NODE_ENV !== "production") {
-    agent.fetchRootKey().catch(err=>{
-      console.warn("Unable to fetch root key. Check to ensure that your local replica is running");
-      console.error(err);
-    });
-  }
+  // Callers must supply a trusted agent; never fetch a root key implicitly.
 
   // Creates an actor with using the candid interface and the HttpAgent
   return Actor.createActor(idlFactory, {
