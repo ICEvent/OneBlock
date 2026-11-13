@@ -8,6 +8,8 @@ on:
       - 'src/oneblock_backend/**'
       - 'tests/oip_security_static.py'
       - 'dfx.json'
+      - 'mops.toml'
+      - 'src/proof_registry/**'
       - '.github/workflows/backend-ci.yml'
   push:
     branches:
@@ -16,6 +18,8 @@ on:
       - 'src/oneblock_backend/**'
       - 'tests/oip_security_static.py'
       - 'dfx.json'
+      - 'mops.toml'
+      - 'src/proof_registry/**'
       - '.github/workflows/backend-ci.yml'
 
 permissions:
@@ -36,6 +40,15 @@ jobs:
 
       - name: Install dfx
         uses: dfinity/setup-dfx@main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Motoko dependencies
+        run: |
+          npm install --global ic-mops@3.5.1
+          mops install
 
       - name: Show dfx version
         run: dfx --version
