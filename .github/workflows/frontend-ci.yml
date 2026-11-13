@@ -9,6 +9,7 @@ on:
       - 'package-lock.json'
       - 'sdk/**'
       - 'tests/strictClaim.test.mjs'
+      - 'tests/validateSourceClaim.test.mjs'
       - '.github/workflows/frontend-ci.yml'
   push:
     branches:
@@ -19,6 +20,7 @@ on:
       - 'package-lock.json'
       - 'sdk/**'
       - 'tests/strictClaim.test.mjs'
+      - 'tests/validateSourceClaim.test.mjs'
       - '.github/workflows/frontend-ci.yml'
 
 jobs:
@@ -38,8 +40,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Strict claim JSON and canonical digest tests
-        run: node --test tests/strictClaim.test.mjs
+      - name: Check frontend dependency vulnerabilities
+        run: npm audit --audit-level=moderate
+
+      - name: Strict JSON, issuer and domain-schema validation
+        run: node --test tests/strictClaim.test.mjs tests/validateSourceClaim.test.mjs
 
       - name: Type check
         run: npx tsc -p src/oneblock_frontend/tsconfig.json --noEmit
