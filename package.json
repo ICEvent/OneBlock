@@ -1,6 +1,6 @@
 {
   "engines": {
-    "node": ">=16.0.0",
+    "node": ">=22.12.0",
     "npm": ">=7.0.0"
   },
   "name": "oneblock",
@@ -19,12 +19,16 @@
     "@dfinity/agent": "^2.1.3",
     "@dfinity/auth-client": "^2.1.3",
     "@dfinity/candid": "^2.1.3",
+    "@dfinity/certificate-verification": "4.0.0",
     "@dfinity/principal": "^2.1.3",
     "@emotion/react": "^11.13.5",
     "@emotion/styled": "^11.13.5",
+    "@icp-sdk/core": "^6.0.0",
     "@mui/icons-material": "^5.15.19",
     "@mui/material": "^5.16.9",
     "@mui/system": "^6.1.10",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "moment": "^2.29.4",
     "react-router-dom": "^7.0.2",
     "react-toastify": "^10.0.6"
