@@ -27,10 +27,8 @@
   },
   "networks": {
     "local": {
-      "providers": [
-        "http://127.0.0.1:8000"
-      ],
-      "type": "ephemeral"
+      "type": "ephemeral",
+      "bind": "127.0.0.1:8000"
     }
   },
   "output_env_file": ".env",
