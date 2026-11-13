@@ -25,7 +25,7 @@ type CertifiedResponse = {
   witness: Uint8Array;
 };
 
-const idlFactory = ({ IDL: Candid }: { IDL: typeof IDL }) =>
+const idlFactory = ({ IDL: Candid }: { IDL: Pick<typeof IDL, "Service" | "Func" | "Record" | "Text" | "Opt" | "Vec" | "Nat8"> }) =>
   Candid.Service({
     getCertifiedClaim: Candid.Func([Candid.Text], [Candid.Record({
       value: Candid.Opt(Candid.Vec(Candid.Nat8)),
