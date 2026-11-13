@@ -2,9 +2,11 @@ import React, { useState } from "react";
 import Navbar from "../components/Navbar";
 import { compareSha256, inspectClaimJson, sha256Hex } from "../lib/verifyEvidence";
 import type { ClaimInspection, DigestComparison } from "../lib/verifyEvidence";
+import { configuredRegistryId, verifyProofFromClaimJson } from "../lib/certifiedClaimService";
+import type { CertifiedProofReport } from "../lib/certifiedClaimService";
 import "../styles/Verify.css";
 
-type VerifyTab = "integrity" | "claim";
+type VerifyTab = "integrity" | "claim" | "proof";
 type SourceKind = "text" | "file";
 type DigestResult = { sha256: string; comparison: DigestComparison; source: string };
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -42,6 +44,11 @@ const Verify = () => {
   const [inspection, setInspection] = useState<ClaimInspection | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [proofClaimId, setProofClaimId] = useState("");
+  const [proofJson, setProofJson] = useState("");
+  const [proofResult, setProofResult] = useState<CertifiedProofReport | null>(null);
+  const [proofError, setProofError] = useState("");
+  const [proofBusy, setProofBusy] = useState(false);
 
   const runDigest = async () => {
     setDigest(null);
@@ -63,6 +70,20 @@ const Verify = () => {
     }
   };
 
+  const runCertifiedProof = async () => {
+    setProofResult(null);
+    setProofError("");
+    setProofBusy(true);
+    try {
+      const report = await verifyProofFromClaimJson(proofClaimId, proofJson);
+      setProofResult(report);
+    } catch (err) {
+      setProofError(err instanceof Error ? err.message : "认证证明验证失败，请核实 Claim ID、原始声明和 ICP 连接。");
+    } finally {
+      setProofBusy(false);
+    }
+  };
+
   return (
     <div className="verify-page">
       <Navbar />
@@ -71,7 +92,7 @@ const Verify = () => {
           <span className="verify-eyebrow">ONEBLOCK · VERIFICATION TOOLS</span>
           <h1>Verify information, not assumptions.</h1>
           <p>检查原始内容是否被修改，理解第三方声明缺少哪些可验证证据。每一步都说明已证实什么、尚未证实什么。</p>
-          <span className="verify-privacy">本地浏览器检查 · 无需登录 · 不上传文字或文件</span>
+          <span className="verify-privacy">无需登录 · 文字/文件与 Claim JSON 在本地处理 · 链上验证仅发送 Claim ID</span>
         </header>
 
         <div className="verify-layout">
@@ -79,6 +100,7 @@ const Verify = () => {
             <div className="verify-tabs" role="tablist" aria-label="验证工具">
               <button type="button" role="tab" aria-selected={tab === "integrity"} className={tab === "integrity" ? "selected" : ""} onClick={() => setTab("integrity")}>内容完整性</button>
               <button type="button" role="tab" aria-selected={tab === "claim"} className={tab === "claim" ? "selected" : ""} onClick={() => setTab("claim")}>Claim 结构检查</button>
+              <button type="button" role="tab" aria-selected={tab === "proof"} className={tab === "proof" ? "selected" : ""} onClick={() => setTab("proof")}>ICP 认证证明</button>
             </div>
 
             {tab === "integrity" ? (
@@ -111,7 +133,7 @@ const Verify = () => {
                   <p className="verify-disclaimer">即使摘要匹配，也只能证明这份内容与参考指纹相同，不能证明发布者身份、内容真实性或首次发布的时间。</p>
                 </div>}
               </div>
-            ) : (
+            ) : tab === "claim" ? (
               <div className="verify-content" role="tabpanel">
                 <h2>Claim Inspector</h2>
                 <p className="verify-muted">检查 OneBlock Claim v1 的基础字段和证据引用。这里只做初步结构检查，尚不验证签名或 ICP 证书。</p>
@@ -135,6 +157,38 @@ const Verify = () => {
                   <p className="verify-disclaimer">字段检查不是 JSON Schema 全量验证；也没有检测重复 JSON 键。现阶段不会宣称任何 Claim 已被 OneBlock 证明。</p>
                 </div>}
               </div>
+            ) : (
+              <div className="verify-content" role="tabpanel">
+                <h2>Certified Proof Verification</h2>
+                <p className="verify-muted">提供注册记录的 Claim ID 和完整原始 JSON。浏览器会计算规范化摘要，独立验证 ICP 证书、Merkle 证明及当前状态；不将原始声明上传到 Canister。</p>
+                <div className="verify-config">
+                  <strong>受信任的 Proof Registry</strong>
+                  <code>{configuredRegistryId() || "未配置（不可执行链上验证）"}</code>
+                  <small>Canister ID 由站点部署配置指定，不能通过表单随意切换。</small>
+                </div>
+                <label className="verify-field">Claim ID（Principal/来源事件 ID）
+                  <input disabled={proofBusy} spellCheck={false} value={proofClaimId} onChange={(e) => { setProofClaimId(e.target.value); setProofResult(null); setProofError(""); }} placeholder="aaaaa-aa/opaque-event-id" />
+                </label>
+                <label className="verify-field">原始 Claim JSON
+                  <textarea disabled={proofBusy} rows={11} spellCheck={false} value={proofJson} onChange={(e) => { setProofJson(e.target.value); setProofResult(null); setProofError(""); }} placeholder='{"protocol":"oneblock.claim","version":"1.0",...}' />
+                </label>
+                <button type="button" className="verify-primary" disabled={proofBusy || !configuredRegistryId() || !proofClaimId.trim() || !proofJson.trim()} onClick={() => void runCertifiedProof()}>{proofBusy ? "正在独立验证…" : "验证 ICP 认证证明"}</button>
+                {!configuredRegistryId() && <p className="verify-muted" role="status">尚未部署可信登记簿 Canister，请由管理员配置 VITE_PROOF_REGISTRY_CANISTER_ID。此页面不会伪造成功结果。</p>}
+                {proofError && <p className="verify-error" role="alert">验证未通过：{proofError}</p>}
+                {proofResult && <div className="verify-result" role="status" aria-live="polite">
+                  <h3>{proofResult.status === "active" ? "ICP 登记证明已验证 · 当前状态 Active" : "ICP 登记证明已验证 · 已撤销"}</h3>
+                  <p className={proofResult.status === "active" ? "verify-status verified" : "verify-status revoked"}>
+                    {proofResult.status === "active" ? "IC 证书、Merkle 路径及声明摘要一致。" : "认证树确认该记录已撤销，不能作为当前有效证明使用。"}
+                  </p>
+                  <div className="verify-kv"><span>签发 Principal</span><code>{proofResult.issuerPrincipal}</code></div>
+                  <div className="verify-kv"><span>Claim SHA-256</span><code>{proofResult.claimSha256}</code></div>
+                  <div className="verify-kv"><span>登记状态</span><strong>{proofResult.status}</strong></div>
+                  <div className="verify-kv"><span>IC 认证证明</span><strong>已通过</strong></div>
+                  <div className="verify-kv"><span>机构/品牌身份</span><strong>未验证</strong></div>
+                  <div className="verify-kv"><span>业务事实真实性</span><strong>未验证</strong></div>
+                  <p className="verify-disclaimer">这里只能证明某 ICP Principal 在指定登记簿记录了相应数据承诺，不能证明公司身份、用户授权或现实事件真实发生。证书有新鲜度窗口，实时高风险操作须再次核验。</p>
+                </div>}
+              </div>
             )}
           </section>
 
@@ -147,8 +201,8 @@ const Verify = () => {
             </div>
             <div className="verify-info-card">
               <h2>当前工具的边界</h2>
-              <p>此版本只完成本地 SHA-256 比对和声明基础结构检查。</p>
-              <p>下一阶段接入 Issuer Registry、完整 Schema 验证、密码学签名验证、ICP Certified Data 与撤销状态。</p>
+              <p>此版本提供本地 SHA-256、Claim 结构检查和配置后可用的 ICP 认证摘要/撤销状态验证。</p>
+              <p>尚未实现机构实名核验、完整 Schema 校验、用户授权与业务事实交叉印证。</p>
               <p>任何缺少证据的结论必须标记为「未验证」，不能显示为「真实」。</p>
             </div>
           </aside>
