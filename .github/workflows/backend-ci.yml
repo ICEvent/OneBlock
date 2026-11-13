@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'src/oneblock_backend/**'
+      - 'tests/oip_security_static.py'
       - 'dfx.json'
       - '.github/workflows/backend-ci.yml'
   push:
@@ -13,6 +14,7 @@ on:
       - main
     paths:
       - 'src/oneblock_backend/**'
+      - 'tests/oip_security_static.py'
       - 'dfx.json'
       - '.github/workflows/backend-ci.yml'
 
@@ -38,12 +40,8 @@ jobs:
       - name: Show dfx version
         run: dfx --version
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - name: Install pinned Motoko dependencies
-        run: |
-          npm install --global ic-mops@3.5.1
-          mops install
+      - name: Check legacy OIP trust semantics
+        run: python3 tests/oip_security_static.py
+
       - name: Check profile canister
         run: dfx build --check profile
