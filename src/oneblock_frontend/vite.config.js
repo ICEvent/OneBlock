@@ -1,7 +1,6 @@
 import { fileURLToPath, URL } from 'url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
-import environment from 'vite-plugin-environment';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: '../../.env' });
@@ -9,13 +8,6 @@ dotenv.config({ path: '../../.env' });
 export default defineConfig({
   build: {
     emptyOutDir: true,
-  },
-  optimizeDeps: {
-    esbuildOptions: {
-      define: {
-        global: "globalThis",
-      },
-    },
   },
   server: {
     proxy: {
@@ -25,13 +17,13 @@ export default defineConfig({
       },
     },
   },
-  plugins: [
-    react(),
-    environment("all", { prefix: "CANISTER_" }),
-    environment("all", { prefix: "DFX_" }),
-  ],
+  plugins: [react()],
+  // Explicitly allowlist public build identifiers. Never ship all process.env.
   define: {
-    'process.env': process.env
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production'),
+    'process.env.DFX_NETWORK': JSON.stringify(process.env.DFX_NETWORK === 'local' ? 'local' : 'ic'),
+    'process.env.CANISTER_ID_PROFILE': JSON.stringify(process.env.CANISTER_ID_PROFILE || ''),
+    'process.env.CANISTER_ID_PROFILE_ASSETS': JSON.stringify(process.env.CANISTER_ID_PROFILE_ASSETS || ''),
   },
   resolve: {
     alias: [
