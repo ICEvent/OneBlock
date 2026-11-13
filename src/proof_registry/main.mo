@@ -50,6 +50,13 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
   };
 
   public type IssuerNamespace = { issuer : Principal; prefix : Text };
+  public type IssuerRotation = {
+    old_issuer : Principal;
+    successor : Principal;
+    requested_at : Int;
+    admin_approved : Bool;
+    completed_at : ?Int;
+  };
   public type IssuerPolicy = {
     issuer : Principal;
     active : Bool;
@@ -134,6 +141,7 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
   var pendingAdministrator : ?Principal = null;
   var issuerPolicies : [IssuerPolicy] = [];
   var issuerNamespaces : [IssuerNamespace] = [];
+  var issuerRotations : [IssuerRotation] = [];
   var approvals : [HolderApproval] = [];
   var consentRequests : [ConsentRequest] = [];
   var withdrawals : [ConsentWithdrawal] = [];
@@ -150,6 +158,13 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
   func policyFor(issuer : Principal) : ?IssuerPolicy {
     for (policy in issuerPolicies.vals()) {
       if (policy.issuer == issuer) return ?policy;
+    };
+    null
+  };
+
+  func rotationFor(oldIssuer : Principal) : ?IssuerRotation {
+    for (rotation in issuerRotations.vals()) {
+      if (rotation.old_issuer == oldIssuer) return ?rotation;
     };
     null
   };
@@ -422,6 +437,94 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
       case null null;
       case (?prefix) ?{ issuer = issuer; prefix = prefix };
     }
+  };
+
+  // Rotation requires three separate principals: outgoing issuer requests,
+  // registry administrator approves, and successor accepts. Old claims are
+  // never reissued under the new Principal.
+  public shared ({ caller }) func requestIssuerRotation(successor : Principal) : async Result.Result<IssuerRotation, Text> {
+    if (not approved(caller)) return #err("issuer not approved or suspended");
+    if (Principal.isAnonymous(successor) or caller == successor) return #err("invalid successor");
+    if (issuerFor(successor) != null) return #err("successor already registered");
+    if (namespaceFor(caller) == null) return #err("issuer namespace not approved");
+    if (rotationFor(caller) != null) return #err("issuer rotation already requested");
+    if (issuers.size() >= issuerLimit) return #err("issuer registry capacity reached");
+    let item : IssuerRotation = {
+      old_issuer = caller; successor = successor;
+      requested_at = Time.now(); admin_approved = false; completed_at = null;
+    };
+    issuerRotations := Array.append(issuerRotations, [item]);
+    #ok(item)
+  };
+
+  public shared ({ caller }) func approveIssuerRotation(oldIssuer : Principal, successor : Principal) : async Result.Result<IssuerRotation, Text> {
+    if (not admin(caller)) return #err("administrator approval required");
+    let old = switch (rotationFor(oldIssuer)) {
+      case null return #err("issuer rotation not requested");
+      case (?r) r;
+    };
+    if (old.successor != successor or old.completed_at != null) return #err("invalid rotation nomination");
+    issuerRotations := Array.map<IssuerRotation, IssuerRotation>(
+      issuerRotations, func(r : IssuerRotation) : IssuerRotation {
+        if (r.old_issuer == oldIssuer) { { r with admin_approved = true } } else r
+      }
+    );
+    #ok({ old with admin_approved = true })
+  };
+
+  public shared ({ caller }) func acceptIssuerRotation(oldIssuer : Principal) : async Result.Result<Issuer, Text> {
+    let rotation = switch (rotationFor(oldIssuer)) {
+      case null return #err("issuer rotation not requested");
+      case (?r) r;
+    };
+    if (rotation.successor != caller) return #err("only nominated successor may accept");
+    if (not rotation.admin_approved) return #err("administrator approval required");
+    if (rotation.completed_at != null) return #err("issuer rotation already completed");
+    if (issuerFor(caller) != null) return #err("successor already registered");
+    if (issuers.size() >= issuerLimit) return #err("issuer registry capacity reached");
+    let previous = switch (issuerFor(oldIssuer)) {
+      case null return #err("former issuer missing");
+      case (?p) p;
+    };
+    let prefix = switch (namespaceFor(oldIssuer)) {
+      case null return #err("former namespace missing");
+      case (?p) p;
+    };
+    let oldPolicy = switch (policyFor(oldIssuer)) {
+      case null return #err("former issuer policy missing");
+      case (?p) p;
+    };
+    let successorIssuer : Issuer = {
+      issuer = caller;
+      display_name = previous.display_name;
+      registered_at = Time.now();
+    };
+    issuers := Array.append(issuers, [successorIssuer]);
+    issuerPolicies := Array.map<IssuerPolicy, IssuerPolicy>(
+      issuerPolicies, func(p : IssuerPolicy) : IssuerPolicy {
+        if (p.issuer == oldIssuer) { { p with active = false } } else p
+      }
+    );
+    issuerPolicies := Array.append(issuerPolicies, [{
+      issuer = caller; active = true;
+      schema_limit = oldPolicy.schema_limit;
+      claim_limit = oldPolicy.claim_limit;
+      approved_at = Time.now();
+    }]);
+    // Namespace transfer is explicit and leaves old issuer permanently
+    // in inactive historical records, even if a controller key is reused.
+    issuerNamespaces := Array.append(issuerNamespaces, [{ issuer = caller; prefix = prefix }]);
+    issuerRotations := Array.map<IssuerRotation, IssuerRotation>(
+      issuerRotations, func(r : IssuerRotation) : IssuerRotation {
+        if (r.old_issuer == oldIssuer) { { r with completed_at = ?Time.now() } } else r
+      }
+    );
+    certifyAllForIssuer(oldIssuer);
+    #ok(successorIssuer)
+  };
+
+  public query func getIssuerRotation(oldIssuer : Principal) : async ?IssuerRotation {
+    rotationFor(oldIssuer)
   };
 
   public shared ({ caller }) func setIssuerActive(issuer : Principal, active : Bool) : async Result.Result<IssuerPolicy, Text> {
