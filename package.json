@@ -27,6 +27,8 @@
     "@mui/icons-material": "^5.15.19",
     "@mui/material": "^5.16.9",
     "@mui/system": "^6.1.10",
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1",
     "moment": "^2.29.4",
     "react-router-dom": "^7.0.2",
     "react-toastify": "^10.0.6"
