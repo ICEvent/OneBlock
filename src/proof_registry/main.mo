@@ -83,8 +83,20 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
   };
 
   public type ClaimStatus = { #active; #revoked; #issuer_suspended; #consent_withdrawn };
+  // Public projection does not expose sensitive or guessable evidence hashes,
+  // subject commitments or private holder identities.
+  public type PublicAttestation = {
+    id : Text;
+    issuer : Principal;
+    source_event_id : Text;
+    schema_id : Text;
+    claim_sha256 : Blob;
+    event_at : Int;
+    accepted_at : Int;
+  };
+
   public type ClaimState = {
-    attestation : Attestation;
+    attestation : PublicAttestation;
     status : ClaimStatus;
     last_status_event : ?StatusEvent;
     // Always false in phase 1. A query response is not a certified proof.
@@ -257,6 +269,28 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
       }
     };
     certifiedTree.setCertifiedData();
+  };
+
+  func publicAttestation(item : Attestation) : PublicAttestation {
+    {
+      id = item.id; issuer = item.issuer;
+      source_event_id = item.source_event_id;
+      schema_id = item.schema_id;
+      claim_sha256 = item.claim_sha256;
+      event_at = item.event_at;
+      accepted_at = item.accepted_at;
+    }
+  };
+
+  func validReasonCode(value : Text) : Bool {
+    let size = Text.size(value);
+    if (size == 0 or size > 32) return false;
+    for (ch in Text.toIter(value)) {
+      if (not (
+        (ch >= 'a' and ch <= 'z') or (ch >= '0' and ch <= '9') or ch == '_'
+      )) return false;
+    };
+    true
   };
 
   func isDigest(value : Blob) : Bool {
@@ -512,7 +546,7 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
     };
     if (claim.issuer != caller) return #err("only the original issuer may revoke");
     if (statusFor(claimId) != null) return #err("already revoked");
-    if (Text.size(reasonCode) == 0 or Text.size(reasonCode) > 80) return #err("invalid reason code");
+    if (not validReasonCode(reasonCode)) return #err("reason must be a short lowercase machine code");
     if (statusEvents.size() >= statusEventLimit) return #err("status registry capacity reached");
 
     let event : StatusEvent = {
@@ -544,7 +578,7 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
       case (?claim) {
         let statusEvent = statusFor(claimId);
         ?{
-          attestation = claim;
+          attestation = publicAttestation(claim);
           status = currentStatus(claim);
           last_status_event = statusEvent;
           certified = false;
@@ -561,7 +595,7 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
       case (?claim) {
         let statusEvent = statusFor(claimId);
         ?{
-          attestation = claim;
+          attestation = publicAttestation(claim);
           status = currentStatus(claim);
           last_status_event = statusEvent;
           certified = false;
@@ -577,6 +611,9 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
     certificate : ?Blob;
     witness : Blob;
   } {
+    if (Text.size(claimId) > 250) {
+      return { value = null; certificate = null; witness = Blob.fromArray([]) };
+    };
     let path = claimPath(claimId);
     {
       value = certifiedTree.lookup(path);
@@ -593,6 +630,9 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
     certificate : ?Blob;
     witness : Blob;
   } {
+    if (Text.size(schemaId) > 160) {
+      return { value = null; certificate = null; witness = Blob.fromArray([]) };
+    };
     let path = schemaPath(issuer, schemaId);
     {
       value = certifiedTree.lookup(path);
