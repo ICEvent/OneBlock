@@ -25,6 +25,10 @@ jobs:
         run: |
           npm install --global ic-mops@3.5.1
           mops install
+      - name: Install independent certificate verifier test dependencies
+        run: npm install --no-save --package-lock=false --ignore-scripts @dfinity/certificate-verification@4.0.0 @icp-sdk/core@^6.0.0
+      - name: Test canonical claim digest and witness encoding
+        run: node --test tests/claimDigest.test.mjs
       - name: Verify DFX toolchain
         run: dfx --version
       - name: Start local ICP replica
