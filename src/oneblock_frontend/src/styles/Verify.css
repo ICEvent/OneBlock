@@ -43,3 +43,14 @@
 .verify-info-card p { color: #597185; line-height: 1.65; font-size: 13px; margin: 5px 0 14px; }
 @media (max-width: 850px) { .verify-layout { grid-template-columns: 1fr; } .verify-aside { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 600px) { .verify-shell { padding: 22px 14px 55px; } .verify-content { padding: 18px; } .verify-aside { display: flex; } .verify-kv { flex-direction: column; gap: 5px; } .verify-kv strong, .verify-kv code { text-align: left; } .verify-kv span { flex: auto; } }
+
+.verify-config { display: flex; flex-direction: column; gap: 7px; padding: 14px; border: 1px solid #d9e4ed; background: #f2f7fa; border-radius: 9px; margin-bottom: 20px; }
+.verify-config strong { font-size: 14px; color: #244861; }
+.verify-config code { overflow-wrap: anywhere; color: #145783; font-size: 13px; }
+.verify-config small { line-height: 1.5; color: #5c7183; }
+.verify-status.verified { color: #096647; }
+.verify-status.revoked { color: #ac3942; }
+@media (max-width: 600px) {
+  .verify-tabs { gap: 2px; }
+  .verify-tabs button { padding: 10px 5px; font-size: 12px; line-height: 1.4; }
+}
