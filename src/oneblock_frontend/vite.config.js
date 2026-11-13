@@ -18,8 +18,12 @@ export default defineConfig({
     },
   },
   plugins: [react()],
-  // Explicitly allowlist public build identifiers. Never ship all process.env.
+  // Vite 8 does not polyfill Node's 'global'. Some ICP crypto/browser
+  // dependencies still refer to it. Alias ONLY that identifier to the
+  // standards-based browser global; do not expose 'process.env' or Node APIs.
+  // Applies to dev optimized dependencies and production transformed bundles.
   define: {
+    global: 'globalThis',
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV === 'development' ? 'development' : 'production'),
     'process.env.DFX_NETWORK': JSON.stringify(process.env.DFX_NETWORK === 'local' ? 'local' : 'ic'),
     'process.env.CANISTER_ID_PROFILE': JSON.stringify(process.env.CANISTER_ID_PROFILE || ''),
