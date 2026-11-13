@@ -158,6 +158,10 @@ def main() -> None:
     expect(call("acceptAdministration", "()", "holder"), "no pending appointment")
     expect(call("acceptAdministration", "()", "adversary"), "ok = principal")
     expect(call("setIssuerActive", f'(principal "{owner}", true)'), "administrator approval required")
+    # A new issuer cannot impersonate the approved namespace or a subnamespace.
+    expect(call("approveIssuer", f'(principal "{holder}", "Overlapping namespace test")', "adversary"), "ok = record")
+    expect(call("setIssuerNamespace", f'(principal "{holder}", "hortsun.team.")', "adversary"), "namespace overlaps")
+
     print("PASS: admin control, explicit holder approval, quotas, certified statuses, withdrawal, upgrade, rotation")
 
 
