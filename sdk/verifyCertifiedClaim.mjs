@@ -14,7 +14,7 @@ import { bytesToHex, hexToBytes } from "./claimDigest.mjs";
 
 const encoder = new TextEncoder();
 const STATUS = Object.freeze({ 0: "active", 1: "revoked", 2: "issuer_suspended", 3: "consent_withdrawn" });
-const MAX_CERT_AGE_MS = 5 * 60 * 1000;
+const MAX_CERT_AGE_MS = 60 * 1000; // Last-certified state, not real-time consensus.
 
 export function unpackClaimLeaf(bytes) {
   if (!(bytes instanceof Uint8Array) || bytes.length !== 34 || bytes[0] !== 1) {
