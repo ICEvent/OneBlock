@@ -51,6 +51,7 @@ def main() -> None:
     expect(call("submitCommitment", submission()), "ok = record")
     expect(call("getRegistryCounts"), "claims = 1")
     expect(call("submitCommitment", submission(0x44)), "conflicting idempotency key")
+    expect(call("submitCommitment", submission().replace(blob(0x11), 'blob "\\00"')), "claim hash must contain exactly 32 bytes")
 
     dfx("identity", "new", "adversary", "--storage-mode", "plaintext")
     expect(call("registerSchema", f'("hortsun.service.v1", {blob(0x55)})', "adversary"), "unregistered issuer")
@@ -63,6 +64,9 @@ def main() -> None:
     state = call("getClaimState", f'("{claim_id}")')
     expect(state, "revoked")
     expect(state, "certified = false")
+    expect(call("getRegistryCounts"), "status_events = 1")
+    dfx("canister", "install", "proof_registry", "--mode", "upgrade")
+    expect(call("getClaimState", f'("{claim_id}")'), "revoked")
     expect(call("getRegistryCounts"), "status_events = 1")
     print("PASS: authority, schema, commitment, idempotency, mutation prevention, revocation")
 
