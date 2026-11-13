@@ -13,7 +13,7 @@ import { Principal } from "@icp-sdk/core/principal";
 import { bytesToHex, hexToBytes } from "./claimDigest.mjs";
 
 const encoder = new TextEncoder();
-const STATUS = Object.freeze({ 0: "active", 1: "revoked" });
+const STATUS = Object.freeze({ 0: "active", 1: "revoked", 2: "issuer_suspended", 3: "consent_withdrawn" });
 const MAX_CERT_AGE_MS = 5 * 60 * 1000;
 
 export function unpackClaimLeaf(bytes) {
@@ -54,7 +54,7 @@ function sameBytes(a, b) {
  * @param {string} input.canisterId trusted proof_registry canister principal.
  * @param {Uint8Array} input.rootKey independently trusted IC root public key.
  * @param {{value: Uint8Array|null|Uint8Array[],certificate:Uint8Array|null|Uint8Array[],witness:Uint8Array}} input.response
- * @returns {Promise<{status:"active"|"revoked",sha256:string,certificateVerified:true}>}
+ * @returns {Promise<{status:"active"|"revoked"|"issuer_suspended"|"consent_withdrawn",sha256:string,certificateVerified:true}>}
  */
 export async function verifyCertifiedClaim({ claimId, expectedSha256, canisterId, rootKey, response }) {
   if (typeof claimId !== "string" || claimId.length < 3) throw new Error("missing claim ID");
