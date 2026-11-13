@@ -11,6 +11,7 @@ on:
       - 'src/declarations/**'
       - 'scripts/harden-generated-agents.mjs'
       - 'tests/strictClaim.test.mjs'
+      - 'tests/reactSingleton.test.mjs'
       - 'tests/validateSourceClaim.test.mjs'
       - '.github/workflows/frontend-ci.yml'
   push:
@@ -24,6 +25,7 @@ on:
       - 'src/declarations/**'
       - 'scripts/harden-generated-agents.mjs'
       - 'tests/strictClaim.test.mjs'
+      - 'tests/reactSingleton.test.mjs'
       - 'tests/validateSourceClaim.test.mjs'
       - '.github/workflows/frontend-ci.yml'
 
@@ -43,6 +45,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify single React runtime and Router hook compatibility
+        run: node --test tests/reactSingleton.test.mjs
 
       - name: Check frontend dependency vulnerabilities
         run: npm audit --audit-level=moderate
