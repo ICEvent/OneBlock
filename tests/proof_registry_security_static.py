@@ -9,6 +9,7 @@ assert "persistent actor class ProofRegistry(initialAdmin : Principal)" in regis
 assert 'administrator approval required' in registry
 assert "if (not approved(caller))" in registry
 assert "setIssuerNamespace" in registry
+assert "requestIssuerRotation" in registry and "approveIssuerRotation" in registry and "acceptIssuerRotation" in registry
 assert "schema namespace not approved" in registry
 assert "requestFor(issuer, caller, claimHash, subjectHash)" in registry
 assert "issuer request quota reached" in registry
