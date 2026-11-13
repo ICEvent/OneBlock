@@ -13,6 +13,12 @@ dfx deploy proof_registry --argument "(principal \"$ADMIN\")"
 
 There is **no permissionless issuer self-registration**. On the first local installation the initial administrator may register its own issuer Principal; for external issuer Canisters it calls `approveIssuer(issuerPrincipal, displayName)` after reviewing the intended operator. Display names are NOT automatically legally vetted.
 
+### Issuer Principal rotation
+
+A normal replacement of an issuer's signing canister/key is a three-party operation: the original issuer calls `requestIssuerRotation(successor)`, the registry administrator calls `approveIssuerRotation(old, successor)`, and the new successor Principal calls `acceptIssuerRotation(old)`. The new Principal inherits the approved Schema namespace and quota, but receives **a new issuer identity**. All old issuer's active certifications are recertified `issuer_suspended`. Past claims are never reattributed, rewritten or silently transferred to the successor. Suspension of the outgoing issuer blocks a pending rotation.
+
+If the outgoing key is irrevocably lost, the staged protocol does not provide an instant self-service recovery; an independently reviewed governance recovery/migration procedure is required. This restriction prevents attackers from silently transferring someone else's issuer namespace. Do not interpret administrator rotation as issuer rotation.
+
 Administrator must explicitly bind the issuer to one **immutable namespace prefix** via `setIssuerNamespace(issuerPrincipal, "hortsun.")` before issuer can register schemas. Schema ID must begin with that approved prefix. Prefix is permanently bound; changing company/operator ownership requires an explicit governance migration, not silent relabeling.
 
 Only admin can assign per-issuer quotas, suspend/reactivate issuers and nominate a new admin. Administrator rotation requires `nominateAdministrator` from current admin and `acceptAdministration` from the nominee; nominee cannot unilaterally take control. For production, use a well-controlled governance canister rather than a personal device key.
