@@ -10,6 +10,8 @@
 import assert from "node:assert/strict";
 import { HttpAgent, Actor } from "@dfinity/agent";
 import { IDL } from "@dfinity/candid";
+import { Principal } from "@dfinity/principal";
+import { verifyCertifiedSchema } from "../sdk/verifyCertifiedSchema.mjs";
 import { verifyCertifiedClaim } from "../sdk/verifyCertifiedClaim.mjs";
 
 const [claimId, digestHex, expectedStatus] = process.argv.slice(2);
@@ -24,6 +26,11 @@ if (!/^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?\/?$/.test(host)) {
 }
 
 const idlFactory = ({ IDL }) => IDL.Service({
+  getCertifiedSchema: IDL.Func([IDL.Principal, IDL.Text], [IDL.Record({
+    value: IDL.Opt(IDL.Vec(IDL.Nat8)),
+    certificate: IDL.Opt(IDL.Vec(IDL.Nat8)),
+    witness: IDL.Vec(IDL.Nat8),
+  })], ["query"]),
   getCertifiedClaim: IDL.Func([IDL.Text], [IDL.Record({
     value: IDL.Opt(IDL.Vec(IDL.Nat8)),
     certificate: IDL.Opt(IDL.Vec(IDL.Nat8)),
@@ -67,4 +74,20 @@ await assert.rejects(
   verifyCertifiedClaim({ ...trusted, response: { ...response, witness: new Uint8Array([1, 2, 3]) } }),
 );
 
-console.log(`PASS: independently certified ${expectedStatus} claim, wrong digest/canister/value/witness rejected`);
+const issuerPrincipal = claimId.split("/")[0];
+const schemaId = "hortsun.service.v1";
+const certifiedSchema = await actor.getCertifiedSchema(Principal.fromText(issuerPrincipal), schemaId);
+const schemaTrusted = {
+  issuerPrincipal, schemaId, expectedSha256: "55".repeat(32), canisterId,
+  rootKey: new Uint8Array(agent.rootKey), response: certifiedSchema,
+};
+assert.equal((await verifyCertifiedSchema(schemaTrusted)).schemaDigestVerified, true);
+await assert.rejects(verifyCertifiedSchema({ ...schemaTrusted, expectedSha256: "44".repeat(32) }));
+await assert.rejects(verifyCertifiedSchema({ ...schemaTrusted, schemaId: "another.schema" }));
+await assert.rejects(verifyCertifiedSchema({ ...schemaTrusted, issuerPrincipal: "aaaaa-aa" }));
+const flippedSchema = Uint8Array.from(certifiedSchema.value[0]);
+flippedSchema[0] ^= 1;
+await assert.rejects(
+  verifyCertifiedSchema({ ...schemaTrusted, response: { ...certifiedSchema, value: [flippedSchema] } }),
+);
+console.log(`PASS: independently certified ${expectedStatus} claim plus issuer-scoped schema; tampering rejected`);
