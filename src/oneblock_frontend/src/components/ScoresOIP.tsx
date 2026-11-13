@@ -33,6 +33,18 @@ export default function ScoresOIP({ scores }: { scores: Scores | null }) {
     );
   }
 
+  // Security: an older OIP score was calculated from self-asserted factors.
+  // Zeroed legacy values are UNKNOWN, not a judgment of the user's identity.
+  if (scores.model_version === "oip-v0.3-legacy-quarantined") {
+    return (
+      <div className="oip-scores-empty" role="status">
+        <div className="oip-empty-icon">🔒</div>
+        <p>Identity scoring temporarily unavailable.</p>
+        <p>Legacy OIP factors have not been cryptographically verified. No identity, human, trust, reputation or AI score is being asserted.</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="oip-scores">
