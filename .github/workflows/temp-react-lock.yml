@@ -22,4 +22,4 @@ jobs:
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
       - name: Confirm singleton in lock and emit bytes
         run: |
-          node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("package-lock.json")); const r=Object.entries(j.packages).filter(([k,v])=>/\/(react|react-dom)$/.test(k)).map(([k,v])=>({k,version:v.version})); console.log("REACT_PACKAGES:"+JSON.stringify(r)); if(r.some(x=>x.version!=="18.3.1"))process.exit(1); const d=fs.readFileSync("package-lock.json").toString("base64"); for(let i=0;i<d.length;i+=1000)console.log("LOCK_CHUNK:"+d.slice(i,i+1000));'
+          node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync("package-lock.json")); const r=Object.entries(j.packages).filter(([k,v])=>/(?:^|\/)node_modules\/react(?:-dom)?$/.test(k)).map(([k,v])=>({k,version:v.version})); console.log("REACT_PACKAGES:"+JSON.stringify(r)); if(r.some(x=>x.version!=="18.3.1"))process.exit(1); const d=fs.readFileSync("package-lock.json").toString("base64"); for(let i=0;i<d.length;i+=1000)console.log("LOCK_CHUNK:"+d.slice(i,i+1000));'
