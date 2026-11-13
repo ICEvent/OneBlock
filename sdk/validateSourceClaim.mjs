@@ -19,6 +19,13 @@ function forbidRemoteRefs(value, depth = 0) {
     value.forEach(v => forbidRemoteRefs(v, depth + 1));
   } else if (value && typeof value === "object") {
     for (const [key, nested] of Object.entries(value)) {
+      // Native RegExp in AJV can have catastrophic backtracking on an
+      // issuer-provided pattern. No issuer-supplied regex until an RE2-like
+      // bounded engine and workload limits are available.
+      if (key === "pattern" || key === "patternProperties" ||
+          key === "$dynamicRef" || key === "$dynamicAnchor") {
+        throw new Error("Issuer-defined regular expressions and dynamic references are unsupported");
+      }
       if ((key === "$ref" || key === "$dynamicRef") &&
           (typeof nested !== "string" || !nested.startsWith("#/"))) {
         throw new Error("Remote or non-local Schema references are unsupported");
@@ -32,6 +39,9 @@ function forbidRemoteRefs(value, depth = 0) {
 export function validateSourceClaim(raw, domainSchemaRaw, recordIdRaw, envelopeSchema) {
   const validateEnvelope = makeValidator().compile(envelopeSchema);
   const claim = parseStrictClaimJson(raw);
+  if (new TextEncoder().encode(domainSchemaRaw).length > 64 * 1024) {
+    throw new Error("Domain Schema exceeds 64 KiB safety limit");
+  }
   const domainSchema = parseStrictClaimJson(domainSchemaRaw);
   const recordId = recordIdRaw.trim();
 
