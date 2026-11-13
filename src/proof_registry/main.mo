@@ -531,6 +531,12 @@ persistent actor class ProofRegistry(initialAdmin : Principal) = this {
 
   public shared ({ caller }) func setIssuerActive(issuer : Principal, active : Bool) : async Result.Result<IssuerPolicy, Text> {
     if (not admin(caller)) return #err("administrator approval required");
+    if (active) {
+      switch (rotationFor(issuer)) {
+        case (?r) { if (r.completed_at != null) return #err("rotated issuer is permanently retired") };
+        case null {};
+      }
+    };
     let old = switch (policyFor(issuer)) {
       case null return #err("issuer not registered");
       case (?p) p;
