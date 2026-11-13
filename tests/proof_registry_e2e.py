@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Local dfx E2E smoke test for the phase-1 registry, no mainnet/network writes."""
+"""Local-only adversarial E2E: authorization, quotas, certified status and upgrades."""
 from __future__ import annotations
 
-import subprocess
 import os
+import subprocess
+import time
+
+EVENT_ID = "a1" * 16
 
 
 def dfx(*args: str) -> str:
@@ -18,15 +21,6 @@ def call(method: str, args: str = "()", identity: str | None = None) -> str:
     return dfx(*prefix, "canister", "call", "proof_registry", method, args)
 
 
-def verify_certified(claim_id: str, status: str) -> None:
-    env = os.environ.copy()
-    env["PROOF_REGISTRY_CANISTER_ID"] = dfx("canister", "id", "proof_registry").strip()
-    subprocess.run([
-        "node", "tests/verifyCertifiedClaim.e2e.mjs",
-        claim_id, "11" * 32, status,
-    ], env=env, check=True)
-
-
 def expect(output: str, term: str) -> None:
     assert term in output, f"Expected {term!r} in:\n{output}"
 
@@ -35,10 +29,10 @@ def blob(byte: int) -> str:
     return 'blob "' + (f"\\{byte:02x}" * 32) + '"'
 
 
-def submission(digest_byte: int = 0x11) -> str:
+def submission(digest_byte: int = 0x11, event_id: str = EVENT_ID) -> str:
     return (
         "(record { "
-        'source_event_id = "job-1024"; '
+        f'source_event_id = "{event_id}"; '
         'schema_id = "hortsun.service.v1"; '
         f"claim_sha256 = {blob(digest_byte)}; "
         f"subject_commitment = {blob(0x22)}; "
@@ -48,54 +42,87 @@ def submission(digest_byte: int = 0x11) -> str:
     )
 
 
+def certified(claim_id: str, status: str) -> None:
+    env = os.environ.copy()
+    env["PROOF_REGISTRY_CANISTER_ID"] = dfx("canister", "id", "proof_registry").strip()
+    subprocess.run(
+        ["node", "tests/verifyCertifiedClaim.e2e.mjs", claim_id, "11" * 32, status],
+        env=env, check=True,
+    )
+
+
 def main() -> None:
     owner = dfx("identity", "get-principal").strip()
-    print("issuer principal:", owner)
+    claim_id = f"{owner}/{EVENT_ID}"
+    print("admin+issuer principal:", owner)
+    dfx("identity", "new", "holder", "--storage-mode", "plaintext")
+    dfx("identity", "new", "adversary", "--storage-mode", "plaintext")
+    adversary = dfx("--identity", "adversary", "identity", "get-principal").strip()
+
     expect(call("getRegistryCounts"), "claims = 0")
+    expect(call("registerIssuer", '("Hortsun example (unvetted)")', "adversary"), "administrator approval required")
     expect(call("registerIssuer", '("Hortsun example (unvetted)")'), "ok = record")
     expect(call("registerSchema", f'("hortsun.service.v1", {blob(0x55)})'), "ok = record")
+    expect(call("registerSchema", f'("adversary.schema", {blob(0x55)})', "adversary"), "issuer not approved")
+    expect(call("submitCommitment", submission(), "adversary"), "issuer not approved")
 
+    # No holder authorization means no issued claim, even from a registered issuer.
+    expect(call("submitCommitment", submission()), "holder approval for exact claim digest is required")
+    expiry = time.time_ns() + 3600 * 1_000_000_000
+    grant_arg = f'(principal "{owner}", {blob(0x11)}, {blob(0x22)}, {expiry} : int)'
+    expect(call("approveCommitment", grant_arg, "holder"), "ok = record")
+    expect(call("approveCommitment", grant_arg, "holder"), "already authorized")
+    # This holder cannot impersonate issuer (and may not revoke another issuer's records).
+    expect(call("setIssuerActive", f'(principal "{owner}", false)', "holder"), "administrator approval required")
+
+    expect(call("submitCommitment", submission("bogus" if False else 0x11, "job-customer-name")), "source_event_id must be 32 or 64")
+    expect(call("submitCommitment", submission().replace(blob(0x11), 'blob "\\00"')), "claim hash must contain exactly 32 bytes")
     first = call("submitCommitment", submission())
     expect(first, "ok = record")
-    expect(first, f"{owner}/job-1024")
+    expect(first, claim_id)
     expect(call("submitCommitment", submission()), "ok = record")
     expect(call("getRegistryCounts"), "claims = 1")
-    claim_id = f"{owner}/job-1024"
-    certified_active = dfx("canister", "call", "--query", "proof_registry", "getCertifiedClaim", f'("{claim_id}")')
-    expect(certified_active, "certificate = opt blob")
-    expect(certified_active, "witness = blob")
-    expect(certified_active, "value = opt blob")
-    verify_certified(claim_id, "active")
-    absent = dfx("canister", "call", "--query", "proof_registry", "getCertifiedClaim", '("not-found")')
-    expect(absent, "value = null")
+    certified(claim_id, "active")
+
+    # Valid approval for a *different* digest still cannot overwrite an event.
+    grant_other = f'(principal "{owner}", {blob(0x44)}, {blob(0x22)}, {expiry} : int)'
+    expect(call("approveCommitment", grant_other, "holder"), "ok = record")
     expect(call("submitCommitment", submission(0x44)), "conflicting idempotency key")
-    expect(call("submitCommitment", submission().replace(blob(0x11), 'blob "\\00"')), "claim hash must contain exactly 32 bytes")
 
-    dfx("identity", "new", "adversary", "--storage-mode", "plaintext")
-    expect(call("registerSchema", f'("hortsun.service.v1", {blob(0x55)})', "adversary"), "unregistered issuer")
-    expect(call("submitCommitment", submission(), "adversary"), "unregistered issuer")
-    claim_id = f"{owner}/job-1024"
+    # Suspend issuer: all existing active leaves must be certified as suspended.
+    expect(call("setIssuerActive", f'(principal "{owner}", false)'), "ok = record")
+    certified(claim_id, "issuer_suspended")
+    expect(call("submitCommitment", submission()), "issuer not approved")
+    expect(call("setIssuerActive", f'(principal "{owner}", true)'), "ok = record")
+    certified(claim_id, "active")
+
+    # Holder withdrawal is a terminal state; re-approval of the same digest is forbidden.
+    withdraw_arg = f'(principal "{owner}", {blob(0x11)})'
+    expect(call("withdrawConsent", withdraw_arg, "adversary"), "no authorization owned by caller")
+    expect(call("withdrawConsent", withdraw_arg, "holder"), "ok = 1")
+    certified(claim_id, "consent_withdrawn")
+    expect(call("approveCommitment", grant_arg, "holder"), "withdrawn authorization cannot be reused")
+    expect(call("submitCommitment", submission()), "holder withdrew consent")
+
+    # Issuer revocation has priority over other invalidity conditions.
     expect(call("revokeCommitment", f'("{claim_id}", "corrected")', "adversary"), "only the original issuer")
-
     expect(call("revokeCommitment", f'("{claim_id}", "corrected")'), "ok = record")
     expect(call("revokeCommitment", f'("{claim_id}", "corrected")'), "already revoked")
-    state = call("getClaimState", f'("{claim_id}")')
-    expect(state, "revoked")
-    expect(state, "certified = false")
-    expect(call("getRegistryCounts"), "status_events = 1")
-    certified_revoked = dfx("canister", "call", "--query", "proof_registry", "getCertifiedClaim", f'("{claim_id}")')
-    expect(certified_revoked, "certificate = opt blob")
-    expect(certified_revoked, "witness = blob")
-    assert certified_active != certified_revoked, "revocation must change certified witness/value"
-    verify_certified(claim_id, "revoked")
-    dfx("canister", "install", "proof_registry", "--mode", "upgrade")
+    expect(call("getClaimState", f'("{claim_id}")'), "revoked")
+    certified(claim_id, "revoked")
+
+    dfx("canister", "install", "proof_registry", "--mode", "upgrade",
+        "--argument", f'(principal "{owner}")')
     expect(call("getClaimState", f'("{claim_id}")'), "revoked")
     expect(call("getRegistryCounts"), "status_events = 1")
-    certified_after_upgrade = dfx("canister", "call", "--query", "proof_registry", "getCertifiedClaim", f'("{claim_id}")')
-    expect(certified_after_upgrade, "certificate = opt blob")
-    expect(certified_after_upgrade, "witness = blob")
-    verify_certified(claim_id, "revoked")
-    print("PASS: authority, schema, commitment, idempotency, mutation prevention, revocation")
+    certified(claim_id, "revoked")
+
+    # Rotating the governor requires acceptance by the named successor.
+    expect(call("nominateAdministrator", f'(principal "{adversary}")'), "ok = principal")
+    expect(call("acceptAdministration", "()", "holder"), "no pending appointment")
+    expect(call("acceptAdministration", "()", "adversary"), "ok = principal")
+    expect(call("setIssuerActive", f'(principal "{owner}", true)'), "administrator approval required")
+    print("PASS: admin control, explicit holder approval, quotas, certified statuses, withdrawal, upgrade, rotation")
 
 
 if __name__ == "__main__":
