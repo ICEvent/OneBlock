@@ -113,7 +113,7 @@ persistent actor ProofRegistry {
   };
 
   func isDigest(value : Blob) : Bool {
-    Blob.size(value) == 32
+    value.size() == 32
   };
 
   func validShortId(value : Text) : Bool {
