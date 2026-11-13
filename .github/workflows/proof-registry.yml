@@ -6,6 +6,13 @@ on:
       - "dfx.json"
       - "src/proof_registry/**"
       - "tests/proof_registry_e2e.py"
+      - "tests/proof_registry_security_static.py"
+      - "tests/verifyCertifiedClaim.e2e.mjs"
+      - "tests/claimDigest.test.mjs"
+      - "sdk/**"
+      - "mops.toml"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/proof-registry.yml"
   workflow_dispatch:
 
