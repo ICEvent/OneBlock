@@ -3613,6 +3613,9 @@ persistent actor {
         switch (identityGraphs.get(principal)) {
             case null { #err("identity graph not found") };
             case (?g) {
+                // No legacy OIP score qualifies for access-control decisions,
+                // including policies with zero thresholds or no requirements.
+                return #err("legacy identity factors are unverified; score-based policy evaluation disabled");
                 switch (contextPolicies.get(policyId)) {
                     case null { #err("policy not found") };
                     case (?p) {
