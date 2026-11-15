@@ -43,41 +43,41 @@ export function inspectClaimJson(raw: string): ClaimInspection {
   const empty: ClaimInspection = {
     parsed: false, shapeReady: false, issuer: "—", subject: "—", predicate: "—", schema: "—",
     evidenceCount: 0, problems: [], unanswered: [
-      "签发者身份及签名未核验", "ICP 认证状态与撤销记录未核验", "声明所述事实尚未核实",
+      "Issuer identity and signature have not been verified", "ICP certification status and revocation records have not been verified", "The facts stated in the claim have not been verified",
     ],
   };
-  if (!raw.trim()) return { ...empty, problems: ["请输入第三方 Claim JSON。"] };
+  if (!raw.trim()) return { ...empty, problems: ["Please enter the third-party Claim JSON."] };
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return { ...empty, problems: ["不是有效的 JSON，无法检查声明结构。"] };
+    return { ...empty, problems: ["Invalid JSON; unable to inspect the claim structure."] };
   }
-  if (!isRecord(parsed)) return { ...empty, problems: ["Claim 根节点必须是 JSON 对象。"] };
+  if (!isRecord(parsed)) return { ...empty, problems: ["The Claim root must be a JSON object."] };
   const claim = parsed;
   const problems: string[] = [];
   if (claim.protocol !== "oneblock.claim" || claim.version !== "1.0") {
-    problems.push("缺少受支持的 protocol=oneblock.claim / version=1.0。")
+    problems.push("Missing supported protocol=oneblock.claim / version=1.0.")
   }
-  if (!nonempty(claim.issuer_id)) problems.push("缺少 issuer_id（签发者）。");
-  if (!nonempty(claim.predicate)) problems.push("缺少 predicate（声明内容类型）。");
-  if (!nonempty(claim.schema_id)) problems.push("缺少 schema_id（数据标准版本）。");
+  if (!nonempty(claim.issuer_id)) problems.push("Missing issuer_id (issuer).");
+  if (!nonempty(claim.predicate)) problems.push("Missing predicate (claim type).");
+  if (!nonempty(claim.schema_id)) problems.push("Missing schema_id (data standard version).");
   if (!isRecord(claim.subject) || !nonempty(claim.subject.namespace) || !nonempty(claim.subject.id) || !nonempty(claim.subject.kind)) {
-    problems.push("缺少有效 subject（namespace / id / kind）。");
+    problems.push("Missing a valid subject (namespace / id / kind).");
   }
-  if (!isRecord(claim.claim_data)) problems.push("缺少 claim_data 对象。")
-  if (!nonempty(claim.event_at) || !nonempty(claim.issued_at)) problems.push("缺少 event_at 或 issued_at。")
-  if (!nonempty(claim.source_event_id)) problems.push("缺少 source_event_id（来源事件 ID）。")
+  if (!isRecord(claim.claim_data)) problems.push("Missing claim_data object.")
+  if (!nonempty(claim.event_at) || !nonempty(claim.issued_at)) problems.push("Missing event_at or issued_at.")
+  if (!nonempty(claim.source_event_id)) problems.push("Missing source_event_id (source event ID).")
   if (!["public", "unlisted", "restricted"].includes(String(claim.visibility))) {
-    problems.push("visibility 应为 public / unlisted / restricted。")
+    problems.push("visibility must be public / unlisted / restricted.")
   }
   const evidence = Array.isArray(claim.evidence) ? claim.evidence : null;
-  if (!evidence) problems.push("缺少 evidence 数组。")
-  else if (evidence.length === 0) problems.push("没有提供支持性证据；声明不能仅凭结构认定为真实。")
+  if (!evidence) problems.push("Missing evidence array.")
+  else if (evidence.length === 0) problems.push("No supporting evidence provided; structure alone cannot establish a claim as true.")
   else {
     evidence.forEach((value, i) => {
       if (!isRecord(value) || !nonempty(value.content_sha256) || !/^[a-f0-9]{64}$/i.test(value.content_sha256) || !nonempty(value.evidence_id)) {
-        problems.push(`第 ${i + 1} 条 evidence 缺少 evidence_id 或合法的 SHA-256 摘要。`);
+        problems.push(`Evidence item ${i + 1} is missing evidence_id or a valid SHA-256 digest.`);
       }
     });
   }

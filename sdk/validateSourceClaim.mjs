@@ -47,7 +47,7 @@ export function validateSourceClaim(raw, domainSchemaRaw, recordIdRaw, envelopeS
 
   const sep = recordId.indexOf("/");
   if (sep <= 0 || sep !== recordId.lastIndexOf("/") || sep === recordId.length - 1) {
-    throw new Error("Record ID 应为 issuer-principal/opaque-event-id。");
+    throw new Error("Record ID must be issuer-principal/opaque-event-id.");
   }
   const principalRaw = recordId.slice(0, sep);
   let issuer;
@@ -55,31 +55,31 @@ export function validateSourceClaim(raw, domainSchemaRaw, recordIdRaw, envelopeS
     issuer = Principal.fromText(principalRaw);
     if (issuer.toText() !== principalRaw) throw new Error("noncanonical");
   } catch {
-    throw new Error("Record ID 中的 Issuer Principal 无效。");
+    throw new Error("Invalid issuer Principal in Record ID.");
   }
 
   const opaqueEventId = recordId.slice(sep + 1);
   if (!/^[a-f0-9]{32}([a-f0-9]{32})?$/.test(opaqueEventId)) {
-    throw new Error("来源事件 ID 必须是 128 或 256 位不可预测的十六进制标识。");
+    throw new Error("Source event ID must be an unpredictable 128-bit or 256-bit hexadecimal identifier.");
   }
   if (claim.issuer_id !== principalRaw) {
-    throw new Error("Claim issuer_id 与通过 Principal 认证的签发者不一致。");
+    throw new Error("Claim issuer_id does not match the Principal-authenticated issuer.");
   }
   if (claim.source_event_id !== opaqueEventId) {
-    throw new Error("Claim 的 source_event_id 与 Record ID 不一致。");
+    throw new Error("Claim source_event_id does not match Record ID.");
   }
 
   if (!validateEnvelope(claim)) {
-    throw new Error("Claim 不符合 OVDP 1.0 格式：" +
+    throw new Error("Claim does not conform to OVDP 1.0: " +
       (validateEnvelope.errors ?? []).slice(0, 3).map(e => `${e.instancePath || "/"} ${e.message}`).join("; "));
   }
 
   if (domainSchema.$id !== claim.schema_id) {
-    throw new Error("Domain Schema 的 $id 与 Claim schema_id 不一致。");
+    throw new Error("Domain Schema $id does not match Claim schema_id.");
   }
   if (typeof domainSchema.$schema !== "string" ||
       !domainSchema.$schema.startsWith("https://json-schema.org/draft/2020-12/")) {
-    throw new Error("当前只接受 JSON Schema 2020-12。");
+    throw new Error("Only JSON Schema 2020-12 is currently accepted.");
   }
   forbidRemoteRefs(domainSchema);
   const domainAjv = makeValidator();
@@ -87,19 +87,19 @@ export function validateSourceClaim(raw, domainSchemaRaw, recordIdRaw, envelopeS
   try {
     validator = domainAjv.compile(domainSchema);
   } catch (e) {
-    throw new Error("Domain Schema 无效或包含不支持的引用：" + (e instanceof Error ? e.message : "unknown"));
+    throw new Error("Domain Schema is invalid or contains unsupported references: " + (e instanceof Error ? e.message : "unknown"));
   }
   if (!validator(claim.claim_data)) {
-    throw new Error("Claim 数据不符合签发者登记的 Domain Schema：" +
+    throw new Error("Claim data does not conform to the issuer's registered Domain Schema: " +
       (validator.errors ?? []).slice(0, 3).map(e => `${e.instancePath || "/"} ${e.message}`).join("; "));
   }
 
   const issuedAt = Date.parse(String(claim.issued_at));
   if (!Number.isFinite(issuedAt) || issuedAt > Date.now() + 60_000) {
-    throw new Error("Claim 签发时间无效或超出允许的未来偏差。");
+    throw new Error("Claim issue time is invalid or exceeds the allowed future clock skew.");
   }
   if (typeof claim.valid_until === "string" && Date.parse(claim.valid_until) <= Date.now()) {
-    throw new Error("Claim 已超过有效期，不能判定为有效登记。");
+    throw new Error("Claim has expired and cannot be considered a valid registration.");
   }
 
   return { claim, domainSchema, recordId, issuerPrincipal: principalRaw };

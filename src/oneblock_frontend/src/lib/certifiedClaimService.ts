@@ -59,13 +59,13 @@ export async function verifyProofFromClaimJson(
   recordIdRaw: string, claimRaw: string, domainSchemaRaw: string
 ): Promise<CertifiedProofReport> {
   const canisterId = configuredRegistryId();
-  if (!canisterId) throw new Error("Proof Registry 尚未配置，拒绝离线伪造验证结果。");
+  if (!canisterId) throw new Error("Proof Registry is not configured; verification cannot proceed.");
   let trustedRegistry: Principal;
   try {
     trustedRegistry = Principal.fromText(canisterId);
     if (trustedRegistry.toText() !== canisterId) throw new Error("noncanonical");
   } catch {
-    throw new Error("可信的 Proof Registry Canister ID 配置错误。");
+    throw new Error("The trusted Proof Registry Canister ID is invalid.");
   }
 
   const { claim, domainSchema, recordId, issuerPrincipal } =
@@ -82,7 +82,7 @@ export async function verifyProofFromClaimJson(
   const host = developmentLocal ? localUrl : HOST;
   const agent = new HttpAgent({ host });
   if (developmentLocal) await agent.fetchRootKey();
-  if (!agent.rootKey) throw new Error("没有可信 IC 根公钥。");
+  if (!agent.rootKey) throw new Error("No trusted IC root public key is available.");
 
   const actor = Actor.createActor(idlFactory, { agent, canisterId }) as unknown as {
     getCertifiedClaim: (id: string) => Promise<CertifiedResponse>;
