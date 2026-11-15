@@ -27,10 +27,10 @@ const DEMO_CLAIM = JSON.stringify({
 }, null, 2);
 
 const comparisons: Record<DigestComparison, string> = {
-  match: "摘要相同：输入内容与提供的 SHA-256 指纹匹配。",
-  mismatch: "摘要不匹配：内容不同或参考摘要错误。",
-  "not-provided": "已生成指纹，但没有提供参考摘要，无法作完整性对比。",
-  "invalid-reference": "参考摘要格式错误：应为 64 位十六进制 SHA-256。",
+  match: "Digests match: the input matches the provided SHA-256 fingerprint.",
+  mismatch: "Digests do not match: the content differs or the reference digest is incorrect.",
+  "not-provided": "Fingerprint generated. Provide a reference digest to compare integrity.",
+  "invalid-reference": "Invalid reference digest: enter a 64-character hexadecimal SHA-256 value.",
 };
 
 const Verify = () => {
@@ -56,16 +56,16 @@ const Verify = () => {
     setError("");
     setBusy(true);
     try {
-      if (kind === "file" && !file) throw new Error("请先选择文件。");
-      if (kind === "text" && !text) throw new Error("请先输入要核对的文字。");
+      if (kind === "file" && !file) throw new Error("Please select a file first.");
+      if (kind === "text" && !text) throw new Error("Please enter the text to check.");
       if (file && kind === "file" && file.size > MAX_FILE_BYTES) {
-        throw new Error("原型暂时只支持不超过 20 MB 的文件。");
+        throw new Error("This prototype supports files up to 20 MB.");
       }
       const bytes = kind === "file" ? new Uint8Array(await file!.arrayBuffer()) : text;
       const sha256 = await sha256Hex(bytes);
       setDigest({ sha256, comparison: compareSha256(sha256, expected), source: kind === "file" ? file!.name : "UTF-8 text" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "无法读取或计算摘要，请使用 HTTPS 浏览器重试。");
+      setError(err instanceof Error ? err.message : "Unable to read or hash the content. Please retry in a browser over HTTPS.");
     } finally {
       setBusy(false);
     }
@@ -79,7 +79,7 @@ const Verify = () => {
       const report = await verifyProofFromClaimJson(proofClaimId, proofJson, proofSchemaJson);
       setProofResult(report);
     } catch (err) {
-      setProofError(err instanceof Error ? err.message : "认证证明验证失败，请核实 Claim ID、原始声明和 ICP 连接。");
+      setProofError(err instanceof Error ? err.message : "Proof verification failed. Check the Claim ID, original claim, and ICP connection.");
     } finally {
       setProofBusy(false);
     }
@@ -92,115 +92,115 @@ const Verify = () => {
         <header className="verify-hero">
           <span className="verify-eyebrow">ONEBLOCK · VERIFICATION TOOLS</span>
           <h1>Verify information, not assumptions.</h1>
-          <p>检查原始内容是否被修改，理解第三方声明缺少哪些可验证证据。每一步都说明已证实什么、尚未证实什么。</p>
-          <span className="verify-privacy">无需登录 · 文字/文件与 Claim JSON 在本地处理 · 链上验证仅查询 Record ID、签发 Principal 与 Schema ID</span>
+          <p>Check whether original content has changed and identify missing evidence in third-party claims. Each step explains what has and has not been verified.</p>
+          <span className="verify-privacy">No sign-in required · Text, files, and Claim JSON are processed locally · On-chain checks query only the Record ID, issuer Principal, and Schema ID</span>
         </header>
 
         <div className="verify-layout">
           <section className="verify-panel" aria-label="Verification workbench">
-            <div className="verify-tabs" role="tablist" aria-label="验证工具">
-              <button type="button" role="tab" aria-selected={tab === "integrity"} className={tab === "integrity" ? "selected" : ""} onClick={() => setTab("integrity")}>内容完整性</button>
-              <button type="button" role="tab" aria-selected={tab === "claim"} className={tab === "claim" ? "selected" : ""} onClick={() => setTab("claim")}>Claim 结构检查</button>
-              <button type="button" role="tab" aria-selected={tab === "proof"} className={tab === "proof" ? "selected" : ""} onClick={() => setTab("proof")}>ICP 认证证明</button>
+            <div className="verify-tabs" role="tablist" aria-label="Verification tools">
+              <button type="button" role="tab" aria-selected={tab === "integrity"} className={tab === "integrity" ? "selected" : ""} onClick={() => setTab("integrity")}>Content integrity</button>
+              <button type="button" role="tab" aria-selected={tab === "claim"} className={tab === "claim" ? "selected" : ""} onClick={() => setTab("claim")}>Claim structure</button>
+              <button type="button" role="tab" aria-selected={tab === "proof"} className={tab === "proof" ? "selected" : ""} onClick={() => setTab("proof")}>ICP certified proof</button>
             </div>
 
             {tab === "integrity" ? (
               <div className="verify-content" role="tabpanel">
                 <h2>Evidence Fingerprint</h2>
-                <p className="verify-muted">使用浏览器 SHA-256 算法计算原始内容的指纹，并与发布方提供的摘要比较。</p>
+                <p className="verify-muted">Calculate a fingerprint of the original content using SHA-256 in your browser and compare it with the publisher's digest.</p>
                 <div className="verify-choice" aria-label="Source kind">
-                  <button type="button" className={kind === "text" ? "active" : ""} onClick={() => { setKind("text"); setDigest(null); setError(""); }}>文字内容</button>
-                  <button type="button" className={kind === "file" ? "active" : ""} onClick={() => { setKind("file"); setDigest(null); setError(""); }}>本地文件</button>
+                  <button type="button" className={kind === "text" ? "active" : ""} onClick={() => { setKind("text"); setDigest(null); setError(""); }}>Text</button>
+                  <button type="button" className={kind === "file" ? "active" : ""} onClick={() => { setKind("file"); setDigest(null); setError(""); }}>Local file</button>
                 </div>
                 {kind === "text" ? (
-                  <label className="verify-field">待检查文字
-                    <textarea value={text} onChange={(e) => { setText(e.target.value); setDigest(null); }} rows={6} placeholder="粘贴需要核对的原始文字。空格、换行和标点都影响指纹。" />
+                  <label className="verify-field">Text to check
+                    <textarea value={text} onChange={(e) => { setText(e.target.value); setDigest(null); }} rows={6} placeholder="Paste the original text. Spaces, line breaks, and punctuation affect the fingerprint." />
                   </label>
                 ) : (
-                  <label className="verify-field">待检查文件（最多 20 MB）
+                  <label className="verify-field">File to check (up to 20 MB)
                     <input type="file" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setDigest(null); }} />
                   </label>
                 )}
-                <label className="verify-field">参考 SHA-256（可选）
-                  <input value={expected} spellCheck={false} onChange={(e) => { setExpected(e.target.value); setDigest(null); }} placeholder="64 位十六进制或 sha256: 前缀" />
+                <label className="verify-field">Reference SHA-256 (optional)
+                  <input value={expected} spellCheck={false} onChange={(e) => { setExpected(e.target.value); setDigest(null); }} placeholder="64 hexadecimal characters, optionally prefixed with sha256:" />
                 </label>
-                <button type="button" className="verify-primary" onClick={() => void runDigest()} disabled={busy}>{busy ? "计算中…" : "检查完整性"}</button>
+                <button type="button" className="verify-primary" onClick={() => void runDigest()} disabled={busy}>{busy ? "Calculating…" : "Check integrity"}</button>
                 {error && <p className="verify-error" role="alert">{error}</p>}
                 {digest && <div className="verify-result" role="status">
-                  <h3>检查结果</h3>
+                  <h3>Check results</h3>
                   <p className="verify-status">{comparisons[digest.comparison]}</p>
-                  <div className="verify-kv"><span>数据来源</span><strong>{digest.source}</strong></div>
+                  <div className="verify-kv"><span>Source</span><strong>{digest.source}</strong></div>
                   <div className="verify-kv"><span>SHA-256</span><code>{digest.sha256}</code></div>
-                  <p className="verify-disclaimer">即使摘要匹配，也只能证明这份内容与参考指纹相同，不能证明发布者身份、内容真实性或首次发布的时间。</p>
+                  <p className="verify-disclaimer">A matching digest only confirms that this content matches the reference fingerprint. It does not verify the publisher's identity, factual accuracy, or original publication time.</p>
                 </div>}
               </div>
             ) : tab === "claim" ? (
               <div className="verify-content" role="tabpanel">
                 <h2>Claim Inspector</h2>
-                <p className="verify-muted">检查 OneBlock Claim v1 的基础字段和证据引用。这里只做初步结构检查，尚不验证签名或 ICP 证书。</p>
+                <p className="verify-muted">Inspect the basic fields and evidence references of a OneBlock Claim v1. This is a preliminary structure check; it does not verify signatures or ICP certificates.</p>
                 <label className="verify-field">Claim JSON
-                  <textarea rows={12} spellCheck={false} value={claimRaw} onChange={(e) => { setClaimRaw(e.target.value); setInspection(null); }} placeholder="粘贴第三方提供的 Claim JSON…" />
+                  <textarea rows={12} spellCheck={false} value={claimRaw} onChange={(e) => { setClaimRaw(e.target.value); setInspection(null); }} placeholder="Paste the third-party Claim JSON…" />
                 </label>
                 <div className="verify-actions">
-                  <button type="button" className="verify-primary" onClick={() => setInspection(inspectClaimJson(claimRaw))}>检查声明</button>
-                  <button type="button" className="verify-secondary" onClick={() => { setClaimRaw(DEMO_CLAIM); setInspection(null); }}>加载虚构示例</button>
+                  <button type="button" className="verify-primary" onClick={() => setInspection(inspectClaimJson(claimRaw))}>Inspect claim</button>
+                  <button type="button" className="verify-secondary" onClick={() => { setClaimRaw(DEMO_CLAIM); setInspection(null); }}>Load fictional example</button>
                 </div>
                 {inspection && <div className="verify-result" role="status">
-                  <h3>{inspection.shapeReady ? "基础字段齐全（非真伪验证）" : "发现字段或证据缺口"}</h3>
+                  <h3>{inspection.shapeReady ? "Basic fields complete (authenticity not verified)" : "Missing fields or evidence found"}</h3>
                   <div className="verify-kv"><span>Issuer</span><strong>{inspection.issuer}</strong></div>
                   <div className="verify-kv"><span>Subject</span><strong>{inspection.subject}</strong></div>
                   <div className="verify-kv"><span>Predicate</span><strong>{inspection.predicate}</strong></div>
                   <div className="verify-kv"><span>Schema</span><strong>{inspection.schema}</strong></div>
-                  <div className="verify-kv"><span>证据引用数量</span><strong>{inspection.evidenceCount}</strong></div>
-                  {inspection.problems.length > 0 && <><h4>发现的问题</h4><ul>{inspection.problems.map((p, i) => <li key={i}>{p}</li>)}</ul></>}
-                  <h4>尚未验证</h4>
+                  <div className="verify-kv"><span>Evidence references</span><strong>{inspection.evidenceCount}</strong></div>
+                  {inspection.problems.length > 0 && <><h4>Issues found</h4><ul>{inspection.problems.map((p, i) => <li key={i}>{p}</li>)}</ul></>}
+                  <h4>Not yet verified</h4>
                   <ul>{inspection.unanswered.map((p, i) => <li key={i}>{p}</li>)}</ul>
-                  <p className="verify-disclaimer">字段检查不是 JSON Schema 全量验证；也没有检测重复 JSON 键。现阶段不会宣称任何 Claim 已被 OneBlock 证明。</p>
+                  <p className="verify-disclaimer">Field inspection is not full JSON Schema validation and does not detect duplicate JSON keys. This check does not establish that a Claim has been proven by OneBlock.</p>
                 </div>}
               </div>
             ) : (
               <div className="verify-content" role="tabpanel">
                 <h2>Certified Proof Verification</h2>
-                <p className="verify-muted">请提供登记 Record ID、完整 Claim JSON 和签发者的 Domain Schema JSON。浏览器本地核验格式、签发 Principal、Schema 内容与两份 ICP 认证摘要；不上传原始数据。</p>
+                <p className="verify-muted">Provide the registered Record ID, full Claim JSON, and issuer's Domain Schema JSON. Your browser checks the format, issuer Principal, schema content, and both ICP-certified digests locally. Original data is not uploaded.</p>
                 <div className="verify-config">
-                  <strong>受信任的 Proof Registry</strong>
-                  <code>{configuredRegistryId() || "未配置（不可执行链上验证）"}</code>
-                  <small>Canister ID 由站点部署配置指定，不能通过表单随意切换。</small>
+                  <strong>Trusted Proof Registry</strong>
+                  <code>{configuredRegistryId() || "Not configured (on-chain verification unavailable)"}</code>
+                  <small>The Canister ID is set by the site deployment configuration and cannot be changed through this form.</small>
                 </div>
-                <label className="verify-field">Record ID（签发 Principal / 随机事件 ID）
-                  <input disabled={proofBusy} spellCheck={false} value={proofClaimId} onChange={(e) => { setProofClaimId(e.target.value); setProofResult(null); setProofError(""); }} placeholder="issuer-principal/32或64位随机hex" />
+                <label className="verify-field">Record ID (issuer Principal / random event ID)
+                  <input disabled={proofBusy} spellCheck={false} value={proofClaimId} onChange={(e) => { setProofClaimId(e.target.value); setProofResult(null); setProofError(""); }} placeholder="issuer-principal/32-or-64-character-random-hex" />
                 </label>
-                <label className="verify-field">原始 Claim JSON
+                <label className="verify-field">Original Claim JSON
                   <textarea disabled={proofBusy} rows={11} spellCheck={false} value={proofJson} onChange={(e) => { setProofJson(e.target.value); setProofResult(null); setProofError(""); }} placeholder='{"protocol":"oneblock.claim","version":"1.0",...}' />
                 </label>
-                <label className="verify-field">原始 Domain Schema JSON（发行方登记的版本）
+                <label className="verify-field">Original Domain Schema JSON (issuer's registered version)
                   <textarea disabled={proofBusy} rows={8} spellCheck={false} value={proofSchemaJson} onChange={(e) => { setProofSchemaJson(e.target.value); setProofResult(null); setProofError(""); }} placeholder='{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"urn:issuer:schema:1",...}' />
                 </label>
-                <button type="button" className="verify-primary" disabled={proofBusy || !configuredRegistryId() || !proofClaimId.trim() || !proofJson.trim() || !proofSchemaJson.trim()} onClick={() => void runCertifiedProof()}>{proofBusy ? "正在独立验证…" : "验证 ICP 认证证明"}</button>
-                {!configuredRegistryId() && <p className="verify-muted" role="status">尚未部署可信登记簿 Canister，请由管理员配置 VITE_PROOF_REGISTRY_CANISTER_ID。此页面不会伪造成功结果。</p>}
-                {proofError && <p className="verify-error" role="alert">验证未通过：{proofError}</p>}
+                <button type="button" className="verify-primary" disabled={proofBusy || !configuredRegistryId() || !proofClaimId.trim() || !proofJson.trim() || !proofSchemaJson.trim()} onClick={() => void runCertifiedProof()}>{proofBusy ? "Verifying independently…" : "Verify ICP certified proof"}</button>
+                {!configuredRegistryId() && <p className="verify-muted" role="status">No trusted registry canister is configured. Ask the administrator to set VITE_PROOF_REGISTRY_CANISTER_ID. Verification is unavailable until configured.</p>}
+                {proofError && <p className="verify-error" role="alert">Verification failed: {proofError}</p>}
                 {proofResult && <div className="verify-result" role="status" aria-live="polite">
-                  <h3>{proofResult.status === "active" ? "ICP 登记与 Schema 已核验 · 最近状态 Active" : "ICP 认证记录已核验 · 当前不可作为有效证明"}</h3>
+                  <h3>{proofResult.status === "active" ? "ICP registration and schema verified · Recent status: Active" : "ICP certified record verified · Currently invalid as proof"}</h3>
                   <p className={proofResult.status === "active" ? "verify-status verified" : "verify-status revoked"}>
                     {proofResult.status === "active"
-                      ? "最近有效认证窗口内，Claim/Schema 摘要与 Merkle 证明一致。"
+                      ? "Claim and schema digests match the Merkle proofs within the recent valid certification window."
                       : proofResult.status === "revoked"
-                        ? "声明已被签发者撤销。"
+                        ? "The issuer has revoked this claim."
                         : proofResult.status === "issuer_suspended"
-                          ? "签发 Principal 已被管理者暂停。"
-                          : "用户已撤回授权，或这是一条没有有效授权的旧记录。"}
+                          ? "The administrator has suspended the issuer Principal."
+                          : "The user has withdrawn consent, or this is a legacy record without valid consent."}
                   </p>
-                  <div className="verify-kv"><span>签发 Principal</span><code>{proofResult.issuerPrincipal}</code></div>
+                  <div className="verify-kv"><span>Issuer Principal</span><code>{proofResult.issuerPrincipal}</code></div>
                   <div className="verify-kv"><span>Schema SHA-256</span><code>{proofResult.schemaSha256}</code></div>
-                  <div className="verify-kv"><span>Schema 验证</span><strong>认证摘要与数据符合要求</strong></div>
-                  <div className="verify-kv"><span>检验时间（本机）</span><strong>{new Date(proofResult.checkPerformedAt).toLocaleString()}</strong></div>
+                  <div className="verify-kv"><span>Schema verification</span><strong>Certified digest and data meet requirements</strong></div>
+                  <div className="verify-kv"><span>Check time (local device)</span><strong>{new Date(proofResult.checkPerformedAt).toLocaleString()}</strong></div>
                   <div className="verify-kv"><span>Claim SHA-256</span><code>{proofResult.claimSha256}</code></div>
-                  <div className="verify-kv"><span>登记状态</span><strong>{proofResult.status}</strong></div>
-                  <div className="verify-kv"><span>IC 认证证明</span><strong>已通过</strong></div>
-                  <div className="verify-kv"><span>机构/品牌身份</span><strong>未验证</strong></div>
-                  <div className="verify-kv"><span>Subject 身份对应关系</span><strong>未验证</strong></div>
-                  <div className="verify-kv"><span>业务事实真实性</span><strong>未验证</strong></div>
-                  <p className="verify-disclaimer">认证仅证明指定 Principal 登记的 Claim/Schema 摘要与最近认证状态相符。登记簿对提交前的具体摘要授权进行了检查，但不能单靠该证明确认 Subject 的现实身份、机构资质或事件真实性。证书允许最多一分钟时间偏差；转账和授权等高风险操作仍需新鲜共识检查。</p>
+                  <div className="verify-kv"><span>Registration status</span><strong>{proofResult.status}</strong></div>
+                  <div className="verify-kv"><span>IC certified proof</span><strong>Passed</strong></div>
+                  <div className="verify-kv"><span>Organization / brand identity</span><strong>Not verified</strong></div>
+                  <div className="verify-kv"><span>Subject identity binding</span><strong>Not verified</strong></div>
+                  <div className="verify-kv"><span>Factual accuracy</span><strong>Not verified</strong></div>
+                  <p className="verify-disclaimer">Certification only confirms that the Claim and schema digests registered by the specified Principal match the recent certified state. The registry checks consent for the exact digest before submission, but this proof alone does not establish the subject's real-world identity, organizational credentials, or factual accuracy. Certificates allow up to one minute of clock skew; high-risk actions such as transfers and authorizations still require a fresh consensus check.</p>
                 </div>}
               </div>
             )}
@@ -208,16 +208,16 @@ const Verify = () => {
 
           <aside className="verify-aside" aria-label="Verification limits">
             <div className="verify-info-card">
-              <h2>三类不同的证据</h2>
-              <div><strong>1. 来源</strong><p>谁签发了声明？签名、公钥与权限能否核实？</p></div>
-              <div><strong>2. 完整性</strong><p>原始字节是否与摘要匹配？链上登记状态是否有效？</p></div>
-              <div><strong>3. 真实性</strong><p>证据是否真的支持该事实？是否存在独立的反证？</p></div>
+              <h2>Three types of evidence</h2>
+              <div><strong>1. Source</strong><p>Who issued the claim? Can their signature, public key, and authority be verified?</p></div>
+              <div><strong>2. Integrity</strong><p>Do the original bytes match the digest? Is the on-chain registration valid?</p></div>
+              <div><strong>3. Factual accuracy</strong><p>Does the evidence support the claim? Is there independent evidence against it?</p></div>
             </div>
             <div className="verify-info-card">
-              <h2>当前工具的边界</h2>
-              <p>此版本提供本地 SHA-256、Claim 检查，以及配置后可用的 Claim + Schema 双重 ICP 认证摘要与失效状态验证。</p>
-              <p>尚未实现机构实名核验、完整 Schema 校验、用户授权与业务事实交叉印证。</p>
-              <p>任何缺少证据的结论必须标记为「未验证」，不能显示为「真实」。</p>
+              <h2>Current tool limits</h2>
+              <p>This version provides local SHA-256 hashing, Claim inspection, and, when configured, ICP-certified Claim and schema digest verification with invalidation status checks.</p>
+              <p>Organization identity checks, full schema validation, and cross-checking user consent against real-world facts are not yet implemented.</p>
+              <p>Conclusions without supporting evidence must be labeled “Not verified” and cannot be presented as fact.</p>
             </div>
           </aside>
         </div>

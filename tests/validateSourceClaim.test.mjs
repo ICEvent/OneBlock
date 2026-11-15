@@ -42,7 +42,7 @@ test("valid strict issuer-scoped claim and canonical hashes", async () => {
 test("issuer Principal, event ID and schema ID must all agree", () => {
   assert.throws(() => testCall({ ...claim, issuer_id: "fake-company" }), /issuer_id/);
   assert.throws(() => testCall({ ...claim, source_event_id: "b2".repeat(16) }), /source_event_id/);
-  assert.throws(() => testCall(claim, schema, issuer + "/invoice-abc"), /十六进制/);
+  assert.throws(() => testCall(claim, schema, issuer + "/invoice-abc"), /hexadecimal/);
   assert.throws(() => testCall(claim, { ...schema, $id: "fake.schema" }), /schema_id/);
 });
 
@@ -58,8 +58,8 @@ test("domain data and envelope must both pass 2020-12 validation", () => {
 test("person-linked claim needs a consent reference and timestamps must be valid", () => {
   assert.throws(() => testCall({ ...claim, subject: { ...claim.subject, kind: "person" } }), /OVDP/);
   assert.doesNotThrow(() => testCall({ ...claim, subject: { ...claim.subject, kind: "person" }, consent_ref: "private-consent-reference" }));
-  assert.throws(() => testCall({ ...claim, valid_until: "2020-01-01T00:00:00Z" }), /有效期/);
-  assert.throws(() => testCall({ ...claim, issued_at: "2099-01-01T00:00:00Z" }), /签发时间/);
+  assert.throws(() => testCall({ ...claim, valid_until: "2020-01-01T00:00:00Z" }), /expired/);
+  assert.throws(() => testCall({ ...claim, issued_at: "2099-01-01T00:00:00Z" }), /issue time/);
 });
 
 test("duplicate raw keys, external schema refs and malicious schema IDs are rejected", () => {
