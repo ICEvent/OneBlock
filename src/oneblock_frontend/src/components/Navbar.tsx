@@ -88,6 +88,7 @@ const Navbar = () => {
           {isAuthed ? (
             <>
               <Link to="/console" className={location.pathname === '/console' ? 'active' : ''}>Console</Link>
+              <Link to="/integrations" className={location.pathname === '/integrations' ? 'active' : ''}>Integrations</Link>
               <Link to="/policy" className={location.pathname === '/policy' ? 'active' : ''}>Policy</Link>
               <Link to="/oip" className={location.pathname === '/oip' ? 'active' : ''}>Identity model</Link>
               <button onClick={logout} className="logout-btn">Logout</button>
