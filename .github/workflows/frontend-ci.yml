@@ -15,6 +15,7 @@ on:
       - 'tests/viteBrowserGlobals.test.mjs'
       - 'tests/validateSourceClaim.test.mjs'
       - 'tests/integrations.test.mjs'
+      - 'tests/signedReadState.test.mjs'
       - '.github/workflows/frontend-ci.yml'
   push:
     branches:
@@ -31,6 +32,7 @@ on:
       - 'tests/viteBrowserGlobals.test.mjs'
       - 'tests/validateSourceClaim.test.mjs'
       - 'tests/integrations.test.mjs'
+      - 'tests/signedReadState.test.mjs'
       - '.github/workflows/frontend-ci.yml'
 
 jobs:
@@ -70,6 +72,9 @@ jobs:
 
       - name: Integration authorization and untrusted receipt checks
         run: node --experimental-strip-types --test tests/integrations.test.mjs
+
+      - name: Delegated P-256 request signing and polling regression
+        run: node --test tests/signedReadState.test.mjs
 
       - name: Build frontend
         working-directory: src/oneblock_frontend
