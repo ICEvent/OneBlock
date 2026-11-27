@@ -1,3 +1,4 @@
+import Error "mo:base/Error";
 import Prim "mo:prim";
 import Cycles "mo:base/ExperimentalCycles";
 import Nat "mo:base/Nat";
@@ -3357,9 +3358,7 @@ persistent actor {
     public query ({ caller }) func availableCycles() : async Nat {
         if (isAdmin(caller)) {
             return Cycles.balance()
-        } else {
-            return 0
-        }
+        } else { throw Error.reject("Not authorized to read runtime metrics") }
 
     };
 
@@ -3374,13 +3373,7 @@ persistent actor {
                 memory = Prim.rts_memory_size();
                 heap = Prim.rts_heap_size();
             }
-        } else {
-            {
-                cycles = 0;
-                memory = 0;
-                heap = 0;
-            }
-        }
+        } else { throw Error.reject("Not authorized to read runtime metrics") }
     };
 
     public shared ({ caller }) func addAdmin(pid : Text) : async Result.Result<Nat, Text> {
