@@ -3354,34 +3354,21 @@ persistent actor {
         }
     };
 
-    public query ({ caller }) func availableCycles() : async Nat {
-        if (isAdmin(caller)) {
-            return Cycles.balance()
-        } else {
-            return 0
-        }
+    public query func availableCycles() : async Nat {
+    Cycles.balance()
+  };
 
-    };
-
-    public query ({ caller }) func getSystemData() : async {
-        cycles : Nat;
-        memory : Nat;
-        heap : Nat;
-    } {
-        if (isAdmin(caller)) {
-            {
-                cycles = Cycles.balance();
-                memory = Prim.rts_memory_size();
-                heap = Prim.rts_heap_size();
-            }
-        } else {
-            {
-                cycles = 0;
-                memory = 0;
-                heap = 0;
-            }
-        }
-    };
+  public query func getSystemData() : async {
+    cycles : Nat;
+    memory : Nat;
+    heap : Nat;
+  } {
+    {
+      cycles = Cycles.balance();
+      memory = Prim.rts_memory_size();
+      heap = Prim.rts_heap_size();
+    }
+  };
 
     public shared ({ caller }) func addAdmin(pid : Text) : async Result.Result<Nat, Text> {
         if (isAdmin(caller)) {
